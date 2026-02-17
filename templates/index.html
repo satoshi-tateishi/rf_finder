@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; }
         .ch-btn { aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; position: relative; border-radius: 4px; border-width: 1px; }
@@ -47,59 +49,45 @@
             </div>
         </div>
 
-        <!-- Selected Facility Info -->
-        <div id="selected-facility-card" class="hidden bg-white p-4 rounded-lg shadow-sm mb-4 border-l-4 border-green-500">
-            <div class="flex justify-between items-start">
-                <div class="flex-1 min-w-0 pr-2">
-                    <h2 id="display-facility-name" class="font-bold text-gray-800 break-words flex flex-col gap-1"></h2>
-                    <p id="display-facility-address" class="text-[10px] text-gray-500 mt-1"></p>
-                </div>
-                <button onclick="clearSelection()" class="text-gray-300 hover:text-red-500 shrink-0">
-                    <i class="fa-solid fa-circle-xmark fa-lg"></i>
-                </button>
+        <!-- Keep List Section -->
+        <div id="keep-list-section" class="hidden bg-white p-4 rounded-lg shadow-sm mb-4">
+            <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-green-600"></i> キープリスト
+            </h3>
+            <div id="keep-list" class="space-y-2 mb-4">
+                <!-- Keep items dynamic -->
             </div>
         </div>
 
-        <!-- Frequency Grid Section -->
-        <div id="rf-section" class="hidden">
-            <div class="bg-white p-4 rounded-lg shadow-sm">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-gray-700">チャンネル空き状況</h3>
-                    <span class="text-[10px] text-gray-400">470 - 714 MHz</span>
+        <!-- Channel Selection Section -->
+        <div id="ch-selection-section" class="hidden space-y-4">
+            <!-- Legend -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border-t border-gray-100">
+                <p class="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wider">機種別対応帯域</p>
+                <div id="device-legend" class="flex flex-wrap gap-3 text-[10px] text-gray-600">
+                    <!-- Dynamic Legend -->
                 </div>
-
-                <div id="rf-grid" class="ch-grid">
-                    <!-- Dynamic Content -->
-                </div>
-
-                <!-- Legend -->
-                <div class="mt-6 pt-4 border-t border-gray-100">
-                    <p class="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wider">機種別対応帯域</p>
-                    <div id="device-legend" class="flex flex-wrap gap-3 text-[10px] text-gray-600">
-                        <!-- Dynamic Legend -->
-                    </div>
-                </div>
-                
                 <div class="mt-4 flex gap-2 text-[10px]">
                     <div class="flex items-center gap-1"><span class="w-2 h-1 bg-yellow-400 opacity-70"></span> ガードバンド (1MHz)</div>
                     <div class="flex items-center gap-1"><span class="w-2 h-1 bg-gray-200"></span> 使用不可</div>
                 </div>
             </div>
 
+            <div id="facility-channels-container" class="space-y-4">
+                <!-- Per-facility channel grids dynamic -->
+            </div>
+
             <!-- Action Buttons -->
-            <div class="mt-6 grid grid-cols-2 gap-3">
-                <button class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-file-csv"></i> WSM CSV
-                </button>
-                <button class="bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-file-pdf"></i> 運用調整届
+            <div class="mt-6">
+                <button onclick="goToAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                    <i class="fa-solid fa-paper-plane"></i> 運用調整連絡へ
                 </button>
             </div>
         </div>
 
         <div id="welcome-msg" class="text-center py-20 text-gray-300">
             <i class="fa-solid fa-building fa-4x mb-4 opacity-20"></i>
-            <p>施設を検索してください</p>
+            <p>施設を検索してキープリストに追加してください</p>
         </div>
 
     </div>
@@ -122,25 +110,56 @@
         const API_SEARCH = '/api/facilities/search/';
         const API_DETAIL = '/api/facilities/';
         
-        let selectedFacility = null;
-        let availableChannels = [];
+        let keepList = [];
         const devices = JSON.parse(document.getElementById('devices-data').textContent);
         
-        // デバイスの色設定
-        const deviceColors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
+        // デバイス名に基づく色設定
+        function getDeviceColor(name) {
+            if (name.includes('SR2050')) return '#f97316'; // オレンジ (Tailwind orange-500)
+            if (name.includes('3732') && name.includes('N')) return '#3b82f6'; // ブルー (Tailwind blue-500)
+            if (name.includes('3732') && name.includes('L')) return '#22c55e'; // グリーン (Tailwind green-500)
+            return '#94a3b8'; // デフォルト (gray-400)
+        }
 
-        // 凡例の生成
-        const legend = document.getElementById('device-legend');
-        devices.forEach((d, i) => {
-            const div = document.createElement('div');
-            div.className = 'flex items-center gap-1';
-            div.innerHTML = `<span class="w-2 h-2 rounded-full" style="background-color: ${deviceColors[i % deviceColors.length]}"></span> ${d.name}`;
-            legend.appendChild(div);
+        // Initial legend setup
+        window.addEventListener('DOMContentLoaded', () => {
+            const legend = document.getElementById('device-legend');
+            if (legend) {
+                devices.forEach((d) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center gap-1';
+                    div.innerHTML = `<span class="w-2 h-2 rounded-full" style="background-color: ${getDeviceColor(d.name)}"></span> ${d.name}`;
+                    legend.appendChild(div);
+                });
+            }
         });
 
         const searchInput = document.getElementById('facility-search-input');
         const resultsDiv = document.getElementById('search-results');
+        let sortable = null;
 
+        // Initialize Sortable on Keep List
+        function initSortable() {
+            const el = document.getElementById('keep-list');
+            if (sortable) sortable.destroy();
+            
+            sortable = Sortable.create(el, {
+                handle: '.drag-handle',
+                animation: 150,
+                onEnd: (evt) => {
+                    const movedItem = keepList.splice(evt.oldIndex, 1)[0];
+                    keepList.splice(evt.newIndex, 0, movedItem);
+                    renderKeepList(); // Update numbers
+                    
+                    // TVチャンネル選択UIが表示されている場合は、その順番も更新する
+                    if (!document.getElementById('ch-selection-section').classList.contains('hidden')) {
+                        renderChannelSelection();
+                    }
+                }
+            });
+        }
+
+        // Initial setup for search
         searchInput.addEventListener('input', async (e) => {
             const q = e.target.value;
             if (q.length < 2) { resultsDiv.classList.add('hidden'); return; }
@@ -149,85 +168,164 @@
                 const res = await fetch(`${API_SEARCH}?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 resultsDiv.innerHTML = '';
-                                        if (data.results && data.results.length > 0) {
-                                            data.results.forEach(f => {
-                                                const item = document.createElement('div');
-                                                item.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0';
-                                                const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
-                                                const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
-                                                
-                                                item.innerHTML = `
-                                                    <div class="flex flex-col gap-1">
-                                                        <div class="flex items-center gap-1 flex-wrap">
-                                                            <span class="font-bold text-sm text-gray-800">${f.name}</span>
-                                                            ${categoryBadge}
-                                                            ${areaBadge}
-                                                        </div>
-                                                        <div class="text-[10px] text-gray-400">${f.address}</div>
-                                                    </div>
-                                                `;
-                                                item.onclick = () => selectFacility(f);
-                                                resultsDiv.appendChild(item);
-                                            });
-                                            resultsDiv.classList.remove('hidden');
-                                        } else {
-                                                resultsDiv.classList.add('hidden');
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(f => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0';
+                        const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
+                        const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
+                        
+                        item.innerHTML = `
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                                    ${categoryBadge}
+                                    ${areaBadge}
+                                </div>
+                                <div class="text-[10px] text-gray-400">${f.address}</div>
+                            </div>
+                        `;
+                        item.onclick = () => addToKeepList(f);
+                        resultsDiv.appendChild(item);
+                    });
+                    resultsDiv.classList.remove('hidden');
+                } else {
+                    resultsDiv.classList.add('hidden');
                 }
             } catch (err) { console.error(err); }
         });
 
-        async function selectFacility(f) {
-            selectedFacility = f;
+        async function addToKeepList(f) {
             resultsDiv.classList.add('hidden');
             searchInput.value = '';
             
-            // 施設名とバッジのレイアウト
-            const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap align-middle">${f.category}</span>` : '';
-            const areaBadge = f.applied_area ? `<span class="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded border border-blue-200 whitespace-nowrap align-middle">${f.applied_area}</span>` : '';
+            // 重複チェック
+            if (!keepList.find(item => item.id === f.id)) {
+                // 詳細情報を取得（利用可能周波数など）
+                try {
+                    const res = await fetch(`${API_DETAIL}${f.id}/`);
+                    const data = await res.json();
+                    
+                    keepList.push({ 
+                        ...f, 
+                        selectedChannels: [], 
+                        availableChannels: data.available_channels 
+                    });
+                    renderKeepList();
+                    renderChannelSelection();
+                    document.getElementById('ch-selection-section').classList.remove('hidden');
+                } catch (err) {
+                    console.error('Error fetching facility details:', err);
+                }
+            }
             
-            document.getElementById('display-facility-name').innerHTML = `
-                <div class="inline-block">
-                    <span class="text-lg leading-tight align-middle mr-1">${f.name}</span>
-                    <span class="inline-flex gap-1 align-middle">
-                        ${categoryBadge}
-                        ${areaBadge}
-                    </span>
-                </div>
-            `;
-            
-            document.getElementById('display-facility-address').innerText = f.address;
-            document.getElementById('selected-facility-card').classList.remove('hidden');
-            document.getElementById('rf-section').classList.remove('hidden');
             document.getElementById('welcome-msg').classList.add('hidden');
+            document.getElementById('keep-list-section').classList.remove('hidden');
+        }
+
+        function removeFromKeepList(id) {
+            keepList = keepList.filter(f => f.id !== id);
+            renderKeepList();
             
-            const res = await fetch(`${API_DETAIL}${f.id}/`);
-            const data = await res.json();
-            availableChannels = data.available_channels;
-            renderRFGrid();
+            if (keepList.length === 0) {
+                document.getElementById('keep-list-section').classList.add('hidden');
+                document.getElementById('welcome-msg').classList.remove('hidden');
+                document.getElementById('ch-selection-section').classList.add('hidden');
+            } else {
+                renderChannelSelection();
+            }
         }
 
-        function clearSelection() {
-            selectedFacility = null;
-            document.getElementById('selected-facility-card').classList.add('hidden');
-            document.getElementById('rf-section').classList.add('hidden');
-            document.getElementById('welcome-msg').classList.remove('hidden');
+        function renderKeepList() {
+            const container = document.getElementById('keep-list');
+            container.innerHTML = '';
+            
+            keepList.forEach((f, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100';
+                
+                const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
+                const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
+
+                div.innerHTML = `
+                    <div class="drag-handle text-gray-400 cursor-grab active:cursor-grabbing px-1 py-2">
+                        <i class="fa-solid fa-grip-vertical"></i>
+                    </div>
+                    <div class="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold shrink-0">
+                        ${index + 1}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-1 flex-wrap">
+                                <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                                ${categoryBadge}
+                                ${areaBadge}
+                            </div>
+                            <div class="text-[10px] text-gray-400">${f.address}</div>
+                        </div>
+                    </div>
+                    <button onclick="removeFromKeepList(${f.id})" class="text-gray-300 hover:text-red-500 shrink-0">
+                        <i class="fa-solid fa-circle-xmark fa-lg"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+            initSortable();
         }
 
-        function renderRFGrid() {
-            const grid = document.getElementById('rf-grid');
-            grid.innerHTML = '';
+        function renderChannelSelection() {
+            const container = document.getElementById('facility-channels-container');
+            container.innerHTML = '';
+            
+            keepList.forEach(f => {
+                const section = document.createElement('div');
+                section.className = 'bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500';
+                
+                const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
+                const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
+
+                section.innerHTML = `
+                    <div class="mb-4">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-1 flex-wrap">
+                                <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                                ${categoryBadge}
+                                ${areaBadge}
+                            </div>
+                            <div class="text-[10px] text-gray-400">${f.address}</div>
+                        </div>
+                    </div>
+                    <div id="grid-${f.id}" class="ch-grid"></div>
+                `;
+                
+                container.appendChild(section);
+                renderRFGrid(f, document.getElementById(`grid-${f.id}`));
+            });
+        }
+
+        function renderRFGrid(facility, gridElement) {
+            gridElement.innerHTML = '';
             
             for (let ch = 13; ch <= 53; ch++) {
-                const chData = availableChannels.find(c => c.channel === ch);
+                const chData = facility.availableChannels.find(c => c.channel === ch);
                 const base_start = 470000 + (ch - 13) * 6000;
                 const base_end = base_start + 6000;
 
                 const btn = document.createElement('div');
-                btn.className = `ch-btn ${chData ? 'available' : 'disabled'}`;
+                const isSelected = facility.selectedChannels.includes(ch);
+                btn.className = `ch-btn ${chData ? 'available' : 'disabled'} ${isSelected ? 'selected' : ''}`;
                 btn.innerHTML = `<span>${ch}</span>`;
                 
                 if (chData) {
-                    btn.onclick = () => btn.classList.toggle('selected');
+                    btn.onclick = () => {
+                        if (facility.selectedChannels.includes(ch)) {
+                            facility.selectedChannels = facility.selectedChannels.filter(c => c !== ch);
+                            btn.classList.remove('selected');
+                        } else {
+                            facility.selectedChannels.push(ch);
+                            btn.classList.add('selected');
+                        }
+                    };
                     
                     // ガードバンド表示 (上部にライン)
                     if (chData.gb_lower > 0) {
@@ -249,23 +347,35 @@
                     const indicators = document.createElement('div');
                     indicators.className = 'device-indicators';
                     
-                    devices.forEach((d, i) => {
+                    devices.forEach((d) => {
                         const overlap_min = Math.max(d.min, base_start);
                         const overlap_max = Math.min(d.max, base_end);
                         
+                        const bar = document.createElement('div');
+                        bar.className = 'device-bar';
+                        
                         if (overlap_min < overlap_max) {
-                            const bar = document.createElement('div');
-                            bar.className = 'device-bar';
-                            bar.style.backgroundColor = deviceColors[i % deviceColors.length];
+                            // 対応している場合
+                            bar.style.backgroundColor = getDeviceColor(d.name);
                             bar.style.width = `${(overlap_max - overlap_min) / 6000 * 100}%`;
                             bar.style.marginLeft = `${(overlap_min - base_start) / 6000 * 100}%`;
-                            indicators.appendChild(bar);
+                        } else {
+                            // 対応していない場合（透明なバーを置いて高さを確保）
+                            bar.style.backgroundColor = 'transparent';
+                            bar.style.width = '100%';
                         }
+                        indicators.appendChild(bar);
                     });
                     btn.appendChild(indicators);
                 }
-                grid.appendChild(btn);
+                gridElement.appendChild(btn);
             }
+        }
+
+        function goToAdjustment() {
+            // 次のフェーズの実装
+            console.log('Adjustment request with keepList:', keepList);
+            alert('運用調整連絡への遷移（未実装）');
         }
     </script>
 </body>

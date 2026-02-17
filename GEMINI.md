@@ -36,3 +36,7 @@
    - LINE WORKSトークルームへの送信。
    - 特ラ機構への自動メール送信（ユーザーCC込み）。
    - ゼンハイザーWSM用CSV（セミコロン区切り）出力。
+
+## 5. ドキュメント
+- **パス**: /Users/satoshi/rf_finder/docs
+- **進捗状況**: /Users/satoshi/rf_finder/docs/PHASES.md

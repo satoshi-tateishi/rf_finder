@@ -1,11 +1,21 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
+from django.db.models import Case, When, Q
 from .models import Facility, WirelessEquipment
 from .services import calculate_available_frequencies
 
 def index(request):
     """メイン画面（検索・視覚化）を表示"""
-    devices = WirelessEquipment.objects.all().order_by('model_name')
+    # ユーザー指定の順序: SR2050 (上) -> EM 3732 N (中) -> EM 3732 L (下)
+    # 文字列の不一致を避けるため icontains を使用
+    devices = WirelessEquipment.objects.annotate(
+        custom_order=Case(
+            When(model_name__icontains='SR2050', then=0),
+            When(Q(model_name__icontains='3732') & Q(model_name__icontains='N'), then=1),
+            When(Q(model_name__icontains='3732') & Q(model_name__icontains='L'), then=2),
+            default=3
+        )
+    ).order_by('custom_order', 'model_name')
     return render(request, 'index.html', {'devices': devices})
 
 def facility_search(request):

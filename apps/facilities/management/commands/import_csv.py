@@ -8,10 +8,12 @@ class Command(BaseCommand):
     help = 'Import facility and device data from CSV files (Replaces existing data)'
 
     def handle(self, *args, **options):
-        csv_dir = '/code/csv'
+        # BASE_DIR から相対的に csv ディレクトリを取得するように修正
+        from django.conf import settings
+        csv_dir = os.path.join(settings.BASE_DIR, 'csv')
         
         with transaction.atomic():
-            # 既存データの全削除
+            # 既存データの全削除 (TRUNCATE 相当)
             self.stdout.write('Clearing existing data...')
             WirelessEquipment.objects.all().delete()
             Facility.objects.all().delete() # TVChannelStatusもCASCADEで削除される
@@ -19,14 +21,14 @@ class Command(BaseCommand):
             # 1. Import Devices
             self.import_devices(os.path.join(csv_dir, 'devices.csv'))
             
-            # 2. Import Locations
-            self.import_locations(os.path.join(csv_dir, 'locations.csv'))
+            # 2. Import Locations (郵便番号入りを使用)
+            self.import_locations(os.path.join(csv_dir, 'locations_with_zip.csv'))
 
         self.stdout.write(self.style.SUCCESS('Successfully imported all data'))
 
     def import_devices(self, file_path):
         self.stdout.write(f'Importing devices from {file_path}...')
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 WirelessEquipment.objects.create(
@@ -38,7 +40,7 @@ class Command(BaseCommand):
 
     def import_locations(self, file_path):
         self.stdout.write(f'Importing locations from {file_path}...')
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 # 施設情報の作成
