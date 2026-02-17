@@ -32,7 +32,8 @@ def facility_search(request):
             'address': f.address,
             'prefecture': f.prefecture,
             'applied_area': f.applied_area,
-            'category': f.category
+            'category': f.category,
+            'zip_code': f.external_id
         } for f in facilities
     ]
     return JsonResponse({'results': results})
@@ -51,6 +52,7 @@ def facility_detail(request, facility_id):
             'id': facility.id,
             'name': facility.name,
             'address': facility.address,
+            'zip_code': facility.external_id
         },
         'available_channels': available_channels
     })
