@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RF Finder - 特ラ運用調整支援</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; }
+        .ch-btn { aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; position: relative; border-radius: 4px; border-width: 1px; }
+        .ch-btn.disabled { background-color: #f3f4f6; color: #d1d5db; border-color: #e5e7eb; cursor: not-allowed; }
+        .ch-btn.available { background-color: white; border-color: #d1d5db; color: #374151; }
+        .ch-btn.available:hover { border-color: #3b82f6; background-color: #eff6ff; }
+        .ch-btn.selected { background-color: #dcfce7; color: #166534; font-weight: bold; border-color: #22c55e; border-width: 2px; }
+        
+        .device-indicators { position: absolute; bottom: 2px; left: 2px; right: 2px; display: flex; flex-direction: column; gap: 1px; }
+        .device-bar { height: 3px; border-radius: 1px; }
+        
+        /* ガードバンド表示 */
+        .gb-indicator { position: absolute; top: 0; height: 3px; background-color: #fbbf24; opacity: 0.7; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen pb-20">
+
+    <!-- Header -->
+    <nav class="bg-[#00c300] text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-tower-broadcast"></i> RF Finder
+            </h1>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 max-w-2xl">
+        
+        <!-- Search Section -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-4">
+            <label class="block text-sm font-bold text-gray-700 mb-2">施設検索</label>
+            <div class="relative">
+                <input type="text" id="facility-search-input" 
+                    class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
+                    placeholder="施設名、住所を入力...">
+                <div id="search-results" class="absolute w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 hidden max-h-60 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Selected Facility Info -->
+        <div id="selected-facility-card" class="hidden bg-white p-4 rounded-lg shadow-sm mb-4 border-l-4 border-green-500">
+            <div class="flex justify-between items-start">
+                <div class="flex-1 min-w-0 pr-2">
+                    <h2 id="display-facility-name" class="font-bold text-gray-800 break-words flex flex-col gap-1"></h2>
+                    <p id="display-facility-address" class="text-[10px] text-gray-500 mt-1"></p>
+                </div>
+                <button onclick="clearSelection()" class="text-gray-300 hover:text-red-500 shrink-0">
+                    <i class="fa-solid fa-circle-xmark fa-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Frequency Grid Section -->
+        <div id="rf-section" class="hidden">
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-700">チャンネル空き状況</h3>
+                    <span class="text-[10px] text-gray-400">470 - 714 MHz</span>
+                </div>
+
+                <div id="rf-grid" class="ch-grid">
+                    <!-- Dynamic Content -->
+                </div>
+
+                <!-- Legend -->
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <p class="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wider">機種別対応帯域</p>
+                    <div id="device-legend" class="flex flex-wrap gap-3 text-[10px] text-gray-600">
+                        <!-- Dynamic Legend -->
+                    </div>
+                </div>
+                
+                <div class="mt-4 flex gap-2 text-[10px]">
+                    <div class="flex items-center gap-1"><span class="w-2 h-1 bg-yellow-400 opacity-70"></span> ガードバンド (1MHz)</div>
+                    <div class="flex items-center gap-1"><span class="w-2 h-1 bg-gray-200"></span> 使用不可</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 grid grid-cols-2 gap-3">
+                <button class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-csv"></i> WSM CSV
+                </button>
+                <button class="bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-pdf"></i> 運用調整届
+                </button>
+            </div>
+        </div>
+
+        <div id="welcome-msg" class="text-center py-20 text-gray-300">
+            <i class="fa-solid fa-building fa-4x mb-4 opacity-20"></i>
+            <p>施設を検索してください</p>
+        </div>
+
+    </div>
+
+    <!-- Device Data -->
+    <script id="devices-data" type="application/json">
+        [
+            {% for device in devices %}
+            {
+                "id": {{ device.id }},
+                "name": "{{ device.model_name }}",
+                "min": {{ device.min_frequency }},
+                "max": {{ device.max_frequency }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    </script>
+
+    <script>
+        const API_SEARCH = '/api/facilities/search/';
+        const API_DETAIL = '/api/facilities/';
+        
+        let selectedFacility = null;
+        let availableChannels = [];
+        const devices = JSON.parse(document.getElementById('devices-data').textContent);
+        
+        // デバイスの色設定
+        const deviceColors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+        // 凡例の生成
+        const legend = document.getElementById('device-legend');
+        devices.forEach((d, i) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-1';
+            div.innerHTML = `<span class="w-2 h-2 rounded-full" style="background-color: ${deviceColors[i % deviceColors.length]}"></span> ${d.name}`;
+            legend.appendChild(div);
+        });
+
+        const searchInput = document.getElementById('facility-search-input');
+        const resultsDiv = document.getElementById('search-results');
+
+        searchInput.addEventListener('input', async (e) => {
+            const q = e.target.value;
+            if (q.length < 2) { resultsDiv.classList.add('hidden'); return; }
+
+            try {
+                const res = await fetch(`${API_SEARCH}?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                resultsDiv.innerHTML = '';
+                                        if (data.results && data.results.length > 0) {
+                                            data.results.forEach(f => {
+                                                const item = document.createElement('div');
+                                                item.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0';
+                                                const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
+                                                const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
+                                                
+                                                item.innerHTML = `
+                                                    <div class="flex flex-col gap-1">
+                                                        <div class="flex items-center gap-1 flex-wrap">
+                                                            <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                                                            ${categoryBadge}
+                                                            ${areaBadge}
+                                                        </div>
+                                                        <div class="text-[10px] text-gray-400">${f.address}</div>
+                                                    </div>
+                                                `;
+                                                item.onclick = () => selectFacility(f);
+                                                resultsDiv.appendChild(item);
+                                            });
+                                            resultsDiv.classList.remove('hidden');
+                                        } else {
+                                                resultsDiv.classList.add('hidden');
+                }
+            } catch (err) { console.error(err); }
+        });
+
+        async function selectFacility(f) {
+            selectedFacility = f;
+            resultsDiv.classList.add('hidden');
+            searchInput.value = '';
+            
+            // 施設名とバッジのレイアウト
+            const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap align-middle">${f.category}</span>` : '';
+            const areaBadge = f.applied_area ? `<span class="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded border border-blue-200 whitespace-nowrap align-middle">${f.applied_area}</span>` : '';
+            
+            document.getElementById('display-facility-name').innerHTML = `
+                <div class="inline-block">
+                    <span class="text-lg leading-tight align-middle mr-1">${f.name}</span>
+                    <span class="inline-flex gap-1 align-middle">
+                        ${categoryBadge}
+                        ${areaBadge}
+                    </span>
+                </div>
+            `;
+            
+            document.getElementById('display-facility-address').innerText = f.address;
+            document.getElementById('selected-facility-card').classList.remove('hidden');
+            document.getElementById('rf-section').classList.remove('hidden');
+            document.getElementById('welcome-msg').classList.add('hidden');
+            
+            const res = await fetch(`${API_DETAIL}${f.id}/`);
+            const data = await res.json();
+            availableChannels = data.available_channels;
+            renderRFGrid();
+        }
+
+        function clearSelection() {
+            selectedFacility = null;
+            document.getElementById('selected-facility-card').classList.add('hidden');
+            document.getElementById('rf-section').classList.add('hidden');
+            document.getElementById('welcome-msg').classList.remove('hidden');
+        }
+
+        function renderRFGrid() {
+            const grid = document.getElementById('rf-grid');
+            grid.innerHTML = '';
+            
+            for (let ch = 13; ch <= 53; ch++) {
+                const chData = availableChannels.find(c => c.channel === ch);
+                const base_start = 470000 + (ch - 13) * 6000;
+                const base_end = base_start + 6000;
+
+                const btn = document.createElement('div');
+                btn.className = `ch-btn ${chData ? 'available' : 'disabled'}`;
+                btn.innerHTML = `<span>${ch}</span>`;
+                
+                if (chData) {
+                    btn.onclick = () => btn.classList.toggle('selected');
+                    
+                    // ガードバンド表示 (上部にライン)
+                    if (chData.gb_lower > 0) {
+                        const gb = document.createElement('div');
+                        gb.className = 'gb-indicator';
+                        gb.style.left = '0';
+                        gb.style.width = `${(chData.gb_lower / 6000) * 100}%`;
+                        btn.appendChild(gb);
+                    }
+                    if (chData.gb_upper > 0) {
+                        const gb = document.createElement('div');
+                        gb.className = 'gb-indicator';
+                        gb.style.right = '0';
+                        gb.style.width = `${(chData.gb_upper / 6000) * 100}%`;
+                        btn.appendChild(gb);
+                    }
+
+                    // デバイスインジケーター (下部にライン)
+                    const indicators = document.createElement('div');
+                    indicators.className = 'device-indicators';
+                    
+                    devices.forEach((d, i) => {
+                        const overlap_min = Math.max(d.min, base_start);
+                        const overlap_max = Math.min(d.max, base_end);
+                        
+                        if (overlap_min < overlap_max) {
+                            const bar = document.createElement('div');
+                            bar.className = 'device-bar';
+                            bar.style.backgroundColor = deviceColors[i % deviceColors.length];
+                            bar.style.width = `${(overlap_max - overlap_min) / 6000 * 100}%`;
+                            bar.style.marginLeft = `${(overlap_min - base_start) / 6000 * 100}%`;
+                            indicators.appendChild(bar);
+                        }
+                    });
+                    btn.appendChild(indicators);
+                }
+                grid.appendChild(btn);
+            }
+        }
+    </script>
+</body>
+</html>

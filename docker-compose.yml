@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: rf_finder_db
+    restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: rf_finder
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - rf_network
+
+  web:
+    build: .
+    container_name: rf_finder_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/code
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=mysql://user:password@db:3306/rf_finder
+      - EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USE_TLS=True
+      - EMAIL_HOST_USER=your_email@example.com
+      - EMAIL_HOST_PASSWORD=your_password
+    depends_on:
+      - db
+    networks:
+      - rf_network
+
+  nginx:
+    image: nginx:latest
+    container_name: rf_finder_nginx
+    ports:
+      - "8084:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./static:/static
+      - ./media:/media
+    depends_on:
+      - web
+    networks:
+      - rf_network
+
+networks:
+  rf_network:
+    driver: bridge
+
+volumes:
+  mysql_data:

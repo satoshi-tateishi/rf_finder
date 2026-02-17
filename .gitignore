@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.venv/
+venv/
+ENV/
+*.egg-info/
+.installed.cfg
+*.egg
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Sensitive data
+.env
+*.key
+*.pem
+
+# Project Data & Docker
+mysql_data/
+static/
+media/
+db.sqlite3
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+
+# IDEs & Tools
+.vscode/
+.idea/
+.gemini/
+*.swp
+*.swo
+
+# Project Specific
+docs/PHASES.md
+csv/
+sample_app/
