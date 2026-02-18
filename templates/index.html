@@ -312,7 +312,9 @@
             for (let ch = 13; ch <= 53; ch++) {
                 const chData = facility.availableChannels.find(c => c.channel === ch);
                 const base_start = 470000 + (ch - 13) * 6000;
-                const base_end = base_start + 6000;
+                // ch53は710-714MHz (A帯) のため、4MHz幅とする
+                const chWidth = (ch === 53) ? 4000 : 6000;
+                const base_end = base_start + chWidth;
 
                 const btn = document.createElement('div');
                 const isSelected = facility.selectedChannels.includes(ch);
@@ -335,14 +337,14 @@
                         const gb = document.createElement('div');
                         gb.className = 'gb-indicator';
                         gb.style.left = '0';
-                        gb.style.width = `${(chData.gb_lower / 6000) * 100}%`;
+                        gb.style.width = `${(chData.gb_lower / chWidth) * 100}%`;
                         btn.appendChild(gb);
                     }
                     if (chData.gb_upper > 0) {
                         const gb = document.createElement('div');
                         gb.className = 'gb-indicator';
                         gb.style.right = '0';
-                        gb.style.width = `${(chData.gb_upper / 6000) * 100}%`;
+                        gb.style.width = `${(chData.gb_upper / chWidth) * 100}%`;
                         btn.appendChild(gb);
                     }
 
@@ -360,8 +362,8 @@
                         if (overlap_min < overlap_max) {
                             // 対応している場合
                             bar.style.backgroundColor = getDeviceColor(d.name);
-                            bar.style.width = `${(overlap_max - overlap_min) / 6000 * 100}%`;
-                            bar.style.marginLeft = `${(overlap_min - base_start) / 6000 * 100}%`;
+                            bar.style.width = `${(overlap_max - overlap_min) / chWidth * 100}%`;
+                            bar.style.marginLeft = `${(overlap_min - base_start) / chWidth * 100}%`;
                         } else {
                             // 対応していない場合（透明なバーを置いて高さを確保）
                             bar.style.backgroundColor = 'transparent';

@@ -38,6 +38,9 @@ class TVChannelStatus(models.Model):
     @property
     def frequency_end_khz(self):
         """チャンネルの終了周波数 (kHz)"""
+        # ch53は710-714MHz (A帯) のため、4MHz幅とする
+        if self.channel_number == 53:
+            return self.frequency_start_khz + 4000
         return self.frequency_start_khz + 6000
 
 class WirelessEquipment(models.Model):
