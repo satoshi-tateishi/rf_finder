@@ -174,7 +174,7 @@
                         item.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0';
                         const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
                         const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
-                        const zipDisplay = f.zip_code ? `<span class="mr-1">〒${f.zip_code}</span>` : '';
+                        const zipDisplay = f.postal_code ? `<span class="mr-1">〒${f.postal_code}</span>` : '';
                         
                         item.innerHTML = `
                             <div class="flex flex-col gap-1">
@@ -247,7 +247,7 @@
                 
                 const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
                 const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
-                const zipDisplay = f.zip_code ? `<span class="mr-1">〒${f.zip_code}</span>` : '';
+                const zipDisplay = f.postal_code ? `<span class="mr-1">〒${f.postal_code}</span>` : '';
 
                 div.innerHTML = `
                     <div class="drag-handle text-gray-400 cursor-grab active:cursor-grabbing px-1 py-2">
@@ -285,7 +285,7 @@
                 
                 const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
                 const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
-                const zipDisplay = f.zip_code ? `<span class="mr-1">〒${f.zip_code}</span>` : '';
+                const zipDisplay = f.postal_code ? `<span class="mr-1">〒${f.postal_code}</span>` : '';
 
                 section.innerHTML = `
                     <div class="mb-4">

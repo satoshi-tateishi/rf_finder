@@ -1,0 +1,29 @@
+/* static/css/export_custom.css */
+
+/* カラム選択に関連する全てのコンテナを非表示にする */
+div.selectable-field-export-row,
+.selectable-field-export-row,
+.selectable-field-export-row > div,
+.selectable-field-export-row > label,
+.selectable-field-export-row > p {
+    display: none !important;
+}
+
+/* 説明文 ("This exporter will export the following fields:") を非表示 */
+form#content-main fieldset p,
+#content form fieldset p {
+    display: none !important;
+}
+
+/* フィールドセット全体の余白調整 */
+fieldset.module {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* チェックボックスそのもの（念のため） */
+input[type="checkbox"][name*="resource"],
+input[type="checkbox"].select-toggle {
+    display: none !important;
+}

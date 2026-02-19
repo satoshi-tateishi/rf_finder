@@ -50,7 +50,7 @@ class Command(BaseCommand):
                     prefecture=row['都道府県名'],
                     category=row['屋内外'],
                     applied_area=row.get('適用エリア'),
-                    external_id=row.get('郵便番号'),
+                    postal_code=row.get('郵便番号'),
                 )
                 
                 # チャンネルステータスの作成 (ch13 - ch53)

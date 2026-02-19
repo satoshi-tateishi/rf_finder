@@ -63,11 +63,18 @@ def find_zip_code(prefecture, address):
     return ""
 
 class FacilityResource(resources.ModelResource):
-    # CH状態をエクスポートに含めるための設定
+    # インポート用CSVのヘッダー名に合わせる
+    postal_code = fields.Field(attribute='postal_code', column_name='郵便番号')
+    prefecture = fields.Field(attribute='prefecture', column_name='都道府県名')
+    address = fields.Field(attribute='address', column_name='住所')
+    name = fields.Field(attribute='name', column_name='施設名')
+    category = fields.Field(attribute='category', column_name='屋内外')
+    applied_area = fields.Field(attribute='applied_area', column_name='適用エリア')
+
     class Meta:
         model = Facility
-        fields = ('id', 'name', 'prefecture', 'address', 'category', 'applied_area', 'external_id')
-        export_order = ('id', 'name', 'prefecture', 'address', 'category', 'applied_area', 'external_id') + tuple(f'{ch}CH' for ch in range(13, 54))
+        fields = ('postal_code', 'prefecture', 'address', 'name', 'category', 'applied_area')
+        export_order = ('postal_code', 'prefecture', 'address', 'name', 'category', 'applied_area') + tuple(f'{ch}CH' for ch in range(13, 54))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -76,38 +83,44 @@ class FacilityResource(resources.ModelResource):
             field_name = f'{ch}CH'
             self.fields[field_name] = fields.Field(column_name=field_name, attribute=None)
 
-    def export_field(self, field, obj):
-        if field.column_name.endswith('CH'):
-            ch_num = int(field.column_name.replace('CH', ''))
-            status = obj.channels.filter(channel_number=ch_num).first()
-            if status:
-                return '○' if status.is_available else ''
+    def export(self, queryset=None, *args, **kwargs):
+        if queryset is not None:
+            queryset = queryset.prefetch_related('channels')
+        return super().export(queryset, *args, **kwargs)
+
+    def export_resource(self, obj, **kwargs):
+        self._current_obj_channels = {c.channel_number: c.is_available for c in obj.channels.all()}
+        return super().export_resource(obj, **kwargs)
+
+    def export_field(self, field, obj, **kwargs):
+        if hasattr(field, 'column_name') and str(field.column_name).endswith('CH'):
+            try:
+                ch_num = int(str(field.column_name).replace('CH', ''))
+                if getattr(self, '_current_obj_channels', {}).get(ch_num):
+                    return '○'
+            except (ValueError, AttributeError):
+                pass
             return ''
-        return super().export_field(field, obj)
+        return super().export_field(field, obj, **kwargs)
 
     def before_save_instance(self, instance, using_transactions, dry_run):
-        # 郵便番号が空の場合、住所から自動計算
-        if not instance.external_id or instance.external_id == "":
-            instance.external_id = find_zip_code(instance.prefecture, instance.address)
+        if not instance.postal_code or instance.postal_code == "":
+            instance.postal_code = find_zip_code(instance.prefecture, instance.address)
 
     def after_save_instance(self, instance, using_transactions, dry_run):
         if dry_run:
             return
-            
-        # インポート行データからCH状態を抽出して保存
         if hasattr(self, 'current_row'):
             row = self.current_row
             for ch in range(13, 54):
                 ch_key = f'{ch}CH'
                 is_available = False
-                
                 if ch == 53:
                     is_available = True
                 elif ch_key in row:
                     val = str(row[ch_key]).strip()
                     if val in ['○', '1', 'available']:
                         is_available = True
-                
                 TVChannelStatus.objects.update_or_create(
                     facility=instance,
                     channel_number=ch,

@@ -7,8 +7,8 @@ class Facility(models.Model):
     address = models.TextField(verbose_name="住所")
     category = models.CharField(max_length=100, verbose_name="施設カテゴリ")
     applied_area = models.CharField(max_length=255, verbose_name="適用エリア", null=True, blank=True)
-    # CSVインポート時の名寄せ用キー (例: 総務省ID等)
-    external_id = models.CharField(max_length=100, null=True, blank=True)
+    # 郵便番号 (住所から自動算出またはCSVインポート)
+    postal_code = models.CharField(max_length=100, null=True, blank=True, verbose_name="郵便番号")
 
     class Meta:
         verbose_name = "施設"

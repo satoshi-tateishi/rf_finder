@@ -1,0 +1,63 @@
+{% extends "admin/import_export/base.html" %}
+{% load i18n admin_urls import_export_tags %}
+
+{% block title %}エクスポート: {{ opts.verbose_name_plural }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content_title %}<h1>エクスポート: {{ opts.verbose_name_plural }}</h1>{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* カラム選択に関連する全ての要素を強制非表示 */
+    .selectable-field-export-row,
+    .selectable-field-export-row + div,
+    input[type="checkbox"][name*="resource"],
+    .select-toggle,
+    label[for^="id_facilityresource"] {
+        display: none !important;
+    }
+    /* 説明文も非表示 */
+    #content-main form fieldset p {
+        display: none !important;
+    }
+    /* 余白調整 */
+    fieldset.module {
+        border: none !important;
+        padding: 0 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<form action="" method="POST">
+  {% csrf_token %}
+  
+  {% block form_top %}{% endblock %}
+
+  <fieldset class="module">
+    {% for field in form %}
+      {% if field.is_hidden %}
+        {{ field }}
+      {% else %}
+        {% if "resource" in field.name or "select-all-toggle" in field.name %}
+          {# カラム選択フィールドは非表示のまま出力（値は送信される必要があるため） #}
+          <div style="display:none;">{{ field }}</div>
+        {% else %}
+          <div class="form-row {{ field.id_for_label }}">
+            {{ field.errors }}
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+              <p class="help">{{ field.help_text|safe }}</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </fieldset>
+
+  <div class="submit-row">
+    <input type="submit" class="default" value="{% trans 'Submit' %}">
+  </div>
+</form>
+{% endblock %}

@@ -24,7 +24,7 @@ htmlcov/
 
 # Project Data & Docker
 mysql_data/
-static/
+# static/
 media/
 db.sqlite3
 *.log
@@ -44,3 +44,4 @@ db.sqlite3
 # Project Specific
 csv/
 sample_app/
+.playwright-mcp/

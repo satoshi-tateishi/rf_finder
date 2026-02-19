@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django import forms
 from django.utils.html import format_html
 from django.db.models import Case, When, Q
 from import_export.admin import ImportExportModelAdmin
@@ -33,10 +34,11 @@ class PrefectureJisFilter(admin.SimpleListFilter):
 @admin.register(Facility)
 class FacilityAdmin(ImportExportModelAdmin):
     resource_class = FacilityResource
+    export_template_name = 'admin/import_export/export.html'
     list_display = ('get_facility_info',)
     list_display_links = ('get_facility_info',)
     ordering = ('id',)
-    search_fields = ('name', 'address', 'external_id')
+    search_fields = ('name', 'address', 'postal_code')
     list_filter = (PrefectureJisFilter, 'category')
     
     readonly_fields = ('facility_info_card', 'channel_grid')
@@ -57,6 +59,9 @@ class FacilityAdmin(ImportExportModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def get_export_form(self, request):
+        return super().get_export_form(request)
 
     class Media:
         js = ('js/admin_row_click.js',)
@@ -80,7 +85,7 @@ class FacilityAdmin(ImportExportModelAdmin):
             obj.applied_area
         ) if obj.applied_area else ""
         
-        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.external_id) if obj.external_id else ""
+        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ""
         
         return format_html(
             '{}'
@@ -114,7 +119,7 @@ class FacilityAdmin(ImportExportModelAdmin):
             obj.applied_area
         ) if obj.applied_area else ""
         
-        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.external_id) if obj.external_id else ""
+        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ""
         
         css = """
         <style>

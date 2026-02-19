@@ -1,0 +1,42 @@
+/* static/css/member_admin.css */
+
+.form-row.field-member_id_1.field-member_id_2 .flex-container.form-multiline {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+.form-row.field-member_id_1.field-member_id_2 .flex-container.form-multiline > div {
+    display: flex !important;
+    align-items: center !important;
+}
+
+.fieldBox.field-member_id_1, .fieldBox.field-member_id_2 {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.fieldBox.field-member_id_1 label {
+    width: 160px !important;
+}
+
+.fieldBox.field-member_id_2 label {
+    display: none !important;
+}
+
+.fieldBox.field-member_id_1:after {
+    content: "-";
+    margin: 0 10px;
+    font-weight: bold;
+}
+
+#id_member_id_1 {
+    width: 45px !important;
+}
+
+#id_member_id_2 {
+    width: 55px !important;
+}

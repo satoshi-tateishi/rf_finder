@@ -1,7 +1,7 @@
 from django.db import models
 
-class Company(models.Model):
-    member_id_1 = models.CharField(max_length=3, verbose_name="会員番号1")
+class Member(models.Model):
+    member_id_1 = models.CharField(max_length=3, verbose_name="会員番号")
     member_id_2 = models.CharField(max_length=4, verbose_name="会員番号2")
     name = models.CharField(max_length=255, verbose_name="会員名")
     department = models.CharField(max_length=255, blank=True, null=True, verbose_name="部署")
@@ -10,8 +10,8 @@ class Company(models.Model):
     email = models.EmailField(verbose_name="E-mail")
 
     class Meta:
-        verbose_name = "会社情報"
-        verbose_name_plural = "会社情報"
+        verbose_name = "会員情報"
+        verbose_name_plural = "会員情報"
 
     def __str__(self):
         return self.name

@@ -1,9 +1,9 @@
 from import_export import resources
-from .models import Company, EmailTemplate, WoffUser
+from .models import Member, EmailTemplate, WoffUser
 
-class CompanyResource(resources.ModelResource):
+class MemberResource(resources.ModelResource):
     class Meta:
-        model = Company
+        model = Member
 
 class EmailTemplateResource(resources.ModelResource):
     class Meta:

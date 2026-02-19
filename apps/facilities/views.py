@@ -33,7 +33,7 @@ def facility_search(request):
             'prefecture': f.prefecture,
             'applied_area': f.applied_area,
             'category': f.category,
-            'zip_code': f.external_id
+            'postal_code': f.postal_code
         } for f in facilities
     ]
     return JsonResponse({'results': results})
@@ -52,7 +52,7 @@ def facility_detail(request, facility_id):
             'id': facility.id,
             'name': facility.name,
             'address': facility.address,
-            'zip_code': facility.external_id
+            'postal_code': facility.postal_code
         },
         'available_channels': available_channels
     })
