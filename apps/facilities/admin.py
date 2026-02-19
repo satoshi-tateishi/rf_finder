@@ -239,10 +239,3 @@ class WirelessEquipmentAdmin(ImportExportModelAdmin):
     resource_class = WirelessEquipmentResource
     list_display = ('model_name', 'manufacturer', 'min_frequency', 'max_frequency')
     search_fields = ('model_name', 'manufacturer')
-
-@admin.register(TVChannelStatus)
-class TVChannelStatusAdmin(ImportExportModelAdmin):
-    resource_class = TVChannelStatusResource
-    list_display = ('facility', 'channel_number', 'is_available')
-    list_filter = ('channel_number', 'is_available')
-    search_fields = ('facility__name',)
