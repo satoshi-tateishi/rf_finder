@@ -8,9 +8,10 @@
 特定ラジオマイク（A帯）の施設別空きチャンネル検索、運用調整届（PDF）の自動生成、およびゼンハイザーWSM用データの書き出しを行うWebアプリケーション。
 
 ## 2. 技術スタック
-- UI: LINE WORKS WOFF (HTML/JS)
+- UI: LINE WORKS WOFF (HTML/JS/Tailwind CSS)
 - Backend: Django (Python)
 - Database: MySQL
+- Libraries: reportlab (PDF), openpyxl (Excel)
 - Infrastructure: Docker / nginx / Let's Encrypt
 
 ## 3. 重要な業務ロジック・計算規則
@@ -37,13 +38,15 @@
 
 4. **外部連携**: 
 
-   - 特ラ機構指定Excelへの転記 → PDF出力・プレビュー。
+   - 特ラ機構指定Excel (`master.xlsx`) への転記・ダウンロード。
 
-   - LINE WORKSトークルームへの送信。
+   - 上記Excelデータに基づく運用調整届 (PDF) のプレビュー表示。
 
-   - 特ラ機構への自動メール送信（ユーザーCC込み）。
+   - LINE WORKSトークルームへの送信 (予定)。
 
-   - ゼンハイザーWSM用CSV（セミコロン区切り）出力。
+   - 特ラ機構への自動メール送信 (予定)。
+
+   - ゼンハイザーWSM用CSV（セミコロン区切り）出力 (予定)。
 
 
 
@@ -52,5 +55,9 @@
 - **パス**: /Users/satoshi/rf_finder/docs
 
 - **データインポート手順**: /Users/satoshi/rf_finder/docs/DATA_IMPORT.md
+
+- **PDF生成マッピング**: /Users/satoshi/rf_finder/docs/PDF_MAPPING.md
+
+- **テスト・デバッグ手法**: /Users/satoshi/rf_finder/docs/TESTING.md
 
 - **進捗状況**: /Users/satoshi/rf_finder/docs/PHASES.md

@@ -4,8 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RF Finder - 特ラ運用調整支援</title>
+    <style>
+        @font-face {
+            font-family: 'Noto Sans JP';
+            src: url('/static/fonts/NotoSansJP-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+    </style>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SortableJS -->
@@ -81,6 +103,182 @@
             <div class="mt-6">
                 <button onclick="goToAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
                     <i class="fa-solid fa-paper-plane"></i> 運用調整連絡へ
+                </button>
+            </div>
+        </div>
+
+        <!-- Adjustment Form Section -->
+        <div id="adjustment-form-section" class="hidden space-y-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm">
+                <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen text-blue-600"></i> 申請内容入力
+                </h2>
+
+                <!-- Application Type -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">申請区分</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-700 transition-all">
+                            <input type="radio" name="app_type" value="new" class="hidden" checked>
+                            <i class="fa-solid fa-circle-plus"></i> 新規
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 has-[:checked]:bg-yellow-50 has-[:checked]:border-yellow-500 has-[:checked]:text-yellow-700 transition-all">
+                            <input type="radio" name="app_type" value="change" class="hidden">
+                            <i class="fa-solid fa-pen-to-square"></i> 変更
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 has-[:checked]:bg-red-50 has-[:checked]:border-red-500 has-[:checked]:text-red-700 transition-all">
+                            <input type="radio" name="app_type" value="delete" class="hidden">
+                            <i class="fa-solid fa-trash-can"></i> 削除
+                        </label>
+                    </div>
+                </div>
+
+                <!-- On-site User Info -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-3">現地使用者</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs text-gray-500">氏名</label>
+                            <input type="text" id="user_name" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="立石 智史" value="立石 智史">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500">ふりがな</label>
+                            <input type="text" id="user_kana" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="たていし さとし" value="たていし さとし">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500">Tel</label>
+                            <input type="tel" id="user_tel" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="090-1234-5678">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500">E-mail</label>
+                            <input type="email" id="user_email" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="sample@example.com">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Info -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-3">催事情報</label>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs text-gray-500">催事名 <span class="text-red-500">*</span></label>
+                                <span id="event-name-counter" class="text-[10px] text-gray-400">0 / 50</span>
+                            </div>
+                            <input type="text" id="event_name" maxlength="50" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                                placeholder="ハムレット" required
+                                oninput="document.getElementById('event-name-counter').innerText = this.value.length + ' / 50'">
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs text-gray-500">コメント</label>
+                                <span id="comment-counter" class="text-[10px] text-gray-400">0 / 165</span>
+                            </div>
+                            <textarea id="comment" rows="3" maxlength="165" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                                placeholder="変更内容(局数、日時、現地使用者、使用場所、使用チャンネルなど)・キャンセルの旨・その他、伝達事項をご記入下さい。"
+                                oninput="document.getElementById('comment-counter').innerText = this.value.length + ' / 165'"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Locations (Dynamic per facility) -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-3">使用場所・日程 <span class="text-red-500">*</span></label>
+                    <div id="form-facilities-list" class="space-y-4">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+
+                <!-- Microphone Counts (Matrix) -->
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">使用マイク数</label>
+                    <p class="text-xs text-gray-500 mb-2">※ PDFのレイアウトに合わせて入力してください</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-center text-[10px] border-collapse min-w-[700px]">
+                            <thead>
+                                <tr class="bg-red-50 text-red-600 font-bold">
+                                    <th class="border border-gray-300 p-2 w-24">使用マイク数</th>
+                                    <th colspan="3" class="border border-gray-300 p-2">TV WS</th>
+                                    <th colspan="3" class="border border-gray-300 p-2">※710-714(53ch)</th>
+                                    <th colspan="4" class="border border-gray-300 p-2">1.2G(基本はLです。)</th>
+                                </tr>
+                                <tr class="bg-gray-50 text-gray-500">
+                                    <th class="border border-gray-300 p-1">送信出力(mW)</th>
+                                    <th class="border border-gray-300 p-1 w-14">10mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">20mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">50mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">10mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">20mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">50mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">10mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">20mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">50mW</th>
+                                    <th class="border border-gray-300 p-1 w-14">L,M,H</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="border border-gray-300 p-2 font-bold bg-gray-50">アナログ RM</td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-analog-rm-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-analog-rm-53ch-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-red-50" rowspan="2"><input type="text" id="mic-12g-lmh" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-gray-300 p-2 font-bold bg-gray-50">〃 EM</td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-analog-em-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-analog-em-53ch-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                    <td class="border border-gray-300 p-0 bg-gray-200 text-gray-400">--</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-gray-300 p-2 font-bold bg-gray-50">デジタル RM</td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-20mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-50mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-53ch-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-53ch-20mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-53ch-50mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-12g-10mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-12g-20mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0"><input type="number" id="mic-digital-rm-12g-50mw" min="0" class="w-full text-center py-2 bg-transparent outline-none"></td>
+                                    <td class="border border-gray-300 p-0 bg-gray-100"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between border border-gray-300 p-2 rounded text-[9px] text-blue-600">
+                        <span>TVWSの使用申請で、状況により「53ch」を併用する可能性がある場合：右枠に○印をご記入下さい。</span>
+                        <div id="toggle-53ch" class="w-8 h-8 border border-gray-400 flex items-center justify-center text-lg font-bold bg-white cursor-pointer select-none transition-colors hover:bg-gray-50 active:bg-gray-100" onclick="this.innerText = (this.innerText === '○' ? '' : '○')"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="previewPDF()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                        <i class="fa-solid fa-file-pdf"></i> PDF
+                    </button>
+                    <button onclick="downloadExcel()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                        <i class="fa-solid fa-file-excel"></i> Excel
+                    </button>
+                </div>
+                <button onclick="backToSelection()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-colors">
+                    戻る
                 </button>
             </div>
         </div>
@@ -378,9 +576,186 @@
         }
 
         function goToAdjustment() {
-            // 次のフェーズの実装
-            console.log('Adjustment request with keepList:', keepList);
-            alert('運用調整連絡への遷移（未実装）');
+            if (keepList.length === 0) {
+                alert('施設を選択してください');
+                return;
+            }
+
+            // 使用場所・日程リストの生成
+            const container = document.getElementById('form-facilities-list');
+            container.innerHTML = '';
+            
+            keepList.forEach((f, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">${index + 1}</span>
+                        <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] text-gray-500 block mb-1">使用開始日</label>
+                            <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 block mb-1">使用終了日</label>
+                            <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <label class="text-[10px] text-gray-500 block mb-1">使用開始時間</label>
+                            <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="09:00" required>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 block mb-1">使用終了時間</label>
+                            <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="22:00" required>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('ch-selection-section').classList.add('hidden');
+            document.getElementById('keep-list-section').classList.add('hidden');
+            document.getElementById('adjustment-form-section').classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        function backToSelection() {
+            document.getElementById('adjustment-form-section').classList.add('hidden');
+            document.getElementById('keep-list-section').classList.remove('hidden');
+            document.getElementById('ch-selection-section').classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        async function downloadExcel() {
+            const data = collectFormData();
+            const btn = document.querySelector('button[onclick="downloadExcel()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
+
+            try {
+                const response = await fetch('/api/adjustments/preview-excel/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `運用連絡票_${new Date().toISOString().slice(0,10)}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    alert('Excelの生成に失敗しました');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('通信エラーが発生しました');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function collectFormData() {
+            const appType = document.querySelector('input[name="app_type"]:checked').value;
+            const user = {
+                name: document.getElementById('user_name').value,
+                kana: document.getElementById('user_kana').value,
+                tel: document.getElementById('user_tel').value,
+                email: document.getElementById('user_email').value
+            };
+            const event = {
+                name: document.getElementById('event_name').value,
+                comment: document.getElementById('comment').value
+            };
+            
+            const facilitiesData = keepList.map((f, index) => {
+                const container = document.getElementById('form-facilities-list').children[index];
+                const inputs = container.querySelectorAll('input');
+                return {
+                    ...f,
+                    start_date: inputs[0].value,
+                    end_date: inputs[1].value,
+                    start_time: inputs[2].value,
+                    end_time: inputs[3].value
+                };
+            });
+
+            const extra_53ch = document.getElementById('toggle-53ch').innerText;
+
+            const mic_counts = {
+                analog_rm: { '10mw': document.getElementById('mic-analog-rm-10mw').value },
+                analog_em: { '10mw': document.getElementById('mic-analog-em-10mw').value },
+                digital_rm: {
+                    '10mw': document.getElementById('mic-digital-rm-10mw').value,
+                    '20mw': document.getElementById('mic-digital-rm-20mw').value,
+                    '50mw': document.getElementById('mic-digital-rm-50mw').value
+                },
+                analog_53ch: {
+                    rm_10mw: document.getElementById('mic-analog-rm-53ch-10mw').value,
+                    em_10mw: document.getElementById('mic-analog-em-53ch-10mw').value
+                },
+                digital_53ch: {
+                    '10mw': document.getElementById('mic-digital-rm-53ch-10mw').value,
+                    '20mw': document.getElementById('mic-digital-rm-53ch-20mw').value,
+                    '50mw': document.getElementById('mic-digital-rm-53ch-50mw').value
+                },
+                digital_12g: {
+                    '10mw': document.getElementById('mic-digital-rm-12g-10mw').value,
+                    '20mw': document.getElementById('mic-digital-rm-12g-20mw').value,
+                    '50mw': document.getElementById('mic-digital-rm-12g-50mw').value
+                },
+                '12g_lmh': document.getElementById('mic-12g-lmh').value
+            };
+
+            return {
+                app_type: appType,
+                user: user,
+                event: event,
+                facilities: facilitiesData,
+                extra_53ch: extra_53ch,
+                mic_counts: mic_counts
+            };
+        }
+
+        async function previewPDF() {
+            const data = collectFormData();
+            const btn = document.querySelector('button[onclick="previewPDF()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
+
+            try {
+                const response = await fetch('/api/adjustments/preview-pdf/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                } else {
+                    const errorText = await response.text();
+                    alert('PDFの生成に失敗しました: ' + errorText);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('通信エラーが発生しました');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
         }
     </script>
 </body>
