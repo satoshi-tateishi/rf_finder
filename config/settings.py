@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third party apps
+    'import_export',
     # Local apps
     'apps.facilities',
     'apps.adjustments',
