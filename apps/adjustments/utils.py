@@ -1,3 +1,5 @@
+from django.http import JsonResponse
+
 def format_channels(channels):
     if not channels: return ""
     sorted_channels = sorted(list(set(map(int, channels))))
@@ -14,3 +16,18 @@ def format_channels(channels):
             for val in range(start, end + 1): result.append(str(val))
         i += 1
     return ", ".join(result)
+
+def api_success(data=None):
+    return JsonResponse({
+        'status': 'success',
+        'data': data
+    })
+
+def api_error(message, status=400, errors=None):
+    payload = {
+        'status': 'error',
+        'message': message
+    }
+    if errors:
+        payload['errors'] = errors
+    return JsonResponse(payload, status=status)

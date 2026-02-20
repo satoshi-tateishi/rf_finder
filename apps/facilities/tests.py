@@ -67,20 +67,20 @@ class FacilityAPITest(TestCase):
         # 2文字以上のクエリ
         response = self.client.get(reverse('facilities:search'), {'q': 'ドーム'})
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = response.json()['data']
         self.assertEqual(len(data['results']), 1)
         self.assertEqual(data['results'][0]['name'], "東京ドーム")
 
         # 短すぎるクエリ（2文字未満）は空結果を返す仕様
         response = self.client.get(reverse('facilities:search'), {'q': '東'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()['results']), 0)
+        self.assertEqual(len(response.json()['data']['results']), 0)
 
     def test_facility_detail_api(self):
         """施設詳細APIが計算済みチャンネルを含む正しいデータを返すこと"""
         response = self.client.get(reverse('facilities:detail', args=[self.f1.id]))
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = response.json()['data']
         self.assertEqual(data['facility']['name'], "東京ドーム")
         self.assertTrue('available_channels' in data)
         self.assertEqual(data['available_channels'][0]['channel'], 13)

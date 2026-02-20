@@ -188,16 +188,11 @@ async function sendEmail() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
 
     try {
-        const result = await Api.sendEmail(data);
-
-        if (result.status === 'success') {
-            alert('送信が完了しました。');
-        } else {
-            alert('送信に失敗しました: ' + (result.message || '不明なエラー'));
-        }
+        await Api.sendEmail(data);
+        alert('送信が完了しました。');
     } catch (err) {
         console.error(err);
-        alert('通信エラーが発生しました');
+        alert('送信に失敗しました: ' + err.message);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;

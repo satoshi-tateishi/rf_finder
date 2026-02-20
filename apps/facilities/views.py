@@ -1,13 +1,12 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
+from django.shortcuts import render
 from django.db.models import Case, When, Q
 from .models import Facility, WirelessEquipment
 from .services import calculate_available_frequencies
+from apps.adjustments.utils import api_success, api_error
 
 def index(request):
     """メイン画面（検索・視覚化）を表示"""
     # ユーザー指定の順序: SR2050 (上) -> EM 3732 N (中) -> EM 3732 L (下)
-    # 文字列の不一致を避けるため icontains を使用
     devices = WirelessEquipment.objects.annotate(
         custom_order=Case(
             When(model_name__icontains='SR2050', then=0),
@@ -22,7 +21,7 @@ def facility_search(request):
     """施設を名称で検索するAPI"""
     q = request.GET.get('q', '')
     if len(q) < 2:
-        return JsonResponse({'results': []})
+        return api_success({'results': []})
     
     facilities = Facility.objects.filter(name__icontains=q)[:20]
     results = [
@@ -36,18 +35,18 @@ def facility_search(request):
             'postal_code': f.postal_code
         } for f in facilities
     ]
-    return JsonResponse({'results': results})
+    return api_success({'results': results})
 
 def facility_detail(request, facility_id):
     """施設ごとの利用可能周波数リストを返すAPI"""
     try:
         facility = Facility.objects.get(pk=facility_id)
     except Facility.DoesNotExist:
-        return JsonResponse({'error': 'Not found'}, status=404)
+        return api_error('Facility not found', status=404)
         
     available_channels = calculate_available_frequencies(facility)
     
-    return JsonResponse({
+    return api_success({
         'facility': {
             'id': facility.id,
             'name': facility.name,

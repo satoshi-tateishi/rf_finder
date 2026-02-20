@@ -100,7 +100,6 @@ class AdjustmentAPITest(TestCase):
 
     def test_send_email_api(self):
         """メール送信APIが正常に受理されること"""
-        # メール設定をコンソール出力にして実際の送信を避ける（またはDjangoのmail.outboxで検証）
         response = self.client.post(
             reverse('adjustments:send_email'),
             data=json.dumps(self.valid_data),
@@ -118,3 +117,43 @@ class AdjustmentAPITest(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['status'], 'error')
+
+    def test_missing_member(self):
+        """会員情報（Member）がDBに存在しない場合でも生成処理が継続されること"""
+        Member.objects.all().delete()
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(self.valid_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_validation_error_empty_payload(self):
+        """空のJSONオブジェクトを送った場合にバリデーションエラーになること"""
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('errors', response.json())
+
+    def test_validation_error_missing_event_name(self):
+        """必須項目（催事名）が欠落している場合にエラーになること"""
+        incomplete_data = {
+            "app_type": "new",
+            "user": {"name": "使用者"},
+            "event": {}, # 催事名がない
+            "facilities": []
+        }
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(incomplete_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('name', response.json()['errors'])
