@@ -1,17 +1,9 @@
 import io
 import json
-from datetime import datetime
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib import colors
-from django.conf import settings
 from apps.accounts.models import Member
-from .services import format_channels, generate_adjustment_excel, generate_adjustment_pdf
-import os
+from .services import generate_adjustment_excel, generate_adjustment_pdf
 
 @csrf_exempt
 def preview_excel(request):
