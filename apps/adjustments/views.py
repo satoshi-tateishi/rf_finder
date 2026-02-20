@@ -12,17 +12,25 @@ def validate_adjustment_data(data):
     """
     調整届データのバリデーションを行う。
     """
+    all_errors = {}
+
+    # 1. 基本フォーム (独自クリーン含む)
     form = AdjustmentRequestForm(data)
     if not form.is_valid():
-        return False, form.errors
+        all_errors.update(form.errors)
 
+    # 2. 現地使用者フォーム
     user_form = UserInfoForm(data.get('user', {}))
     if not user_form.is_valid():
-        return False, user_form.errors
+        all_errors.update({f"user_{k}": v for k, v in user_form.errors.items()})
 
+    # 3. 催事フォーム
     event_form = EventInfoForm(data.get('event', {}))
     if not event_form.is_valid():
-        return False, event_form.errors
+        all_errors.update({f"event_{k}": v for k, v in event_form.errors.items()})
+
+    if all_errors:
+        return False, all_errors
 
     return True, None
 

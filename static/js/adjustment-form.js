@@ -12,32 +12,36 @@ function goToAdjustment() {
     const container = document.getElementById('form-facilities-list');
     container.innerHTML = '';
     
-    keepList.forEach((f, index) => {
+    window.keepList.forEach((f, index) => {
         const div = document.createElement('div');
         div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
+        const formattedChannels = Api.formatChannels(f.selectedChannels);
         div.innerHTML = `
-            <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center gap-2 mb-1">
                 <span class="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">${index + 1}</span>
                 <span class="font-bold text-sm text-gray-800">${f.name}</span>
+            </div>
+            <div class="ml-7 mb-3 text-[10px] text-blue-600 font-medium">
+                使用チャンネル : ${formattedChannels}
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始日</label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required oninput="clearError(this)">
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了日</label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required oninput="clearError(this)">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始時間</label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="09:00" required>
+                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="09:00" required oninput="clearError(this)">
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了時間</label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="22:00" required>
+                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="22:00" required oninput="clearError(this)">
                 </div>
             </div>
         `;
@@ -119,6 +123,65 @@ function collectFormData() {
     };
 }
 
+function handleValidationErrors(err) {
+    // エラーメッセージ（文字列）からキーワードを抽出してハイライト
+    const errorText = err.message || "";
+    
+    // 1. 一般的な入力項目のハイライト
+    const fieldMap = {
+        'user_name': 'user_name',
+        'user_kana': 'user_kana',
+        'user_tel': 'user_tel',
+        'user_email': 'user_email',
+        'event_name': 'event_name'
+    };
+
+    Object.keys(fieldMap).forEach(key => {
+        if (errorText.includes(key)) {
+            const el = document.getElementById(fieldMap[key]);
+            if (el) applyErrorStyle(el);
+        }
+    });
+
+    // 2. マイク数のハイライト (テーブル全体)
+    if (errorText.includes('mic_counts')) {
+        const container = document.getElementById('mic-counts-table-container');
+        if (container) {
+            applyErrorStyle(container);
+            // テーブル内のいずれかの入力が変わったらエラー表示を消す
+            const inputs = container.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                const eventName = (input.tagName === 'SELECT') ? 'change' : 'input';
+                input.addEventListener(eventName, () => clearError(container), { once: true });
+            });
+        }
+    }
+
+    // 3. 施設日程のハイライト
+    if (errorText.includes('facilities')) {
+        const container = document.getElementById('form-facilities-list');
+        if (container) {
+            const inputs = container.querySelectorAll('input');
+            inputs.forEach(input => {
+                if (!input.value) applyErrorStyle(input);
+            });
+        }
+    }
+
+    alert('入力内容に不備があります。赤色の項目を確認してください。\n\n' + errorText);
+}
+
+function applyErrorStyle(el) {
+    el.classList.add('bg-red-50', 'border-red-500', 'ring-1', 'ring-red-500');
+    // 入力されたら解除するイベントを追加
+    const eventName = (el.tagName === 'SELECT') ? 'change' : 'input';
+    el.addEventListener(eventName, () => clearError(el), { once: true });
+}
+
+function clearError(el) {
+    el.classList.remove('bg-red-50', 'border-red-500', 'ring-1', 'ring-red-500');
+}
+
 async function downloadExcel() {
     const data = collectFormData();
     const btn = document.querySelector('button[onclick="downloadExcel()"]');
@@ -127,23 +190,17 @@ async function downloadExcel() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
-        const response = await Api.downloadExcel(data);
-
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `運用連絡票_${new Date().toISOString().slice(0,10)}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } else {
-            alert('Excelの生成に失敗しました');
-        }
+        const blob = await Api.downloadExcel(data);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `運用連絡票_${new Date().toISOString().slice(0,10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
     } catch (err) {
         console.error(err);
-        alert('通信エラーが発生しました');
+        handleValidationErrors(err);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
@@ -158,19 +215,12 @@ async function previewPDF() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
-        const response = await Api.previewPDF(data);
-
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            window.open(url, '_blank');
-        } else {
-            const errorText = await response.text();
-            alert('PDFの生成に失敗しました: ' + errorText);
-        }
+        const blob = await Api.previewPDF(data);
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
     } catch (err) {
         console.error(err);
-        alert('通信エラーが発生しました');
+        handleValidationErrors(err);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
@@ -192,7 +242,7 @@ async function sendEmail() {
         alert('送信が完了しました。');
     } catch (err) {
         console.error(err);
-        alert('送信に失敗しました: ' + err.message);
+        handleValidationErrors(err);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;

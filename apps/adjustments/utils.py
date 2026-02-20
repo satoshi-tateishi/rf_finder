@@ -21,7 +21,7 @@ def api_success(data=None):
     return JsonResponse({
         'status': 'success',
         'data': data
-    })
+    }, json_dumps_params={'ensure_ascii': False})
 
 def api_error(message, status=400, errors=None):
     payload = {
@@ -30,4 +30,4 @@ def api_error(message, status=400, errors=None):
     }
     if errors:
         payload['errors'] = errors
-    return JsonResponse(payload, status=status)
+    return JsonResponse(payload, status=status, json_dumps_params={'ensure_ascii': False})

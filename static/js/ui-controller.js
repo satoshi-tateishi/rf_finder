@@ -10,11 +10,30 @@ function getDeviceColor(name) {
     return '#94a3b8'; // デフォルト (gray-400)
 }
 
+function updateAdjustmentButtonState() {
+    const btn = document.getElementById('go-to-adjustment-btn');
+    if (!btn) return;
+
+    // 少なくとも1つの施設で、1つ以上のチャンネルが選択されているか確認
+    const hasSelection = window.keepList && window.keepList.some(f => f.selectedChannels && f.selectedChannels.length > 0);
+    
+    if (hasSelection) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+        btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    }
+}
+
 function renderChannelSelection() {
     const container = document.getElementById('facility-channels-container');
+    if (!container) return;
     container.innerHTML = '';
     
-    keepList.forEach(f => {
+    window.keepList.forEach(f => {
         const section = document.createElement('div');
         section.className = 'bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500';
         
@@ -39,9 +58,12 @@ function renderChannelSelection() {
         container.appendChild(section);
         renderRFGrid(f, document.getElementById(`grid-${f.id}`));
     });
+
+    updateAdjustmentButtonState();
 }
 
 function renderRFGrid(facility, gridElement) {
+    if (!gridElement) return;
     gridElement.innerHTML = '';
     
     for (let ch = 13; ch <= 53; ch++) {
@@ -65,6 +87,7 @@ function renderRFGrid(facility, gridElement) {
                     facility.selectedChannels.push(ch);
                     btn.classList.add('selected');
                 }
+                updateAdjustmentButtonState();
             };
             
             // ガードバンド表示 (上部にライン)
@@ -116,8 +139,8 @@ function renderRFGrid(facility, gridElement) {
 window.addEventListener('DOMContentLoaded', () => {
     // Legend initialization
     const legend = document.getElementById('device-legend');
-    if (legend && typeof devices !== 'undefined') {
-        devices.forEach((d) => {
+    if (legend && typeof window.devices !== 'undefined') {
+        window.devices.forEach((d) => {
             const div = document.createElement('div');
             div.className = 'flex items-center gap-1';
             div.innerHTML = `<span class="w-2 h-2 rounded-full" style="background-color: ${getDeviceColor(d.name)}"></span> ${d.name}`;
@@ -165,4 +188,7 @@ window.addEventListener('DOMContentLoaded', () => {
             } catch (err) { console.error(err); }
         });
     }
+
+    // 初期状態のボタン更新
+    updateAdjustmentButtonState();
 });

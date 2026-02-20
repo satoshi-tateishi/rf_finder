@@ -1,7 +1,7 @@
 /**
  * Keep List Management module
  */
-let keepList = [];
+window.keepList = [];
 let sortable = null;
 
 function initSortable() {
@@ -12,8 +12,8 @@ function initSortable() {
         handle: '.drag-handle',
         animation: 150,
         onEnd: (evt) => {
-            const movedItem = keepList.splice(evt.oldIndex, 1)[0];
-            keepList.splice(evt.newIndex, 0, movedItem);
+            const movedItem = window.keepList.splice(evt.oldIndex, 1)[0];
+            window.keepList.splice(evt.newIndex, 0, movedItem);
             renderKeepList(); // Update numbers
             
             // TVチャンネル選択UIが表示されている場合は、その順番も更新する
@@ -32,11 +32,11 @@ async function addToKeepList(f) {
     searchInput.value = '';
     
     // 重複チェック
-    if (!keepList.find(item => item.id === f.id)) {
+    if (!window.keepList.find(item => item.id === f.id)) {
         try {
             const data = await Api.getFacilityDetail(f.id);
             
-            keepList.push({ 
+            window.keepList.push({ 
                 ...f, 
                 selectedChannels: [], 
                 availableChannels: data.available_channels 
@@ -54,10 +54,10 @@ async function addToKeepList(f) {
 }
 
 function removeFromKeepList(id) {
-    keepList = keepList.filter(f => f.id !== id);
+    window.keepList = window.keepList.filter(f => f.id !== id);
     renderKeepList();
     
-    if (keepList.length === 0) {
+    if (window.keepList.length === 0) {
         document.getElementById('keep-list-section').classList.add('hidden');
         document.getElementById('welcome-msg').classList.remove('hidden');
         document.getElementById('ch-selection-section').classList.add('hidden');
@@ -70,7 +70,7 @@ function renderKeepList() {
     const container = document.getElementById('keep-list');
     container.innerHTML = '';
     
-    keepList.forEach((f, index) => {
+    window.keepList.forEach((f, index) => {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100';
         

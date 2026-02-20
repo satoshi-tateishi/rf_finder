@@ -26,8 +26,9 @@ class AdjustmentLogicTest(TestCase):
             "user": {"name": "使用者", "kana": "しようしゃ", "tel": "090", "email": "u@ex.com"},
             "event": {"name": "催事", "comment": "コメント"},
             "facilities": [
-                {"name": "施設1", "start_date": "2026-02-20", "selectedChannels": [13, 14]}
-            ]
+                {"name": "施設1", "start_date": "2026-02-20", "start_time": "09:00", "selectedChannels": [13, 14]}
+            ],
+            "mic_counts": {"analog_rm": {"10mw": 1}}
         }
         
         # Excel生成テスト
@@ -73,9 +74,19 @@ class AdjustmentAPITest(TestCase):
         Member.objects.create(name="テスト会員")
         self.valid_data = {
             "app_type": "new",
-            "user": {"name": "使用者", "email": "u@ex.com"},
+            "user": {
+                "name": "使用者", "kana": "しようしゃ", 
+                "tel": "090-1234-5678", "email": "u@ex.com"
+            },
             "event": {"name": "催事"},
-            "facilities": [{"name": "施設1", "start_date": "2026-02-20"}]
+            "facilities": [
+                {
+                    "name": "施設1", 
+                    "start_date": "2026-02-20", "end_date": "2026-02-20",
+                    "start_time": "09:00", "end_time": "22:00"
+                }
+            ],
+            "mic_counts": {"analog_rm": {"10mw": 1}}
         }
 
     def test_preview_pdf_api(self):
@@ -143,12 +154,9 @@ class AdjustmentAPITest(TestCase):
 
     def test_validation_error_missing_event_name(self):
         """必須項目（催事名）が欠落している場合にエラーになること"""
-        incomplete_data = {
-            "app_type": "new",
-            "user": {"name": "使用者"},
-            "event": {}, # 催事名がない
-            "facilities": []
-        }
+        incomplete_data = self.valid_data.copy()
+        incomplete_data['event'] = {} # 催事名がない
+        
         response = self.client.post(
             reverse('adjustments:preview_pdf'),
             data=json.dumps(incomplete_data),
@@ -156,4 +164,47 @@ class AdjustmentAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['status'], 'error')
-        self.assertIn('name', response.json()['errors'])
+        # エラーキーが event_name になっていることを確認 (UserInfoForm/EventInfoFormの接頭辞)
+        self.assertIn('event_name', response.json()['errors'])
+
+    def test_validation_error_missing_user_fields(self):
+        """現地使用者の必須項目が欠落している場合にエラーになること"""
+        incomplete_data = self.valid_data.copy()
+        incomplete_data['user'] = {"name": "名前のみ"} # 他が足りない
+        
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(incomplete_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        errors = response.json()['errors']
+        self.assertIn('user_kana', errors)
+        self.assertIn('user_tel', errors)
+        self.assertIn('user_email', errors)
+
+    def test_validation_error_no_mic_counts(self):
+        """マイク数が1つも入力されていない場合にエラーになること"""
+        incomplete_data = self.valid_data.copy()
+        incomplete_data['mic_counts'] = {} # 空
+        
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(incomplete_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('mic_counts', response.json()['errors'])
+
+    def test_validation_error_incomplete_facility(self):
+        """施設の時間情報が不足している場合にエラーになること"""
+        incomplete_data = self.valid_data.copy()
+        incomplete_data['facilities'] = [{"name": "施設1", "start_date": "2026-02-20"}] # 時間がない
+        
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(incomplete_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('facilities', response.json()['errors'])

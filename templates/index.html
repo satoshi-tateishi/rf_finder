@@ -101,7 +101,7 @@
 
             <!-- Action Buttons -->
             <div class="mt-6">
-                <button onclick="goToAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                <button id="go-to-adjustment-btn" onclick="goToAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
                     <i class="fa-solid fa-paper-plane"></i> 運用調整連絡へ
                 </button>
             </div>
@@ -139,11 +139,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs text-gray-500">氏名</label>
-                            <input type="text" id="user_name" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="立石 智史" value="立石 智史">
+                            <input type="text" id="user_name" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="新音 太郎" value="">
                         </div>
                         <div>
                             <label class="text-xs text-gray-500">ふりがな</label>
-                            <input type="text" id="user_kana" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="たていし さとし" value="たていし さとし">
+                            <input type="text" id="user_kana" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="しんおん たろう" value="">
                         </div>
                         <div>
                             <label class="text-xs text-gray-500">Tel</label>
@@ -151,7 +151,7 @@
                         </div>
                         <div>
                             <label class="text-xs text-gray-500">E-mail</label>
-                            <input type="email" id="user_email" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="sample@example.com">
+                            <input type="email" id="user_email" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@shin-on1981.com">
                         </div>
                     </div>
                 </div>
@@ -194,7 +194,7 @@
                     <label class="block text-sm font-bold text-gray-700 mb-2">使用マイク数</label>
                     <p class="text-xs text-gray-500 mb-2">※ PDFのレイアウトに合わせて入力してください</p>
                     
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto" id="mic-counts-table-container">
                         <table class="w-full text-center text-[10px] border-collapse min-w-[700px]">
                             <thead>
                                 <tr class="bg-red-50 text-red-600 font-bold">
