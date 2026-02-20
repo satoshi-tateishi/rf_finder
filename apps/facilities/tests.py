@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.urls import reverse
 from .models import Facility, TVChannelStatus
 from .services import calculate_available_frequencies
 
@@ -54,3 +55,37 @@ class FrequencyCalculationTest(TestCase):
         ch14 = next(r for r in results if r['channel'] == 14)
         self.assertEqual(ch14['gb_lower'], 0)
         self.assertEqual(ch14['gb_upper'], 0)
+
+class FacilityAPITest(TestCase):
+    def setUp(self):
+        self.f1 = Facility.objects.create(name="東京ドーム", prefecture="東京都", address="文京区")
+        self.f2 = Facility.objects.create(name="明治座", prefecture="東京都", address="中央区")
+        TVChannelStatus.objects.create(facility=self.f1, channel_number=13, is_available=True)
+
+    def test_facility_search_api(self):
+        """名称による施設検索が正しく機能すること"""
+        # 2文字以上のクエリ
+        response = self.client.get(reverse('facilities:search'), {'q': 'ドーム'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['name'], "東京ドーム")
+
+        # 短すぎるクエリ（2文字未満）は空結果を返す仕様
+        response = self.client.get(reverse('facilities:search'), {'q': '東'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 0)
+
+    def test_facility_detail_api(self):
+        """施設詳細APIが計算済みチャンネルを含む正しいデータを返すこと"""
+        response = self.client.get(reverse('facilities:detail', args=[self.f1.id]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['facility']['name'], "東京ドーム")
+        self.assertTrue('available_channels' in data)
+        self.assertEqual(data['available_channels'][0]['channel'], 13)
+
+    def test_facility_detail_not_found(self):
+        """存在しない施設IDの場合は404を返すこと"""
+        response = self.client.get(reverse('facilities:detail', args=[99999]))
+        self.assertEqual(response.status_code, 404)

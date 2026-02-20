@@ -1,6 +1,8 @@
 import io
+import json
 from django.test import TestCase
 from django.core import mail
+from django.urls import reverse
 from apps.accounts.models import Member, EmailTemplate
 from .utils import format_channels
 from .services import generate_adjustment_excel, generate_adjustment_pdf, send_adjustment_email
@@ -33,7 +35,7 @@ class AdjustmentLogicTest(TestCase):
         self.assertIsInstance(excel_buffer, io.BytesIO)
         self.assertTrue(len(excel_buffer.getvalue()) > 0)
 
-        # PDF生成テスト (LibreOfficeが必要なため、環境によってはスキップされる可能性があるが、コンテナ内なら動くはず)
+        # PDF生成テスト
         try:
             pdf_buffer = generate_adjustment_pdf(data, member)
             self.assertIsInstance(pdf_buffer, io.BytesIO)
@@ -65,3 +67,54 @@ class AdjustmentLogicTest(TestCase):
         self.assertIn("こんにちは 太郎 様", sent.body)
         self.assertEqual(len(sent.attachments), 1)
         self.assertEqual(sent.attachments[0][0], "adjustment_form.pdf")
+
+class AdjustmentAPITest(TestCase):
+    def setUp(self):
+        Member.objects.create(name="テスト会員")
+        self.valid_data = {
+            "app_type": "new",
+            "user": {"name": "使用者", "email": "u@ex.com"},
+            "event": {"name": "催事"},
+            "facilities": [{"name": "施設1", "start_date": "2026-02-20"}]
+        }
+
+    def test_preview_pdf_api(self):
+        """PDFプレビューAPIが正常にPDFを返すこと"""
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data=json.dumps(self.valid_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_preview_excel_api(self):
+        """ExcelプレビューAPIが正常にExcelファイルを返すこと"""
+        response = self.client.post(
+            reverse('adjustments:preview_excel'),
+            data=json.dumps(self.valid_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    def test_send_email_api(self):
+        """メール送信APIが正常に受理されること"""
+        # メール設定をコンソール出力にして実際の送信を避ける（またはDjangoのmail.outboxで検証）
+        response = self.client.post(
+            reverse('adjustments:send_email'),
+            data=json.dumps(self.valid_data),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_api_invalid_json(self):
+        """不正なJSONを送った場合に400エラーになること"""
+        response = self.client.post(
+            reverse('adjustments:preview_pdf'),
+            data="invalid json",
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
