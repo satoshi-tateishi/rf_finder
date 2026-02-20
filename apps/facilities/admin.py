@@ -1,10 +1,14 @@
 from django.contrib import admin
-from django import forms
+from django.db.models import Case, Q, When
 from django.utils.html import format_html
-from django.db.models import Case, When, Q
 from import_export.admin import ImportExportModelAdmin
-from .models import Facility, TVChannelStatus, WirelessEquipment
-from .resources import FacilityResource, WirelessEquipmentResource, TVChannelStatusResource
+
+from .models import Facility, WirelessEquipment
+from .resources import (
+    FacilityResource,
+    WirelessEquipmentResource,
+)
+
 
 class PrefectureJisFilter(admin.SimpleListFilter):
     title = '都道府県'
@@ -12,13 +16,53 @@ class PrefectureJisFilter(admin.SimpleListFilter):
 
     # JISコード順の都道府県リスト
     PREFECTURES_JIS = [
-        '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
-        '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
-        '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
-        '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
-        '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
-        '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
-        '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'
+        '北海道',
+        '青森県',
+        '岩手県',
+        '宮城県',
+        '秋田県',
+        '山形県',
+        '福島県',
+        '茨城県',
+        '栃木県',
+        '群馬県',
+        '埼玉県',
+        '千葉県',
+        '東京都',
+        '神奈川県',
+        '新潟県',
+        '富山県',
+        '石川県',
+        '福井県',
+        '山梨県',
+        '長野県',
+        '岐阜県',
+        '静岡県',
+        '愛知県',
+        '三重県',
+        '滋賀県',
+        '京都府',
+        '大阪府',
+        '兵庫県',
+        '奈良県',
+        '和歌山県',
+        '鳥取県',
+        '島根県',
+        '岡山県',
+        '広島県',
+        '山口県',
+        '徳島県',
+        '香川県',
+        '愛媛県',
+        '高知県',
+        '福岡県',
+        '佐賀県',
+        '長崎県',
+        '熊本県',
+        '大分県',
+        '宮崎県',
+        '鹿児島県',
+        '沖縄県',
     ]
 
     def lookups(self, request, model_admin):
@@ -31,6 +75,7 @@ class PrefectureJisFilter(admin.SimpleListFilter):
             return queryset.filter(prefecture=self.value())
         return queryset
 
+
 @admin.register(Facility)
 class FacilityAdmin(ImportExportModelAdmin):
     resource_class = FacilityResource
@@ -40,15 +85,21 @@ class FacilityAdmin(ImportExportModelAdmin):
     ordering = ('id',)
     search_fields = ('name', 'address', 'postal_code')
     list_filter = (PrefectureJisFilter, 'category')
-    
+
     readonly_fields = ('facility_info_card', 'channel_grid')
     fieldsets = (
-        ('基本情報', {
-            'fields': ('facility_info_card',),
-        }),
-        ('使用可能チャンネル', {
-            'fields': ('channel_grid',),
-        }),
+        (
+            '基本情報',
+            {
+                'fields': ('facility_info_card',),
+            },
+        ),
+        (
+            '使用可能チャンネル',
+            {
+                'fields': ('channel_grid',),
+            },
+        ),
     )
 
     def has_add_permission(self, request):
@@ -74,19 +125,29 @@ class FacilityAdmin(ImportExportModelAdmin):
             '.field-get_facility_info:hover {{ background-color: #eff6ff !important; cursor: pointer; }}'
             '</style>'
         )
-        
-        category_badge = format_html(
-            '<span style="background: #f3f4f6; color: #4b5563; font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid #e5e7eb; margin-left: 5px; vertical-align: middle;">{}</span>',
-            obj.category
-        ) if obj.category else ""
-        
-        area_badge = format_html(
-            '<span style="background: #eff6ff; color: #2563eb; font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid #dbeafe; margin-left: 5px; vertical-align: middle;">{}</span>',
-            obj.applied_area
-        ) if obj.applied_area else ""
-        
-        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ""
-        
+
+        category_badge = (
+            format_html(
+                '<span style="background: #f3f4f6; color: #4b5563; font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid #e5e7eb; margin-left: 5px; vertical-align: middle;">{}</span>',
+                obj.category,
+            )
+            if obj.category
+            else ''
+        )
+
+        area_badge = (
+            format_html(
+                '<span style="background: #eff6ff; color: #2563eb; font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid #dbeafe; margin-left: 5px; vertical-align: middle;">{}</span>',
+                obj.applied_area,
+            )
+            if obj.applied_area
+            else ''
+        )
+
+        zip_display = (
+            format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ''
+        )
+
         return format_html(
             '{}'
             '<div>'
@@ -102,38 +163,48 @@ class FacilityAdmin(ImportExportModelAdmin):
             area_badge,
             zip_display,
             obj.prefecture,
-            obj.address
+            obj.address,
         )
 
     @admin.display(description='')
     def facility_info_card(self, obj):
         from django.utils.safestring import mark_safe
-        
-        category_badge = format_html(
-            '<span style="background: #f3f4f6; color: #4b5563; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #e5e7eb; margin-left: 8px; vertical-align: middle; font-weight: normal;">{}</span>',
-            obj.category
-        ) if obj.category else ""
-        
-        area_badge = format_html(
-            '<span style="background: #eff6ff; color: #2563eb; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #dbeafe; margin-left: 8px; vertical-align: middle; font-weight: normal;">{}</span>',
-            obj.applied_area
-        ) if obj.applied_area else ""
-        
-        zip_display = format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ""
-        
+
+        category_badge = (
+            format_html(
+                '<span style="background: #f3f4f6; color: #4b5563; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #e5e7eb; margin-left: 8px; vertical-align: middle; font-weight: normal;">{}</span>',
+                obj.category,
+            )
+            if obj.category
+            else ''
+        )
+
+        area_badge = (
+            format_html(
+                '<span style="background: #eff6ff; color: #2563eb; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid #dbeafe; margin-left: 8px; vertical-align: middle; font-weight: normal;">{}</span>',
+                obj.applied_area,
+            )
+            if obj.applied_area
+            else ''
+        )
+
+        zip_display = (
+            format_html('<span style="margin-right: 5px;">〒{}</span>', obj.postal_code) if obj.postal_code else ''
+        )
+
         css = """
         <style>
             /* ページタイトルの書き換えと重複する施設名の非表示 */
             #content > h1 { font-size: 0 !important; margin-bottom: 20px !important; }
             #content > h1::before { content: "施設詳細" !important; font-size: 20px !important; visibility: visible !important; }
             #content > h2 { display: none !important; }
-            
+
             /* ラベルの非表示と全幅表示設定 */
             .field-facility_info_card label, .field-channel_grid label { display: none !important; }
             .field-facility_info_card .readonly, .field-channel_grid .readonly { width: 100% !important; margin-left: 0 !important; padding: 0 !important; }
         </style>
         """
-        
+
         card_html = format_html(
             '<div style="background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid #10b981; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 900px; margin-top: 5px;">'
             '<div style="margin-bottom: 10px;">'
@@ -147,32 +218,36 @@ class FacilityAdmin(ImportExportModelAdmin):
             area_badge,
             zip_display,
             obj.prefecture,
-            obj.address
+            obj.address,
         )
         return mark_safe(css + card_html)
 
     @admin.display(description='')
     def channel_grid(self, obj):
-        from .services import calculate_available_frequencies
         from django.utils.safestring import mark_safe
-        
+
+        from .services import calculate_available_frequencies
+
         # ユーザー指定の順序でデバイスを取得
         devices = WirelessEquipment.objects.annotate(
             custom_order=Case(
                 When(model_name__icontains='SR2050', then=0),
                 When(Q(model_name__icontains='3732') & Q(model_name__icontains='N'), then=1),
                 When(Q(model_name__icontains='3732') & Q(model_name__icontains='L'), then=2),
-                default=3
+                default=3,
             )
         ).order_by('custom_order', 'model_name')
-        
+
         available_channels = calculate_available_frequencies(obj)
         available_map = {c['channel']: c for c in available_channels}
-        
+
         def get_device_color(name):
-            if 'SR2050' in name: return '#f97316'
-            if '3732' in name and 'N' in name: return '#3b82f6'
-            if '3732' in name and 'L' in name: return '#22c55e'
+            if 'SR2050' in name:
+                return '#f97316'
+            if '3732' in name and 'N' in name:
+                return '#3b82f6'
+            if '3732' in name and 'L' in name:
+                return '#22c55e'
             return '#94a3b8'
 
         css = """
@@ -190,54 +265,74 @@ class FacilityAdmin(ImportExportModelAdmin):
             .admin-legend-bar { width: 16px; height: 4px; border-radius: 1px; }
         </style>
         """
-        
+
         legend_html = ['<div class="admin-legend">']
         for d in devices:
             legend_html.append(
-                format_html('<div class="admin-legend-item"><span class="admin-legend-dot" style="background:{}"></span> {}</div>',
-                            get_device_color(d.model_name), d.model_name)
+                format_html(
+                    '<div class="admin-legend-item"><span class="admin-legend-dot" style="background:{}"></span> {}</div>',
+                    get_device_color(d.model_name),
+                    d.model_name,
+                )
             )
-        legend_html.append('<div class="admin-legend-item"><span class="admin-legend-bar" style="background:#fbbf24;"></span> GB (1MHz)</div>')
-        legend_html.append('<div class="admin-legend-item"><span class="admin-legend-bar" style="background:#f3f4f6; border:1px solid #d1d5db;"></span> N/A</div>')
+        legend_html.append(
+            '<div class="admin-legend-item"><span class="admin-legend-bar" style="background:#fbbf24;"></span> GB (1MHz)</div>'
+        )
+        legend_html.append(
+            '<div class="admin-legend-item"><span class="admin-legend-bar" style="background:#f3f4f6; border:1px solid #d1d5db;"></span> N/A</div>'
+        )
         legend_html.append('</div>')
-        
+
         grid_html = ['<div class="admin-ch-grid">']
         for ch in range(13, 54):
             ch_data = available_map.get(ch)
-            btn_class = "admin-ch-btn" if ch_data else "admin-ch-btn disabled"
+            btn_class = 'admin-ch-btn' if ch_data else 'admin-ch-btn disabled'
             grid_html.append(format_html('<div class="{}"><span>{}</span>', btn_class, ch))
-            
+
             if ch_data:
                 base_start = ch_data['base_start']
                 ch_width = 4000 if ch == 53 else 6000
-                
+
                 if ch_data['gb_lower'] > 0:
                     width = (ch_data['gb_lower'] / ch_width) * 100
-                    grid_html.append(format_html('<div class="admin-gb-indicator" style="left:0; width:{}%;"></div>', width))
+                    grid_html.append(
+                        format_html('<div class="admin-gb-indicator" style="left:0; width:{}%;"></div>', width)
+                    )
                 if ch_data['gb_upper'] > 0:
                     width = (ch_data['gb_upper'] / ch_width) * 100
-                    grid_html.append(format_html('<div class="admin-gb-indicator" style="right:0; width:{}%;"></div>', width))
-                
+                    grid_html.append(
+                        format_html('<div class="admin-gb-indicator" style="right:0; width:{}%;"></div>', width)
+                    )
+
                 grid_html.append('<div class="admin-device-indicators">')
                 for d in devices:
                     overlap_min = max(d.min_frequency, base_start)
                     overlap_max = min(d.max_frequency, base_start + ch_width)
-                    
+
                     if overlap_min < overlap_max:
                         width = ((overlap_max - overlap_min) / ch_width) * 100
                         margin = ((overlap_min - base_start) / ch_width) * 100
-                        grid_html.append(format_html('<div class="admin-device-bar" style="background:{}; width:{}%; margin-left:{}%;"></div>',
-                                                     get_device_color(d.model_name), width, margin))
+                        grid_html.append(
+                            format_html(
+                                '<div class="admin-device-bar" style="background:{}; width:{}%; margin-left:{}%;"></div>',
+                                get_device_color(d.model_name),
+                                width,
+                                margin,
+                            )
+                        )
                     else:
-                        grid_html.append('<div class="admin-device-bar" style="background:transparent; width:100%;"></div>')
+                        grid_html.append(
+                            '<div class="admin-device-bar" style="background:transparent; width:100%;"></div>'
+                        )
                 grid_html.append('</div>')
-            
+
             grid_html.append('</div>')
         grid_html.append('</div>')
-        
+
         card_html = f'<div class="admin-ch-card">{"".join(legend_html)}{"".join(grid_html)}</div>'
-        
+
         return mark_safe(css + card_html)
+
 
 @admin.register(WirelessEquipment)
 class WirelessEquipmentAdmin(ImportExportModelAdmin):

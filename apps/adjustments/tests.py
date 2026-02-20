@@ -1,36 +1,48 @@
 import io
 import json
-from django.test import TestCase
+
 from django.core import mail
+from django.test import TestCase
 from django.urls import reverse
-from apps.accounts.models import Member, EmailTemplate
+
+from apps.accounts.models import EmailTemplate, Member
+
+from .services import (
+    generate_adjustment_excel,
+    generate_adjustment_pdf,
+    send_adjustment_email,
+)
 from .utils import format_channels
-from .services import generate_adjustment_excel, generate_adjustment_pdf, send_adjustment_email
+
 
 class AdjustmentLogicTest(TestCase):
     def test_format_channels(self):
         """チャンネル番号リストが正しいハイフン連結文字列になること"""
-        self.assertEqual(format_channels([13, 14, 15]), "13-15")
-        self.assertEqual(format_channels([13, 14, 16, 17, 18]), "13, 14, 16-18")
-        self.assertEqual(format_channels([13, 15, 17]), "13, 15, 17")
-        self.assertEqual(format_channels([]), "")
+        self.assertEqual(format_channels([13, 14, 15]), '13-15')
+        self.assertEqual(format_channels([13, 14, 16, 17, 18]), '13, 14, 16-18')
+        self.assertEqual(format_channels([13, 15, 17]), '13, 15, 17')
+        self.assertEqual(format_channels([]), '')
 
     def test_generate_excel_and_pdf_smoke(self):
         """ExcelとPDFの生成がエラーなく完了し、BytesIOを返すこと"""
         member = Member.objects.create(
-            member_id_1="123", member_id_2="4567", name="テスト会員", 
-            manager_name="担当者", phone="03-1234-5678", email="test@example.com"
+            member_id_1='123',
+            member_id_2='4567',
+            name='テスト会員',
+            manager_name='担当者',
+            phone='03-1234-5678',
+            email='test@example.com',
         )
         data = {
-            "app_type": "new",
-            "user": {"name": "使用者", "kana": "しようしゃ", "tel": "090", "email": "u@ex.com"},
-            "event": {"name": "催事", "comment": "コメント"},
-            "facilities": [
-                {"name": "施設1", "start_date": "2026-02-20", "start_time": "09:00", "selectedChannels": [13, 14]}
+            'app_type': 'new',
+            'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090', 'email': 'u@ex.com'},
+            'event': {'name': '催事', 'comment': 'コメント'},
+            'facilities': [
+                {'name': '施設1', 'start_date': '2026-02-20', 'start_time': '09:00', 'selectedChannels': [13, 14]}
             ],
-            "mic_counts": {"analog_rm": {"10mw": 1}}
+            'mic_counts': {'analog_rm': {'10mw': 1}},
         }
-        
+
         # Excel生成テスト
         excel_buffer = generate_adjustment_excel(data, member)
         self.assertIsInstance(excel_buffer, io.BytesIO)
@@ -42,59 +54,54 @@ class AdjustmentLogicTest(TestCase):
             self.assertIsInstance(pdf_buffer, io.BytesIO)
             self.assertTrue(len(pdf_buffer.getvalue()) > 0)
         except Exception as e:
-            self.fail(f"PDF generation failed: {e}")
+            self.fail(f'PDF generation failed: {e}')
 
     def test_send_adjustment_email(self):
         """メール送信がテンプレートに基づいて正しく行われること"""
-        member = Member.objects.create(name="テスト会社")
+        member = Member.objects.create(name='テスト会社')
         EmailTemplate.objects.create(
-            subject="【{運用日}】テスト",
-            body="こんにちは {ユーザー名} 様",
-            to_address="recipient@example.com",
-            from_address="sender@example.com"
+            subject='【{運用日}】テスト',
+            body='こんにちは {ユーザー名} 様',
+            to_address='recipient@example.com',
+            from_address='sender@example.com',
         )
-        data = {
-            "user": {"name": "太郎", "email": "taro@ex.com"},
-            "facilities": [{"start_date": "2026-02-20"}]
-        }
-        pdf_buffer = io.BytesIO(b"dummy pdf content")
-        
+        data = {'user': {'name': '太郎', 'email': 'taro@ex.com'}, 'facilities': [{'start_date': '2026-02-20'}]}
+        pdf_buffer = io.BytesIO(b'dummy pdf content')
+
         send_adjustment_email(data, member, pdf_buffer)
-        
+
         # 送信済みメールの検証
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
-        self.assertEqual(sent.subject, "【2026年2月20日】テスト")
-        self.assertIn("こんにちは 太郎 様", sent.body)
+        self.assertEqual(sent.subject, '【2026年2月20日】テスト')
+        self.assertIn('こんにちは 太郎 様', sent.body)
         self.assertEqual(len(sent.attachments), 1)
-        self.assertEqual(sent.attachments[0][0], "adjustment_form.pdf")
+        self.assertEqual(sent.attachments[0][0], 'adjustment_form.pdf')
+
 
 class AdjustmentAPITest(TestCase):
     def setUp(self):
-        Member.objects.create(name="テスト会員")
+        Member.objects.create(name='テスト会員')
         self.valid_data = {
-            "app_type": "new",
-            "user": {
-                "name": "使用者", "kana": "しようしゃ", 
-                "tel": "090-1234-5678", "email": "u@ex.com"
-            },
-            "event": {"name": "催事"},
-            "facilities": [
+            'app_type': 'new',
+            'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090-1234-5678', 'email': 'u@ex.com'},
+            'event': {'name': '催事'},
+            'facilities': [
                 {
-                    "name": "施設1", 
-                    "start_date": "2026-02-20", "end_date": "2026-02-20",
-                    "start_time": "09:00", "end_time": "22:00"
+                    'name': '施設1',
+                    'start_date': '2026-02-20',
+                    'end_date': '2026-02-20',
+                    'start_time': '09:00',
+                    'end_time': '22:00',
                 }
             ],
-            "mic_counts": {"analog_rm": {"10mw": 1}}
+            'mic_counts': {'analog_rm': {'10mw': 1}},
         }
 
     def test_preview_pdf_api(self):
         """PDFプレビューAPIが正常にPDFを返すこと"""
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(self.valid_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(self.valid_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
@@ -102,9 +109,7 @@ class AdjustmentAPITest(TestCase):
     def test_preview_excel_api(self):
         """ExcelプレビューAPIが正常にExcelファイルを返すこと"""
         response = self.client.post(
-            reverse('adjustments:preview_excel'),
-            data=json.dumps(self.valid_data),
-            content_type='application/json'
+            reverse('adjustments:preview_excel'), data=json.dumps(self.valid_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -112,9 +117,7 @@ class AdjustmentAPITest(TestCase):
     def test_send_email_api(self):
         """メール送信APIが正常に受理されること"""
         response = self.client.post(
-            reverse('adjustments:send_email'),
-            data=json.dumps(self.valid_data),
-            content_type='application/json'
+            reverse('adjustments:send_email'), data=json.dumps(self.valid_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['status'], 'success')
@@ -123,9 +126,7 @@ class AdjustmentAPITest(TestCase):
     def test_api_invalid_json(self):
         """不正なJSONを送った場合に400エラーになること"""
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data="invalid json",
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data='invalid json', content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['status'], 'error')
@@ -134,9 +135,7 @@ class AdjustmentAPITest(TestCase):
         """会員情報（Member）がDBに存在しない場合でも生成処理が継続されること"""
         Member.objects.all().delete()
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(self.valid_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(self.valid_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
@@ -144,9 +143,7 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_empty_payload(self):
         """空のJSONオブジェクトを送った場合にバリデーションエラーになること"""
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps({}),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps({}), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['status'], 'error')
@@ -155,12 +152,10 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_missing_event_name(self):
         """必須項目（催事名）が欠落している場合にエラーになること"""
         incomplete_data = self.valid_data.copy()
-        incomplete_data['event'] = {} # 催事名がない
-        
+        incomplete_data['event'] = {}  # 催事名がない
+
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(incomplete_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(incomplete_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['status'], 'error')
@@ -170,12 +165,10 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_missing_user_fields(self):
         """現地使用者の必須項目が欠落している場合にエラーになること"""
         incomplete_data = self.valid_data.copy()
-        incomplete_data['user'] = {"name": "名前のみ"} # 他が足りない
-        
+        incomplete_data['user'] = {'name': '名前のみ'}  # 他が足りない
+
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(incomplete_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(incomplete_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         errors = response.json()['errors']
@@ -186,12 +179,10 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_no_mic_counts(self):
         """マイク数が1つも入力されていない場合にエラーになること"""
         incomplete_data = self.valid_data.copy()
-        incomplete_data['mic_counts'] = {} # 空
-        
+        incomplete_data['mic_counts'] = {}  # 空
+
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(incomplete_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(incomplete_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('mic_counts', response.json()['errors'])
@@ -199,12 +190,10 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_incomplete_facility(self):
         """施設の時間情報が不足している場合にエラーになること"""
         incomplete_data = self.valid_data.copy()
-        incomplete_data['facilities'] = [{"name": "施設1", "start_date": "2026-02-20"}] # 時間がない
-        
+        incomplete_data['facilities'] = [{'name': '施設1', 'start_date': '2026-02-20'}]  # 時間がない
+
         response = self.client.post(
-            reverse('adjustments:preview_pdf'),
-            data=json.dumps(incomplete_data),
-            content_type='application/json'
+            reverse('adjustments:preview_pdf'), data=json.dumps(incomplete_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('facilities', response.json()['errors'])

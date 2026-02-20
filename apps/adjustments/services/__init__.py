@@ -1,3 +1,4 @@
-from .excel_service import generate_adjustment_excel
-from .pdf_service import generate_adjustment_pdf, convert_excel_to_pdf
-from .email_service import send_adjustment_email
+from .email_service import send_adjustment_email as send_adjustment_email
+from .excel_service import generate_adjustment_excel as generate_adjustment_excel
+from .pdf_service import convert_excel_to_pdf as convert_excel_to_pdf
+from .pdf_service import generate_adjustment_pdf as generate_adjustment_pdf

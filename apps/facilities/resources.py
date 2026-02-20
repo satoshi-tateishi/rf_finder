@@ -1,139 +1,128 @@
 import csv
 import unicodedata
-import re
-from pathlib import Path
-from django.conf import settings
-from import_export import resources, fields
+
+from django.db import transaction
+from import_export import fields, resources
+
 from .models import Facility, TVChannelStatus, WirelessEquipment
 
+
 def normalize_address(text):
-    if not isinstance(text, str): return ""
+    if not isinstance(text, str):
+        return ''
     text = unicodedata.normalize('NFKC', text)
     kanji_map = str.maketrans('一二三四五六七八九〇', '1234567890')
     text = text.translate(kanji_map)
-    text = re.sub(r'([0-9]+)丁目', r'\1-', text)
-    text = re.sub(r'([0-9]+)番[地丁]?', r'\1-', text)
-    text = re.sub(r'([0-9]+)号', r'\1', text)
-    text = text.replace(' ', '').replace('　', '')
-    text = re.sub(r'-+', '-', text).strip('-')
-    return text
+    return text.replace(' ', '').replace('　', '')
 
-_zip_lookup = None
+
+_zip_lookup_cache = None
+
 
 def get_zip_lookup():
-    global _zip_lookup
-    if _zip_lookup is not None:
-        return _zip_lookup
-    
-    zip_csv_path = Path(settings.BASE_DIR) / "csv" / "utf_ken_all.csv"
-    if not zip_csv_path.exists():
-        return []
-        
-    lookup = []
-    try:
-        with open(zip_csv_path, 'r', encoding='utf-8') as f:
+    global _zip_lookup_cache
+    if _zip_lookup_cache is not None:
+        return _zip_lookup_cache
+
+    _zip_lookup_cache = {}
+    import os
+
+    from django.conf import settings
+
+    csv_path = os.path.join(settings.BASE_DIR, 'csv', 'x-ken-all.csv')
+    if os.path.exists(csv_path):
+        with open(csv_path, 'r', encoding='shift_jis') as f:
             reader = csv.reader(f)
             for row in reader:
-                if len(row) < 9: continue
+                if len(row) < 9:
+                    continue
                 zip_code = row[2]
                 pref = row[6]
-                city = row[7]
-                town = row[8]
-                if town == '以下に掲載がない場合':
-                    town = ''
-                
-                full_addr = normalize_address(pref + city + town)
-                if full_addr:
-                    lookup.append((full_addr, zip_code))
-    except Exception:
-        return []
-                
-    lookup.sort(key=lambda x: len(x[0]), reverse=True)
-    _zip_lookup = lookup
-    return _zip_lookup
+                addr = row[7] + row[8]
+                if addr == '以下に掲載がない場合':
+                    addr = ''
+                key = normalize_address(pref + addr)
+                if key not in _zip_lookup_cache:
+                    _zip_lookup_cache[key] = zip_code
+    return _zip_lookup_cache
+
 
 def find_zip_code(prefecture, address):
     norm_target = normalize_address(prefecture + address)
-    if not norm_target: return ""
-    
+    if not norm_target:
+        return ''
+
     lookup = get_zip_lookup()
-    for addr_key, zip_code in lookup:
-        if addr_key in norm_target:
-            return f"{zip_code[:3]}-{zip_code[3:]}" if len(zip_code) == 7 else zip_code
-    return ""
+    if norm_target in lookup:
+        return lookup[norm_target]
+
+    for key, val in lookup.items():
+        if norm_target.startswith(key):
+            return val
+    return ''
+
 
 class FacilityResource(resources.ModelResource):
-    # インポート用CSVのヘッダー名に合わせる
-    postal_code = fields.Field(attribute='postal_code', column_name='郵便番号')
-    prefecture = fields.Field(attribute='prefecture', column_name='都道府県名')
-    address = fields.Field(attribute='address', column_name='住所')
-    name = fields.Field(attribute='name', column_name='施設名')
-    category = fields.Field(attribute='category', column_name='屋内外')
-    applied_area = fields.Field(attribute='applied_area', column_name='適用エリア')
-
     class Meta:
         model = Facility
         fields = ('postal_code', 'prefecture', 'address', 'name', 'category', 'applied_area')
-        export_order = ('postal_code', 'prefecture', 'address', 'name', 'category', 'applied_area') + tuple(f'{ch}CH' for ch in range(13, 54))
+        export_order = ('postal_code', 'prefecture', 'address', 'name', 'category', 'applied_area') + tuple(
+            f'{ch}CH' for ch in range(13, 54)
+        )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 動的にCHカラムをフィールドとして追加
+    def __init__(self):
+        super().__init__()
         for ch in range(13, 54):
             field_name = f'{ch}CH'
             self.fields[field_name] = fields.Field(column_name=field_name, attribute=None)
 
     def export(self, queryset=None, *args, **kwargs):
-        if queryset is not None:
-            queryset = queryset.prefetch_related('channels')
         return super().export(queryset, *args, **kwargs)
 
     def export_resource(self, obj, **kwargs):
         self._current_obj_channels = {c.channel_number: c.is_available for c in obj.channels.all()}
         return super().export_resource(obj, **kwargs)
 
-    def export_field(self, field, obj, **kwargs):
-        if hasattr(field, 'column_name') and str(field.column_name).endswith('CH'):
-            try:
-                ch_num = int(str(field.column_name).replace('CH', ''))
-                if getattr(self, '_current_obj_channels', {}).get(ch_num):
-                    return '○'
-            except (ValueError, AttributeError):
-                pass
-            return ''
-        return super().export_field(field, obj, **kwargs)
+    def dehydrate_postal_code(self, obj):
+        if obj.postal_code:
+            return obj.postal_code
+        return find_zip_code(obj.prefecture, obj.address)
 
-    def before_save_instance(self, instance, using_transactions, dry_run):
-        if not instance.postal_code or instance.postal_code == "":
-            instance.postal_code = find_zip_code(instance.prefecture, instance.address)
+    def get_export_value(self, field, obj):
+        if field.column_name.endswith('CH'):
+            ch_num = int(field.column_name.replace('CH', ''))
+            is_avail = self._current_obj_channels.get(ch_num, True)
+            return '○' if is_avail else '×'
+        return super().get_export_value(field, obj)
 
-    def after_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return
-        if hasattr(self, 'current_row'):
-            row = self.current_row
-            for ch in range(13, 54):
-                ch_key = f'{ch}CH'
-                is_available = False
-                if ch == 53:
-                    is_available = True
-                elif ch_key in row:
-                    val = str(row[ch_key]).strip()
-                    if val in ['○', '1', 'available']:
-                        is_available = True
-                TVChannelStatus.objects.update_or_create(
-                    facility=instance,
-                    channel_number=ch,
-                    defaults={'is_available': is_available}
-                )
+    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
+        dataset.insert_col(0, lambda row: None, header='id')
 
-    def before_import_row(self, row, **kwargs):
-        self.current_row = row
+    def before_import_row(self, row, **row_kwargs):
+        row['postal_code'] = find_zip_code(row['prefecture'], row['address'])
+
+    def after_import(self, dataset, result, using_transactions, dry_run, **kwargs):
+        if not dry_run:
+            for row_result in result.rows:
+                if (
+                    row_result.import_type == result.IMPORT_TYPE_NEW
+                    or row_result.import_type == result.IMPORT_TYPE_UPDATE
+                ):
+                    facility = Facility.objects.get(pk=row_result.object_id)
+                    row_data = dataset.dict[row_result.object_index]
+
+                    with transaction.atomic():
+                        for ch in range(13, 54):
+                            val = row_data.get(f'{ch}CH')
+                            if val:
+                                is_avail = val == '○'
+                                TVChannelStatus.objects.update_or_create(
+                                    facility=facility, channel_number=ch, defaults={'is_available': is_avail}
+                                )
+
 
 class WirelessEquipmentResource(resources.ModelResource):
     class Meta:
         model = WirelessEquipment
-
-class TVChannelStatusResource(resources.ModelResource):
-    class Meta:
-        model = TVChannelStatus
+        import_id_fields = ('model_name',)
+        fields = ('manufacturer', 'model_name', 'min_frequency', 'max_frequency')

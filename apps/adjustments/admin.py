@@ -1,5 +1,7 @@
 from django.contrib import admin
+
 from .models import OperationAdjustment
+
 
 @admin.register(OperationAdjustment)
 class OperationAdjustmentAdmin(admin.ModelAdmin):
