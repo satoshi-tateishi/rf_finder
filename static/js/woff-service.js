@@ -95,13 +95,30 @@ const WoffService = (function() {
     }
 
     async function sendMessage(text) {
-        if (!isInClient()) return false;
+        if (!isInClient()) return { success: false, error: 'Not in client' };
         try {
             await woff.sendMessage({ content: text });
-            return true;
+            return { success: true };
         } catch (error) {
             console.error('[WOFF] Failed to send message:', error);
-            return false;
+            return { success: false, error: error };
+        }
+    }
+
+    async function sendFlexMessage(flexData) {
+        if (!isInClient()) return { success: false, error: 'Not in client' };
+        try {
+            // flexData が type: "flex" を持っていない場合はラップする
+            const payload = flexData.type === 'flex' ? flexData : {
+                type: 'flex',
+                altText: 'RF Finder Notification',
+                contents: flexData
+            };
+            await woff.sendFlexMessage({ flex: payload });
+            return { success: true };
+        } catch (error) {
+            console.error('[WOFF] Failed to send flex message:', error);
+            return { success: false, error: error };
         }
     }
 
@@ -111,6 +128,7 @@ const WoffService = (function() {
         getProfile,
         getAccessToken,
         getDetailedProfile,
-        sendMessage
+        sendMessage,
+        sendFlexMessage
     };
 })();

@@ -281,6 +281,90 @@ async function previewPDF() {
     }
 }
 
+async function sendCompletionFlexMessage(data) {
+    if (typeof WoffService === 'undefined' || !WoffService.isInClient()) return;
+
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    // 施設名のリストを作成
+    const facilityNames = data.facilities.map(f => f.name).join(' / ');
+
+    const flexContents = {
+        "type": "bubble",
+        "size": "kilo",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "運用調整届 送信完了",
+                    "weight": "bold",
+                    "color": "#ffffff",
+                    "size": "sm"
+                }
+            ],
+            "backgroundColor": "#00c300"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": data.event.name || "無題の催事",
+                    "weight": "bold",
+                    "size": "md",
+                    "wrap": true
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "margin": "md",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "baseline",
+                            "spacing": "sm",
+                            "contents": [
+                                { "type": "text", "text": "使用者", "color": "#aaaaaa", "size": "xs", "flex": 2 },
+                                { "type": "text", "text": data.user.name || "未入力", "wrap": true, "color": "#666666", "size": "xs", "flex": 5 }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "baseline",
+                            "spacing": "sm",
+                            "contents": [
+                                { "type": "text", "text": "施設", "color": "#aaaaaa", "size": "xs", "flex": 2 },
+                                { "type": "text", "text": facilityNames, "wrap": true, "color": "#666666", "size": "xs", "flex": 5 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "text": `送信日時: ${timestamp}`,
+                    "size": "xxs",
+                    "color": "#cccccc",
+                    "margin": "xl",
+                    "align": "end"
+                }
+            ]
+        }
+    };
+
+    console.log('[WOFF] Attempting to send completion flex message...');
+    const result = await WoffService.sendFlexMessage(flexContents);
+    console.log(`[WOFF] Message send result:`, result);
+}
+
 async function sendEmail() {
     if (!confirm('運用調整届を特ラ機構へ送信してもよろしいですか？')) return;
 
@@ -294,14 +378,8 @@ async function sendEmail() {
     try {
         await Api.sendEmail(data);
         
-        // WOFF環境の場合、トークルームへ完了メッセージを送信 (アラートより先に実行)
-        if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
-            console.log('[WOFF] Attempting to send message to talk room...');
-            const eventName = data.event.name || '無題の催事';
-            const messageText = `【RF Finder】運用調整届を送信しました\n催事名: ${eventName}`;
-            const success = await WoffService.sendMessage(messageText);
-            console.log(`[WOFF] Message send result: ${success}`);
-        }
+        // WOFF環境の場合、トークルームへ完了メッセージを送信 (Flex Message)
+        await sendCompletionFlexMessage(data);
 
         alert('送信が完了しました。');
     } catch (err) {

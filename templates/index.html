@@ -59,6 +59,11 @@
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fa-solid fa-tower-broadcast"></i> RF Finder
             </h1>
+            <div id="woff-test-tools" class="hidden flex gap-2">
+                <button onclick="testSendMessage()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded border border-white/40 transition-colors">
+                    <i class="fa-solid fa-vial"></i> Test Msg
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -334,12 +339,77 @@
 
     <!-- Initialization -->
     <script>
+        async function testSendMessage() {
+            if (!WoffService.isInClient()) {
+                alert('WOFFアプリ内でのみ送信可能です');
+                return;
+            }
+            
+            const confirmed = confirm('テストFlexメッセージを送信しますか？');
+            if (!confirmed) return;
+
+            // シンプルなFlex Messageサンプル
+            const flexContents = {
+                "type": "bubble",
+                "size": "kilo",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "WOFF Test Message",
+                            "weight": "bold",
+                            "color": "#ffffff",
+                            "size": "sm"
+                        }
+                    ],
+                    "backgroundColor": "#00c300"
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "送信テスト成功！",
+                            "weight": "bold",
+                            "size": "md",
+                            "margin": "md"
+                        },
+                        {
+                            "type": "text",
+                            "text": "RF FinderからのFlex Messageテスト送信です。",
+                            "size": "xs",
+                            "color": "#888888",
+                            "wrap": true,
+                            "margin": "sm"
+                        }
+                    ]
+                }
+            };
+
+            const result = await WoffService.sendFlexMessage(flexContents);
+            if (result.success) {
+                console.log('[WOFF] Test Flex Message sent');
+            } else {
+                const error = result.error || {};
+                const errorMsg = `送信に失敗しました。\nCode: ${error.code || 'unknown'}\nMessage: ${error.message || 'No details'}`;
+                alert(errorMsg);
+                console.error('[WOFF] Message send error details:', error);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const woffId = "{{ woff_id }}";
             await WoffService.init(woffId);
             
             // WOFF環境の場合、プロフィールを取得して自動入力
             if (WoffService.isInClient()) {
+                // テストツールを表示
+                const testTools = document.getElementById('woff-test-tools');
+                if (testTools) testTools.classList.remove('hidden');
+
                 try {
                     // 詳細プロフィールの取得を試みる (姓、名、フリガナ、メール)
                     const detailedProfile = await WoffService.getDetailedProfile();
