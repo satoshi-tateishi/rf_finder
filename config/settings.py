@@ -138,3 +138,6 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='webmaster@localhost')
 
 # Recipient Settings
 ADJUSTMENT_EMAIL_TO = env('ADJUSTMENT_EMAIL_TO', default='rm-unyo@radiomic.org')
+
+# WOFF Settings
+WOFF_ID = env('WOFF_ID', default='')

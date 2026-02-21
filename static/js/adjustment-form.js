@@ -2,6 +2,16 @@
  * Adjustment Form Management module
  */
 
+function autoFillUserProfile(profile) {
+    if (!profile) return;
+    
+    const nameInput = document.getElementById('user_name');
+    if (nameInput && !nameInput.value && profile.displayName) {
+        nameInput.value = profile.displayName;
+        console.log(`[WOFF] Auto-filled user name: ${profile.displayName}`);
+    }
+}
+
 function goToAdjustment() {
     if (keepList.length === 0) {
         alert('施設を選択してください');
@@ -239,6 +249,16 @@ async function sendEmail() {
 
     try {
         await Api.sendEmail(data);
+        
+        // WOFF環境の場合、トークルームへ完了メッセージを送信 (アラートより先に実行)
+        if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
+            console.log('[WOFF] Attempting to send message to talk room...');
+            const eventName = data.event.name || '無題の催事';
+            const messageText = `【RF Finder】運用調整届を送信しました\n催事名: ${eventName}`;
+            const success = await WoffService.sendMessage(messageText);
+            console.log(`[WOFF] Message send result: ${success}`);
+        }
+
         alert('送信が完了しました。');
     } catch (err) {
         console.error(err);

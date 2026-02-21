@@ -32,6 +32,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SortableJS -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <!-- LINE WORKS WOFF SDK -->
+    <script charset="utf-8" src="https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js"></script>
+
     <style>
         .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; }
         .ch-btn { aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; position: relative; border-radius: 4px; border-width: 1px; }
@@ -298,6 +302,9 @@
             <p>施設を検索してキープリストに追加してください</p>
         </div>
 
+        <!-- WOFF Debug Footer -->
+        <div id="woff-debug-status" class="fixed bottom-0 left-0 w-full bg-black/50 text-white text-[8px] p-1 pointer-events-none opacity-50 z-[9999]">WOFF: Waiting...</div>
+
     </div>
 
     <!-- Device Data -->
@@ -317,8 +324,30 @@
 
     <!-- Modular JS Files -->
     <script src="/static/js/api.js"></script>
+    <script src="/static/js/woff-service.js"></script>
     <script src="/static/js/keep-list.js"></script>
     <script src="/static/js/adjustment-form.js"></script>
     <script src="/static/js/ui-controller.js"></script>
+
+    <!-- Initialization -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const woffId = "{{ woff_id }}";
+            await WoffService.init(woffId);
+            
+            // WOFF環境の場合、プロフィールを取得して自動入力
+            if (WoffService.isInClient()) {
+                const profile = await WoffService.getProfile();
+                if (profile && typeof autoFillUserProfile === 'function') {
+                    autoFillUserProfile(profile);
+                }
+            }
+
+            // UI Controller の初期化（もし必要なら）
+            if (typeof UIController !== 'undefined' && UIController.init) {
+                UIController.init();
+            }
+        });
+    </script>
 </body>
 </html>

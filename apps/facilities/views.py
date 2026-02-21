@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Case, Q, When
 from django.shortcuts import render
 
@@ -18,7 +19,10 @@ def index(request):
             default=3,
         )
     ).order_by('custom_order', 'model_name')
-    return render(request, 'index.html', {'devices': devices})
+    return render(request, 'index.html', {
+        'devices': devices,
+        'woff_id': settings.WOFF_ID,
+    })
 
 
 def facility_search(request):
