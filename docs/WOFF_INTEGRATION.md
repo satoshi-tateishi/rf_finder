@@ -77,7 +77,30 @@ WOFF はセキュリティ上の理由から **HTTPS 必須** です。ローカ
 
 ---
 
-## 4. 実装のヒント
+## 5. ユーザー情報の取得 (Server-side API)
+
+WOFF で取得したアクセストークンを使用して、サーバーサイドからより詳細なユーザー情報を取得する場合、以下の API を使用します。
+
+### 構成員情報の取得
+- **Endpoint**: `GET https://www.worksapis.com/v1.0/users/{userId}`
+- **Method**: `GET`
+- **Headers**:
+    - `Authorization`: `Bearer {access_token}`
+- **Path Parameters**:
+    - `userId`: 構成員の ID (メールアドレスまたは resourceId)
+- **Required Scopes**:
+    - `user`, `user.read`, `directory`, `directory.read` のいずれか
+
+### 主なレスポンス項目
+- `userId`: ユーザーID
+- `userName`: 氏名 (`lastName`, `firstName`)
+- `email`: メールアドレス
+- `organizations`: 所属組織情報
+- `cellPhone`: 携帯電話番号
+
+---
+
+## 6. 実装のヒント
 （再掲）
 
 - **SSO 連携**: 外部ブラウザでユーザー情報を取得したい場合は `woff.isLoggedIn()` でチェックし、必要に応じて `woff.login()` を呼び出す。

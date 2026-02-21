@@ -5,10 +5,54 @@
 function autoFillUserProfile(profile) {
     if (!profile) return;
     
+    // 1. 氏名の自動入力 ({姓} {名})
     const nameInput = document.getElementById('user_name');
-    if (nameInput && !nameInput.value && profile.displayName) {
-        nameInput.value = profile.displayName;
-        console.log(`[WOFF] Auto-filled user name: ${profile.displayName}`);
+    if (nameInput && !nameInput.value) {
+        if (profile.userName) {
+            const fullName = `${profile.userName.lastName} ${profile.userName.firstName}`;
+            nameInput.value = fullName;
+            console.log(`[WOFF] Auto-filled user name (detailed): ${fullName}`);
+        } else if (profile.displayName) {
+            nameInput.value = profile.displayName;
+            console.log(`[WOFF] Auto-filled user name (basic): ${profile.displayName}`);
+        }
+    }
+
+    // 2. ふりがなの自動入力 (カタカナをひらがなに変換)
+    const kanaInput = document.getElementById('user_kana');
+    if (kanaInput && !kanaInput.value && profile.userName) {
+        if (profile.userName.phoneticLastName || profile.userName.phoneticFirstName) {
+            let fullPhonetic = `${profile.userName.phoneticLastName || ''} ${profile.userName.phoneticFirstName || ''}`.trim();
+            
+            // カタカナからひらがなへの変換
+            fullPhonetic = fullPhonetic.replace(/[\u30a1-\u30f6]/g, (match) => {
+                const chr = match.charCodeAt(0) - 0x60;
+                return String.fromCharCode(chr);
+            });
+            
+            kanaInput.value = fullPhonetic;
+            console.log(`[WOFF] Auto-filled user phonetic name (to hiragana): ${fullPhonetic}`);
+        }
+    }
+
+    // 3. メールの自動入力 (個人メールを優先)
+    const emailInput = document.getElementById('user_email');
+    if (emailInput && !emailInput.value) {
+        const email = profile.privateEmail || profile.email;
+        if (email) {
+            emailInput.value = email;
+            console.log(`[WOFF] Auto-filled user email: ${email}`);
+        }
+    }
+
+    // 4. 電話番号の自動入力 (電話番号を優先)
+    const telInput = document.getElementById('user_tel');
+    if (telInput && !telInput.value) {
+        const phone = profile.telephone || profile.cellPhone;
+        if (phone) {
+            telInput.value = phone;
+            console.log(`[WOFF] Auto-filled user tel: ${phone}`);
+        }
     }
 }
 

@@ -303,7 +303,10 @@
         </div>
 
         <!-- WOFF Debug Footer -->
-        <div id="woff-debug-status" class="fixed bottom-0 left-0 w-full bg-black/50 text-white text-[8px] p-1 pointer-events-none opacity-50 z-[9999]">WOFF: Waiting...</div>
+        <div id="woff-debug-status" class="fixed bottom-0 left-0 w-full bg-black/80 text-white text-[10px] p-2 flex justify-between items-center z-[9999]">
+            <span id="woff-debug-text">WOFF: Waiting...</span>
+            <button onclick="woff.login();" class="bg-blue-600 px-2 py-1 rounded text-white font-bold">Force Re-consent</button>
+        </div>
 
     </div>
 
@@ -337,9 +340,20 @@
             
             // WOFF環境の場合、プロフィールを取得して自動入力
             if (WoffService.isInClient()) {
-                const profile = await WoffService.getProfile();
-                if (profile && typeof autoFillUserProfile === 'function') {
-                    autoFillUserProfile(profile);
+                try {
+                    // 詳細プロフィールの取得を試みる (姓、名、フリガナ、メール)
+                    const detailedProfile = await WoffService.getDetailedProfile();
+                    if (detailedProfile && typeof autoFillUserProfile === 'function') {
+                        autoFillUserProfile(detailedProfile);
+                    } else {
+                        // 失敗した場合は基本プロフィールを使用
+                        const basicProfile = await WoffService.getProfile();
+                        if (basicProfile && typeof autoFillUserProfile === 'function') {
+                            autoFillUserProfile(basicProfile);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[WOFF] Failed to get detailed profile:', e);
                 }
             }
 

@@ -7,7 +7,7 @@ const WoffService = (function() {
 
     function _updateDebugStatus(msg) {
         console.log(`[WOFF Debug] ${msg}`);
-        const debugEl = document.getElementById('woff-debug-status');
+        const debugEl = document.getElementById('woff-debug-text');
         if (debugEl) debugEl.innerText = `WOFF: ${msg}`;
     }
 
@@ -63,6 +63,37 @@ const WoffService = (function() {
         }
     }
 
+    /**
+     * アクセストークンを取得する
+     */
+    async function getAccessToken() {
+        if (!_isInitialized) return null;
+        try {
+            return await woff.getAccessToken();
+        } catch (error) {
+            console.error('[WOFF] Failed to get access token:', error);
+            return null;
+        }
+    }
+
+    /**
+     * サーバーサイド経由で詳細なプロフィールを取得する
+     */
+    async function getDetailedProfile() {
+        if (!_isInitialized) return null;
+        try {
+            const profile = await woff.getProfile();
+            const accessToken = await woff.getAccessToken();
+            if (profile && accessToken) {
+                return await Api.getWoffDetailedProfile(profile.userId, accessToken);
+            }
+            return null;
+        } catch (error) {
+            console.error('[WOFF] Failed to get detailed profile:', error);
+            return null;
+        }
+    }
+
     async function sendMessage(text) {
         if (!isInClient()) return false;
         try {
@@ -78,6 +109,8 @@ const WoffService = (function() {
         init,
         isInClient,
         getProfile,
+        getAccessToken,
+        getDetailedProfile,
         sendMessage
     };
 })();
