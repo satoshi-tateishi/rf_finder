@@ -1,4 +1,3 @@
-import json
 import traceback
 
 from django.http import HttpResponse
@@ -8,12 +7,12 @@ from apps.accounts.models import Member
 
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
 from .services import (
+    LineBotService,
     generate_adjustment_excel,
     generate_adjustment_pdf,
     send_adjustment_email,
-    LineBotService,
 )
-from .utils import api_error, api_success, get_adjustment_filename
+from .utils import api_error, api_success, get_adjustment_filename, json_api_view
 
 
 def validate_adjustment_data(data):
@@ -45,19 +44,8 @@ def validate_adjustment_data(data):
 
 
 @csrf_exempt
-def preview_excel(request):
-    if request.method != 'POST':
-        return api_error('Method not allowed', status=405)
-
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return api_error('Invalid JSON', status=400)
-
-    is_valid, errors = validate_adjustment_data(data)
-    if not is_valid:
-        return api_error('Validation failed', errors=errors)
-
+@json_api_view(validate=True)
+def preview_excel(request, data):
     member = Member.objects.first()
     buffer = generate_adjustment_excel(data, member)
     filename = get_adjustment_filename(data, 'xlsx')
@@ -68,19 +56,9 @@ def preview_excel(request):
 
 
 @csrf_exempt
-def preview_pdf(request):
+@json_api_view(validate=True)
+def preview_pdf(request, data):
     print(">>> preview_pdf called")
-    if request.method != 'POST':
-        return api_error('Method not allowed', status=405)
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return api_error('Invalid JSON', status=400)
-
-    is_valid, errors = validate_adjustment_data(data)
-    if not is_valid:
-        return api_error('Validation failed', errors=errors)
-
     member = Member.objects.first()
     try:
         buffer = generate_adjustment_pdf(data, member)
@@ -93,18 +71,8 @@ def preview_pdf(request):
 
 
 @csrf_exempt
-def send_email(request):
-    if request.method != 'POST':
-        return api_error('Method not allowed', status=405)
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return api_error('Invalid JSON', status=400)
-
-    is_valid, errors = validate_adjustment_data(data)
-    if not is_valid:
-        return api_error('Validation failed', errors=errors)
-
+@json_api_view(validate=True)
+def send_email(request, data):
     member = Member.objects.first()
     try:
         # 1. PDFを生成

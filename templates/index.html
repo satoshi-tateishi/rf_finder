@@ -389,6 +389,8 @@
     <!-- Modular JS Files -->
     <script src="/static/js/api.js"></script>
     <script src="/static/js/notifications.js"></script>
+    <script src="/static/js/form-storage.js"></script>
+    <script src="/static/js/pdf-preview.js"></script>
     <script src="/static/js/keep-list.js"></script>
     <script src="/static/js/adjustment-form.js"></script>
     <script src="/static/js/ui-controller.js"></script>
@@ -399,6 +401,12 @@
             // UI Controller の初期化
             if (typeof UIController !== 'undefined' && UIController.init) {
                 UIController.init();
+            }
+
+            // フォーム状態の復元と監視 (リフレッシュ対策)
+            if (typeof restoreFormState === 'function') {
+                await restoreFormState();
+                initChangeWatchers();
             }
         });
     </script>
