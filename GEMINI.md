@@ -69,4 +69,6 @@
 
 - **テスト・デバッグ手法**: /Users/satoshi/rf_finder/docs/TESTING.md
 
+- **LINE WORKS API連携**: /Users/satoshi/rf_finder/docs/LINE_WORKS_API.md
+
 - **進捗状況**: /Users/satoshi/rf_finder/docs/PHASES.md
