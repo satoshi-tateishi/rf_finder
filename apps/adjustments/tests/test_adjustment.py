@@ -7,12 +7,12 @@ from django.urls import reverse
 
 from apps.accounts.models import EmailTemplate, Member
 
-from .services import (
+from apps.adjustments.services import (
     generate_adjustment_excel,
     generate_adjustment_pdf,
     send_adjustment_email,
 )
-from .utils import format_channels
+from apps.adjustments.utils import format_channels
 
 
 class AdjustmentLogicTest(TestCase):
@@ -61,11 +61,15 @@ class AdjustmentLogicTest(TestCase):
         member = Member.objects.create(name='テスト会社')
         EmailTemplate.objects.create(
             subject='【{運用日}】テスト',
-            body='こんにちは {ユーザー名} 様',
+            body='こんにちは {ユーザー名} 様。区分は {タイプ} です。',
             to_address='recipient@example.com',
-            from_address='sender@example.com',
+            cc_address='{ユーザーEメールアドレス}, boss@example.com',
         )
-        data = {'user': {'name': '太郎', 'email': 'taro@ex.com'}, 'facilities': [{'start_date': '2026-02-20'}]}
+        data = {
+            'app_type': 'change',
+            'user': {'name': '太郎', 'email': 'taro@ex.com'},
+            'facilities': [{'start_date': '2026-02-20'}]
+        }
         pdf_buffer = io.BytesIO(b'dummy pdf content')
 
         send_adjustment_email(data, member, pdf_buffer)
@@ -74,14 +78,24 @@ class AdjustmentLogicTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
         self.assertEqual(sent.subject, '【2026年2月20日】テスト')
-        self.assertIn('こんにちは 太郎 様', sent.body)
+        self.assertIn('こんにちは 太郎 様。区分は 変更 です。', sent.body)
+        # CCの検証
+        self.assertIn('taro@ex.com', sent.cc)
+        self.assertIn('boss@example.com', sent.cc)
         self.assertEqual(len(sent.attachments), 1)
-        self.assertEqual(sent.attachments[0][0], 'adjustment_form.pdf')
+        # ファイル名が正しく生成されているか（運用連絡票_新規_無題の催事_20260220.pdf）
+        self.assertIn('運用連絡票', sent.attachments[0][0])
+        self.assertIn('20260220', sent.attachments[0][0])
 
 
 class AdjustmentAPITest(TestCase):
     def setUp(self):
         Member.objects.create(name='テスト会員')
+        EmailTemplate.objects.create(
+            subject='テスト件名',
+            body='テスト本文',
+            to_address='test@example.com'
+        )
         self.valid_data = {
             'app_type': 'new',
             'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090-1234-5678', 'email': 'u@ex.com'},
@@ -197,3 +211,16 @@ class AdjustmentAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('facilities', response.json()['errors'])
+
+    def test_create_temp_pdf_api(self):
+        """一時URL生成APIがファイル名を含むフルURLを返すこと"""
+        from urllib.parse import unquote
+        response = self.client.post(
+            reverse('adjustments:create_temp_pdf'), data=json.dumps(self.valid_data), content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        url = unquote(response.json()['data']['url'])
+        # URLにファイル名が含まれていることを確認 (運用連絡票_新規_催事_20260220.pdf)
+        self.assertIn('運用連絡票_新規_催事_20260220.pdf', url)
+        # トークン（UUID形式の一部）が含まれていることも確認
+        self.assertRegex(url, r'[0-9a-f]{8}-')

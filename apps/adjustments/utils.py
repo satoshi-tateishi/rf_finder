@@ -31,3 +31,29 @@ def api_error(message, status=400, errors=None):
     if errors:
         payload['errors'] = errors
     return JsonResponse(payload, status=status, json_dumps_params={'ensure_ascii': False})
+
+
+def get_adjustment_filename(data, extension='pdf'):
+    """
+    運用連絡票のファイル名を生成する。
+    形式: 運用連絡票_{区分}_{催事名}_{運用開始日}.{extension}
+    """
+    app_type_map = {
+        'new': '新規',
+        'change': '変更',
+        'delete': '削除'
+    }
+    app_type_raw = data.get('app_type', 'new')
+    app_type_jp = app_type_map.get(app_type_raw, '新規')
+    
+    event_name = data.get('event', {}).get('name', '無題の催事')
+    
+    facilities = data.get('facilities', [])
+    start_date = facilities[0].get('start_date', '') if facilities else ''
+    # 日付からハイフンを除去 (YYYY-MM-DD -> YYYYMMDD)
+    date_str = start_date.replace('-', '') if start_date else '未定'
+    
+    # ファイル名に使用できない文字をサニタイズ（簡易）
+    safe_event_name = "".join([c for c in event_name if c not in r'\/:*?"<>|']).strip()
+    
+    return f"運用連絡票_{app_type_jp}_{safe_event_name}_{date_str}.{extension}"

@@ -71,51 +71,6 @@ const Api = {
         return await this._handleResponse(res);
     },
 
-    async getWoffDetailedProfile(userId, accessToken) {
-        const res = await fetch('/api/accounts/woff/profile/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, accessToken })
-        });
-        return await this._handleResponse(res);
-    },
-
-    async sendTestTextMessage(channelId, message) {
-        const res = await fetch('/api/adjustments/test-send-text-message/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId, message })
-        });
-        return await this._handleResponse(res);
-    },
-
-    async sendTestPdfMessage(channelId) {
-        const res = await fetch('/api/adjustments/test-send-pdf-message/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId })
-        });
-        return await this._handleResponse(res);
-    },
-
-    async sendTestPdfMessage(channelId) {
-        const res = await fetch('/api/adjustments/test-send-pdf-message/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId })
-        });
-        return await this._handleResponse(res);
-    },
-
-    async logWoffChannelIdResult(result) {
-        const res = await fetch('/api/adjustments/log-woff-channel-id-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ result })
-        });
-        return await this._handleResponse(res);
-    },
-
     /**
      * Utility: Format channel numbers (e.g. [13, 14, 15, 20] -> "13-15, 20")
      */

@@ -3,8 +3,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 
-from .models import EmailTemplate, Member, WoffUser
-from .resources import EmailTemplateResource, MemberResource, WoffUserResource
+from .models import EmailTemplate, Member
+from .resources import EmailTemplateResource, MemberResource
 
 
 class MemberAdminForm(forms.ModelForm):
@@ -54,9 +54,9 @@ class MemberAdmin(ImportExportModelAdmin):
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(ImportExportModelAdmin):
     resource_class = EmailTemplateResource
-    list_display = ('subject', 'to_address', 'from_address')
+    list_display = ('subject', 'to_address', 'cc_address')
     fieldsets = (
-        (None, {'fields': ('to_address', 'from_address', 'subject', 'body')}),
+        (None, {'fields': ('to_address', 'cc_address', 'subject', 'body')}),
         (
             '利用可能な変数 (プレースホルダー)',
             {
@@ -88,6 +88,7 @@ class EmailTemplateAdmin(ImportExportModelAdmin):
                     '<li><b>{{ユーザーEメールアドレス}}</b> : 現地使用者のメールアドレス</li>'
                     '<li><b>{{催事名}}</b> : 催事名</li>'
                     '<li><b>{{運用日}}</b> : 最初の施設の開始日</li>'
+                    '<li><b>{{タイプ}}</b> : 申請区分（新規 / 変更 / 削除）</li>'
                     '</ul>'
                     '</div>'
                 ),
@@ -95,10 +96,3 @@ class EmailTemplateAdmin(ImportExportModelAdmin):
             },
         ),
     )
-
-
-@admin.register(WoffUser)
-class WoffUserAdmin(ImportExportModelAdmin):
-    resource_class = WoffUserResource
-    list_display = ('name', 'email', 'user_id', 'phone')
-    search_fields = ('name', 'email', 'user_id')

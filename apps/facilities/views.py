@@ -1,7 +1,3 @@
-import base64
-import hashlib
-import hmac
-
 from django.conf import settings
 from django.db.models import Case, Q, When
 from django.shortcuts import render
@@ -12,44 +8,8 @@ from .models import Facility, WirelessEquipment
 from .services import calculate_available_frequencies
 
 
-def verify_woff_signature(request):
-    """
-    WOFFのリダイレクト検証を行う。
-    """
-    woff_id = settings.WOFF_ID
-    secret_key = settings.WOFF_SECRET_KEY
-    
-    if not woff_id or not secret_key:
-        return True # 設定がない場合はスキップ (開発用)
-
-    timestamp = request.GET.get('timestamp')
-    nonce = request.GET.get('nonce')
-    signature = request.GET.get('signature')
-
-    if not all([timestamp, nonce, signature]):
-        return False
-
-    # {woffId}{timestamp}{nonce} を HMAC-SHA256 で署名
-    data = f"{woff_id}{timestamp}{nonce}"
-    hmac_obj = hmac.new(
-        secret_key.encode('utf-8'),
-        data.encode('utf-8'),
-        hashlib.sha256
-    )
-    # Base64 URL エンコード (末尾のパディングを削除)
-    expected = base64.urlsafe_b64encode(hmac_obj.digest()).decode('utf-8').rstrip('=')
-    
-    return hmac.compare_digest(expected, signature)
-
-
 def index(request):
     """メイン画面（検索・視覚化）を表示"""
-    # WOFFリダイレクト検証 (URLパラメータがある場合のみ実行)
-    is_woff = 'signature' in request.GET
-    woff_valid = False
-    if is_woff:
-        woff_valid = verify_woff_signature(request)
-
     # ユーザー指定の順序: SR2050 (上) -> EM 3732 N (中) -> EM 3732 L (下)
     devices = WirelessEquipment.objects.annotate(
         custom_order=Case(
@@ -61,9 +21,6 @@ def index(request):
     ).order_by('custom_order', 'model_name')
     return render(request, 'index.html', {
         'devices': devices,
-        'woff_id': settings.WOFF_ID,
-        'woff_valid': woff_valid,
-        'is_woff': is_woff,
     })
 
 

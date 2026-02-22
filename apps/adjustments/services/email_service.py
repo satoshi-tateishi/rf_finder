@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 
 from apps.accounts.models import EmailTemplate
+from ..utils import get_adjustment_filename
 
 
 def send_adjustment_email(data, member, pdf_buffer):
@@ -30,50 +31,51 @@ def send_adjustment_email(data, member, pdf_buffer):
 
     # テンプレートの取得
     template = EmailTemplate.objects.first()
+    if not template:
+        raise RuntimeError('メールテンプレートが設定されていません。管理画面から作成してください。')
 
-    if template:
-        subject = template.subject
-        body = template.body
-        # プレースホルダーの置換
-        replacements = {
-            '{ユーザー名}': user_name,
-            '{ユーザーEメールアドレス}': user_email,
-            '{催事名}': event_name,
-            '{運用日}': start_date_formatted,
-        }
-        for placeholder, value in replacements.items():
-            subject = subject.replace(placeholder, value or '')
-            body = body.replace(placeholder, value or '')
+    # 区分（タイプ）の取得
+    app_type_map = {'new': '新規', 'change': '変更', 'delete': '削除'}
+    app_type_jp = app_type_map.get(data.get('app_type'), '新規')
 
-        # 本文の最後に改行を追加（添付ファイルとの隙間用）
-        body = body.rstrip() + '\n\n'
+    subject = template.subject
+    body = template.body
+    cc_raw = template.cc_address
+    
+    # プレースホルダーの置換
+    replacements = {
+        '{ユーザー名}': user_name,
+        '{ユーザーEメールアドレス}': user_email,
+        '{催事名}': event_name,
+        '{運用日}': start_date_formatted,
+        '{タイプ}': app_type_jp,
+    }
+    for placeholder, value in replacements.items():
+        subject = subject.replace(placeholder, value or '')
+        body = body.replace(placeholder, value or '')
+        cc_raw = cc_raw.replace(placeholder, value or '')
 
-        # 送信先: .env の設定がある場合はそれを優先（テスト用）、なければテンプレートの設定を使用
-        recipient = getattr(settings, 'ADJUSTMENT_EMAIL_TO', template.to_address)
-    else:
-        # テンプレートがない場合のデフォルト
-        subject = f'【運用調整届】{event_name} - {user_name}'
-        body = f"""特定ラジオマイク運用調整届（自動送信）
+    # CCのリスト化
+    cc_list = [addr.strip() for addr in cc_raw.split(',') if addr.strip()]
 
-催事名: {event_name}
-申請者: {member.name if member else '未設定'}
-現地使用者: {user_name}
+    # 本文の最後に改行を追加（添付ファイルとの隙間用）
+    body = body.rstrip() + '\n\n'
 
-詳細は添付のPDFをご確認ください。
-
-"""
-        recipient = getattr(settings, 'ADJUSTMENT_EMAIL_TO', 'rm-unyo@radiomic.org')
+    # 送信先: 管理画面の設定を使用
+    recipient = template.to_address
 
     email = EmailMessage(
         subject,
         body,
         settings.DEFAULT_FROM_EMAIL,
         [recipient],
+        cc=cc_list,
     )
 
     # PDFを添付
     pdf_buffer.seek(0)
-    email.attach('adjustment_form.pdf', pdf_buffer.getvalue(), 'application/pdf')
+    filename = get_adjustment_filename(data, 'pdf')
+    email.attach(filename, pdf_buffer.getvalue(), 'application/pdf')
 
     # 送信
     return email.send(fail_silently=False)

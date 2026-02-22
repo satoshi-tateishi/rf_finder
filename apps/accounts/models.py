@@ -20,7 +20,7 @@ class Member(models.Model):
 
 class EmailTemplate(models.Model):
     to_address = models.EmailField(verbose_name='送信先アドレス')
-    from_address = models.EmailField(verbose_name='送信元アドレス')
+    cc_address = models.CharField(max_length=255, blank=True, default='', verbose_name='CC', help_text='カンマ区切りで複数指定可能。{ユーザーEメールアドレス} も使用できます。')
     subject = models.CharField(max_length=255, verbose_name='件名')
     body = models.TextField(verbose_name='本文')
 
@@ -30,17 +30,3 @@ class EmailTemplate(models.Model):
 
     def __str__(self):
         return self.subject
-
-
-class WoffUser(models.Model):
-    user_id = models.CharField(max_length=255, unique=True, verbose_name='ユーザーID')
-    name = models.CharField(max_length=255, verbose_name='名前')
-    email = models.EmailField(verbose_name='メールアドレス', blank=True, default='')
-    phone = models.CharField(max_length=20, verbose_name='電話番号', blank=True, default='')
-
-    class Meta:
-        verbose_name = 'WOFFユーザー'
-        verbose_name_plural = 'WOFFユーザー'
-
-    def __str__(self):
-        return self.name

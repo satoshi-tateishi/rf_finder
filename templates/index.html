@@ -32,9 +32,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SortableJS -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    
-    <!-- LINE WORKS WOFF SDK -->
-    <script charset="utf-8" src="https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js"></script>
 
     <style>
         .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; }
@@ -49,15 +46,76 @@
         
         /* ガードバンド表示 */
         .gb-indicator { position: absolute; top: 0; height: 3px; background-color: #fbbf24; opacity: 0.7; }
+
+        /* Toast Notification Styles */
+        #toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 90%;
+        }
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            transform: translateX(100%);
+            animation: slideIn 0.3s forwards;
+            min-width: 200px;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast.hide {
+            animation: slideOut 0.3s forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .toast-success { background-color: #22c55e; } /* green-500 */
+        .toast-error { background-color: #ef4444; }   /* red-500 */
+        .toast-info { background-color: #3b82f6; }    /* blue-500 */
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
 
-    {% if is_woff and not woff_valid %}
-    <div class="bg-red-600 text-white text-center py-2 text-xs font-bold sticky top-0 z-[100]">
-        <i class="fa-solid fa-triangle-exclamation"></i> セキュリティ検証に失敗しました。公式メニューから開き直してください。
+    <div id="toast-container"></div> <!-- Toast Notification Container -->
+
+    <!-- PDF Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 z-[200] hidden bg-black/80 flex flex-col">
+        <div class="bg-white p-4 flex justify-between items-center shadow-md">
+            <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                <i class="fa-solid fa-file-lines text-blue-600"></i> プレビュー
+            </h3>
+            <button onclick="closePreviewModal()" class="text-gray-500 hover:text-gray-800 p-2">
+                <i class="fa-solid fa-xmark fa-xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 w-full bg-gray-200 overflow-hidden relative">
+            <iframe id="preview-iframe" class="w-full h-full border-0"></iframe>
+            <!-- Mobile Fallback Message -->
+            <div id="preview-mobile-msg" class="hidden absolute inset-0 flex flex-col items-center justify-center p-10 text-center bg-white">
+                <i class="fa-solid fa-file-pdf fa-4x text-red-500 mb-4"></i>
+                <p class="text-gray-600 mb-4">このブラウザでは埋め込みプレビューを表示できません。直接PDFを開いて確認してください。</p>
+                <button onclick="openPdfDirectly()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">PDFを開く</button>
+            </div>
+        </div>
     </div>
-    {% endif %}
 
     <!-- Header -->
     <nav class="bg-[#00c300] text-white p-4 shadow-md sticky top-0 z-50">
@@ -65,14 +123,6 @@
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fa-solid fa-tower-broadcast"></i> RF Finder
             </h1>
-            <div id="woff-test-tools" class="hidden flex gap-2">
-                <button onclick="testSendMessage()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded border border-white/40 transition-colors">
-                    <i class="fa-solid fa-comment-dots"></i> Test Msg
-                </button>
-                <button onclick="testSendFile()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded border border-white/40 transition-colors">
-                    <i class="fa-solid fa-file-pdf"></i> Test PDF
-                </button>
-            </div>
         </div>
     </nav>
 
@@ -294,8 +344,11 @@
 
             <!-- Form Actions -->
             <div class="flex flex-col gap-3">
+                <button onclick="previewPDF()" class="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-eye"></i> 内容をプレビュー
+                </button>
                 <div class="grid grid-cols-2 gap-3">
-                    <button onclick="previewPDF()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                    <button onclick="downloadPDF()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg">
                         <i class="fa-solid fa-file-pdf"></i> PDF
                     </button>
                     <button onclick="downloadExcel()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 text-lg">
@@ -335,7 +388,7 @@
 
     <!-- Modular JS Files -->
     <script src="/static/js/api.js"></script>
-    <script src="/static/js/woff-service.js"></script>
+    <script src="/static/js/notifications.js"></script>
     <script src="/static/js/keep-list.js"></script>
     <script src="/static/js/adjustment-form.js"></script>
     <script src="/static/js/ui-controller.js"></script>
@@ -343,33 +396,7 @@
     <!-- Initialization -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const woffId = "{{ woff_id }}";
-            await WoffService.init(woffId);
-            
-            // WOFF環境の場合、プロフィールを取得して自動入力
-            if (WoffService.isInClient()) {
-                // テストツールを表示
-                const testTools = document.getElementById('woff-test-tools');
-                if (testTools) testTools.classList.remove('hidden');
-
-                try {
-                    // 詳細プロフィールの取得を試みる (姓、名、フリガナ、メール)
-                    const detailedProfile = await WoffService.getDetailedProfile();
-                    if (detailedProfile && typeof autoFillUserProfile === 'function') {
-                        autoFillUserProfile(detailedProfile);
-                    } else {
-                        // 失敗した場合は基本プロフィールを使用
-                        const basicProfile = await WoffService.getProfile();
-                        if (basicProfile && typeof autoFillUserProfile === 'function') {
-                            autoFillUserProfile(basicProfile);
-                        }
-                    }
-                } catch (e) {
-                    console.error('[WOFF] Failed to get detailed profile:', e);
-                }
-            }
-
-            // UI Controller の初期化（もし必要なら）
+            // UI Controller の初期化
             if (typeof UIController !== 'undefined' && UIController.init) {
                 UIController.init();
             }

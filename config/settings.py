@@ -22,6 +22,10 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
+# Proxy settings for generating correct absolute URLs
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # CSRF Trusted Origins (Django 4.0+)
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost:8084', 'http://127.0.0.1:8084'])
 
@@ -135,13 +139,6 @@ EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=10)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='webmaster@localhost')
-
-# Recipient Settings
-ADJUSTMENT_EMAIL_TO = env('ADJUSTMENT_EMAIL_TO', default='rm-unyo@radiomic.org')
-
-# WOFF Settings
-WOFF_ID = env('WOFF_ID', default='')
-WOFF_SECRET_KEY = env('WOFF_SECRET_KEY', default='')
 
 # LINE WORKS Bot API Settings
 LINE_WORKS_CLIENT_ID = env('LINE_WORKS_CLIENT_ID', default='')

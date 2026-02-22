@@ -1,4 +1,4 @@
-# プロジェクト: 特ラ運用調整支援アプリ (LINE WORKS WOFF)
+# プロジェクト: 特ラ運用調整支援アプリ (RF Finder)
 
 ## 0. 基本方針
 - **動作環境**: 本アプリケーションは Docker 環境で動作します。開発、テスト、デプロイは Docker コンテナ内で行うことを前提とします。
@@ -6,13 +6,13 @@
 - **Playwright MCP**: UI の修正を行った際は、Playwright MCP を使用して自動的に表示チェックを行うこと。Playwright MCP の使用については、ユーザーからの事前の承諾が得られているものとする。
 
 ## 1. プロジェクト概要
-特定ラジオマイク（A帯）の施設別空きチャンネル検索、運用調整届（PDF）の自動生成、およびゼンハイザーWSM用データの書き出しを行うWebアプリケーション。
+特定ラジオマイク（A帯）の施設別空きチャンネル検索、運用調整届（PDF/Excel）の自動生成、および特ラ機構への自動メール送信を行うWebアプリケーション。
 
 ## 2. 技術スタック
-- UI: LINE WORKS WOFF (HTML/JS/Tailwind CSS)
+- UI: Standalone Web App (HTML/JS/Tailwind CSS) ※LINE WORKS SSO連携予定
 - Backend: Django (Python)
 - Database: MySQL
-- Libraries: reportlab (PDF), openpyxl (Excel)
+- Libraries: reportlab (PDF), openpyxl (Excel), Pillow (Image)
 - Infrastructure: Docker (開発・本番環境) / nginx / Let's Encrypt
 
 ## 3. 重要な業務ロジック・計算規則
@@ -41,28 +41,27 @@
 
    - 特ラ機構指定Excel (`master.xlsx`) への転記・ダウンロード。
 
-   - 上記Excelデータに基づく運用調整届 (PDF) のプレビュー表示 (LibreOffice使用)。
+   - 運用調整届 (PDF) のプレビュー表示および直接ダウンロード。
+     - ファイル名規則: `運用連絡票_{区分}_{催事名}_{運用開始日}.pdf`
 
-   - 特ラ機構への自動メール送信 (SMTP/SSL Port 465)。
+   - 特ラ機構への自動メール送信 (SMTP/SSL)。管理画面から宛先・CC・本文を柔軟に設定可能。
 
-   - LINE WORKSトークルームへの送信 (予定)。
+   - LINE WORKS Bot 連携 (PDF送信、メッセージ送信機能の基盤実装済み)。
 
    - ゼンハイザーWSM用CSV（セミコロン区切り）出力 (予定)。
 
-## 5. コード品質とリファクタリング (New)
+## 5. コード品質とリファクタリング
 
-- **アーキテクチャ**: サービス層のモジュール化、フロントエンドJSの外部ファイル化。
-- **品質保証**: 主要ロジックおよびAPIのユニットテスト・結合テスト完備。
-- **静的解析**: Ruff によるコード標準化と自動フォーマット。
+- **アーキテクチャ**: サービス層のシングルトン化、Djangoキャッシュを利用したトークン管理。
+- **UI/UX**: `showToast` による非同期通知、全画面PDFプレビューモーダル。
+- **品質保証**: ユニットテスト完備 (LINE Bot Service, 業務ロジック, API)。
+- **静的解析**: Ruff によるコード標準化。
 
 ## 6. ドキュメント
 
 - **パス**: /Users/satoshi/rf_finder/docs
 
 - **リファクタリング計画**: /Users/satoshi/rf_finder/docs/REFACTORING.md
-
-
-- **パス**: /Users/satoshi/rf_finder/docs
 
 - **データインポート手順**: /Users/satoshi/rf_finder/docs/DATA_IMPORT.md
 

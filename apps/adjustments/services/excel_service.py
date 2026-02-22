@@ -7,12 +7,23 @@ from django.conf import settings
 
 from ..utils import format_channels
 
+# PDF出力時の余白設定 (cm単位)
+PDF_MARGIN_TOP_CM = 1.0
+PDF_MARGIN_BOTTOM_CM = 1.0
+PDF_MARGIN_LEFT_CM = 0.6
+PDF_MARGIN_RIGHT_CM = 0.6
+PDF_MARGIN_HEADER_CM = 0.5
+PDF_MARGIN_FOOTER_CM = 0.5
+
+# 単位変換用定数 (1cm = 0.393701インチ)
+CM_TO_INCH = 0.393701
+
 
 def generate_adjustment_excel(data, member=None, for_pdf=False):
     """
     Excelテンプレートにデータを書き込んで返す。
     複数シート (master_01, master_02, master_03) に対応し、施設数に応じてシートを増やす。
-    for_pdf=True の場合、PDF変換時のレイアウト調整として左寄せ項目に半角スペースを付与する。
+    for_pdf=True の場合、PDF変換時のレイアウト調整として左寄せ項目に半角スペースを付与し、余白を設定する。
     """
     template_path = os.path.join(settings.BASE_DIR, 'Excel', 'master.xlsx')
     if not os.path.exists(template_path):
@@ -43,6 +54,15 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
             continue
 
         ws = wb[sheet_name]
+
+        # PDF出力用のページ設定 (余白など、cmをインチに変換して適用)
+        if for_pdf:
+            ws.page_margins.top = PDF_MARGIN_TOP_CM * CM_TO_INCH
+            ws.page_margins.bottom = PDF_MARGIN_BOTTOM_CM * CM_TO_INCH
+            ws.page_margins.left = PDF_MARGIN_LEFT_CM * CM_TO_INCH
+            ws.page_margins.right = PDF_MARGIN_RIGHT_CM * CM_TO_INCH
+            ws.page_margins.header = PDF_MARGIN_HEADER_CM * CM_TO_INCH
+            ws.page_margins.footer = PDF_MARGIN_FOOTER_CM * CM_TO_INCH
 
         # 0. 提出日 (AD1) - サーバーのロケールに依存せず YYYY/MM/DD 固定にするため上書き
         ws['AD1'] = current_date

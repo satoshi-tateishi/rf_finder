@@ -1,64 +1,170 @@
 /**
- * Adjustment Form Management module
+ * State Persistence
  */
+const STORAGE_KEY = 'rf_finder_form_state';
 
-function autoFillUserProfile(profile) {
-    if (!profile) return;
-    
-    // 1. 氏名の自動入力 ({姓} {名})
-    const nameInput = document.getElementById('user_name');
-    if (nameInput && !nameInput.value) {
-        if (profile.userName) {
-            const fullName = `${profile.userName.lastName} ${profile.userName.firstName}`;
-            nameInput.value = fullName;
-            console.log(`[WOFF] Auto-filled user name (detailed): ${fullName}`);
-        } else if (profile.displayName) {
-            nameInput.value = profile.displayName;
-            console.log(`[WOFF] Auto-filled user name (basic): ${profile.displayName}`);
+function saveFormState() {
+    const data = collectFormData();
+    // 施設の基本情報（利用可能チャンネル等）は重いので除外、選択内容のみ保存
+    const state = {
+        app_type: data.app_type,
+        user: data.user,
+        event: data.event,
+        mic_counts: data.mic_counts,
+        extra_53ch: data.extra_53ch,
+        // 施設はIDと日付・時間・選択チャンネルのみ保存
+        facilities: data.facilities.map(f => ({
+            id: f.id,
+            start_date: f.start_date,
+            end_date: f.end_date,
+            start_time: f.start_time,
+            end_time: f.end_time,
+            selectedChannels: f.selectedChannels
+        }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    console.log('[Form] State saved to localStorage');
+}
+
+async function restoreFormState() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    try {
+        const state = JSON.parse(saved);
+        console.log('[Form] Restoring state...', state);
+
+        // 1. 申請区分
+        const radio = document.querySelector(`input[name="app_type"][value="${state.app_type}"]`);
+        if (radio) radio.checked = true;
+
+        // 2. 現地使用者
+        if (state.user) {
+            document.getElementById('user_name').value = state.user.name || '';
+            document.getElementById('user_kana').value = state.user.kana || '';
+            document.getElementById('user_tel').value = state.user.tel || '';
+            document.getElementById('user_email').value = state.user.email || '';
         }
-    }
 
-    // 2. ふりがなの自動入力 (カタカナをひらがなに変換)
-    const kanaInput = document.getElementById('user_kana');
-    if (kanaInput && !kanaInput.value && profile.userName) {
-        if (profile.userName.phoneticLastName || profile.userName.phoneticFirstName) {
-            let fullPhonetic = `${profile.userName.phoneticLastName || ''} ${profile.userName.phoneticFirstName || ''}`.trim();
+        // 3. 催事情報
+        if (state.event) {
+            document.getElementById('event_name').value = state.event.name || '';
+            document.getElementById('comment').value = state.event.comment || '';
+            document.getElementById('event-name-counter').innerText = `${(state.event.name || '').length} / 50`;
+            document.getElementById('comment-counter').innerText = `${(state.event.comment || '').length} / 165`;
+        }
+
+        // 4. マイク数 (Matrix)
+        if (state.mic_counts) {
+            const mc = state.mic_counts;
+            if (mc.analog_rm) document.getElementById('mic-analog-rm-10mw').value = mc.analog_rm['10mw'] || '';
+            if (mc.analog_em) document.getElementById('mic-analog-em-10mw').value = mc.analog_em['10mw'] || '';
+            if (mc.digital_rm) {
+                document.getElementById('mic-digital-rm-10mw').value = mc.digital_rm['10mw'] || '';
+                document.getElementById('mic-digital-rm-20mw').value = mc.digital_rm['20mw'] || '';
+                document.getElementById('mic-digital-rm-50mw').value = mc.digital_rm['50mw'] || '';
+            }
+            if (mc.analog_53ch) {
+                document.getElementById('mic-analog-rm-53ch-10mw').value = mc.analog_53ch.rm_10mw || '';
+                document.getElementById('mic-analog-em-53ch-10mw').value = mc.analog_53ch.em_10mw || '';
+            }
+            if (mc.digital_53ch) {
+                document.getElementById('mic-digital-rm-53ch-10mw').value = mc.digital_53ch['10mw'] || '';
+                document.getElementById('mic-digital-rm-53ch-20mw').value = mc.digital_53ch['20mw'] || '';
+                document.getElementById('mic-digital-rm-53ch-50mw').value = mc.digital_53ch['50mw'] || '';
+            }
+            if (mc.digital_12g) {
+                document.getElementById('mic-digital-rm-12g-10mw').value = mc.digital_12g['10mw'] || '';
+                document.getElementById('mic-digital-rm-12g-20mw').value = mc.digital_12g['20mw'] || '';
+                document.getElementById('mic-digital-rm-12g-50mw').value = mc.digital_12g['50mw'] || '';
+            }
+            document.getElementById('mic-12g-lmh').value = mc['12g_lmh'] || '';
+        }
+
+        if (state.extra_53ch) {
+            document.getElementById('toggle-53ch').innerText = state.extra_53ch;
+        }
+
+        // 5. 施設リストの復元 (キープリストを再構築)
+        if (state.facilities && state.facilities.length > 0) {
+            window.keepList = [];
+            for (const sf of state.facilities) {
+                try {
+                    const facilityBase = await Api.getFacilityDetail(sf.id);
+                    window.keepList.push({
+                        ...facilityBase,
+                        selectedChannels: sf.selectedChannels || [],
+                        availableChannels: facilityBase.available_channels
+                    });
+                } catch (e) { console.error(`Failed to restore facility ${sf.id}:`, e); }
+            }
             
-            // カタカナからひらがなへの変換
-            fullPhonetic = fullPhonetic.replace(/[\u30a1-\u30f6]/g, (match) => {
-                const chr = match.charCodeAt(0) - 0x60;
-                return String.fromCharCode(chr);
-            });
-            
-            kanaInput.value = fullPhonetic;
-            console.log(`[WOFF] Auto-filled user phonetic name (to hiragana): ${fullPhonetic}`);
+            // UI更新
+            if (window.keepList.length > 0) {
+                renderKeepList();
+                renderChannelSelection();
+                document.getElementById('welcome-msg').classList.add('hidden');
+                document.getElementById('keep-list-section').classList.remove('hidden');
+                document.getElementById('ch-selection-section').classList.remove('hidden');
+                
+                // 調整フォームを表示
+                goToAdjustment();
+                
+                // 各施設の日付・時間をセット
+                state.facilities.forEach((sf, index) => {
+                    const container = document.getElementById('form-facilities-list').children[index];
+                    if (container) {
+                        const inputs = container.querySelectorAll('input');
+                        inputs[0].value = sf.start_date || '';
+                        inputs[1].value = sf.end_date || '';
+                        inputs[2].value = sf.start_time || '09:00';
+                        inputs[3].value = sf.end_time || '22:00';
+                    }
+                });
+            }
         }
-    }
 
-    // 3. メールの自動入力 (個人メールを優先)
-    const emailInput = document.getElementById('user_email');
-    if (emailInput && !emailInput.value) {
-        const email = profile.privateEmail || profile.email;
-        if (email) {
-            emailInput.value = email;
-            console.log(`[WOFF] Auto-filled user email: ${email}`);
-        }
-    }
-
-    // 4. 電話番号の自動入力 (電話番号を優先)
-    const telInput = document.getElementById('user_tel');
-    if (telInput && !telInput.value) {
-        const phone = profile.telephone || profile.cellPhone;
-        if (phone) {
-            telInput.value = phone;
-            console.log(`[WOFF] Auto-filled user tel: ${phone}`);
-        }
+        showToast('前回の入力内容を復元しました', 'info');
+    } catch (e) {
+        console.error('Failed to restore form state:', e);
+        localStorage.removeItem(STORAGE_KEY);
     }
 }
 
+function clearFormState() {
+    localStorage.removeItem(STORAGE_KEY);
+}
+
+// フォームの入力変更を監視して保存
+function initChangeWatchers() {
+    const container = document.getElementById('adjustment-form-section');
+    if (!container) return;
+
+    container.addEventListener('input', (e) => {
+        saveFormState();
+    });
+    
+    // ラジオボタンやセレクトボックスの変化も監視
+    container.addEventListener('change', (e) => {
+        saveFormState();
+    });
+    
+    // 53chトグルも監視
+    const toggle53 = document.getElementById('toggle-53ch');
+    if (toggle53) {
+        const observer = new MutationObserver(() => saveFormState());
+        observer.observe(toggle53, { childList: true, characterData: true, subtree: true });
+    }
+}
+
+/**
+ * Adjustment Form Management module
+ */
+let currentPreviewUrl = null;
+
 function goToAdjustment() {
-    if (keepList.length === 0) {
-        alert('施設を選択してください');
+    if (window.keepList.length === 0) {
+        showToast('施設を選択してください', 'info');
         return;
     }
 
@@ -178,8 +284,8 @@ function collectFormData() {
 }
 
 function handleValidationErrors(err) {
-    // エラーメッセージ（文字列）からキーワードを抽出してハイライト
-    const errorText = err.message || "";
+    console.error('[Validation] Full error:', err);
+    const errorText = err.message || "Unknown error";
     
     // 1. 一般的な入力項目のハイライト
     const fieldMap = {
@@ -190,10 +296,14 @@ function handleValidationErrors(err) {
         'event_name': 'event_name'
     };
 
+    let foundField = false;
     Object.keys(fieldMap).forEach(key => {
         if (errorText.includes(key)) {
             const el = document.getElementById(fieldMap[key]);
-            if (el) applyErrorStyle(el);
+            if (el) {
+                applyErrorStyle(el);
+                foundField = true;
+            }
         }
     });
 
@@ -202,6 +312,7 @@ function handleValidationErrors(err) {
         const container = document.getElementById('mic-counts-table-container');
         if (container) {
             applyErrorStyle(container);
+            foundField = true;
             // テーブル内のいずれかの入力が変わったらエラー表示を消す
             const inputs = container.querySelectorAll('input, select');
             inputs.forEach(input => {
@@ -215,6 +326,7 @@ function handleValidationErrors(err) {
     if (errorText.includes('facilities')) {
         const container = document.getElementById('form-facilities-list');
         if (container) {
+            foundField = true;
             const inputs = container.querySelectorAll('input');
             inputs.forEach(input => {
                 if (!input.value) applyErrorStyle(input);
@@ -222,7 +334,11 @@ function handleValidationErrors(err) {
         }
     }
 
-    alert('入力内容に不備があります。赤色の項目を確認してください。\n\n' + errorText);
+    const displayMsg = foundField 
+        ? '入力内容に不備があります。赤色の項目を確認してください。'
+        : `エラーが発生しました: ${errorText}`;
+
+    showToast(displayMsg, 'error', 5000);
 }
 
 function applyErrorStyle(el) {
@@ -236,6 +352,112 @@ function clearError(el) {
     el.classList.remove('bg-red-50', 'border-red-500', 'ring-1', 'ring-red-500');
 }
 
+async function previewPDF() {
+    console.log('[Preview] Data collection started...');
+    const data = collectFormData();
+    console.log('[Preview] Data collected:', data);
+    
+    const btn = document.querySelector('button[onclick="previewPDF()"]');
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
+
+    try {
+        console.log('[Preview] Calling API...');
+        const blob = await Api.previewPDF(data);
+        console.log('[Preview] API Success, blob size:', blob.size);
+        
+        if (currentPreviewUrl) window.URL.revokeObjectURL(currentPreviewUrl);
+        currentPreviewUrl = window.URL.createObjectURL(blob);
+        
+        const iframe = document.getElementById('preview-iframe');
+        const modal = document.getElementById('preview-modal');
+        const mobileMsg = document.getElementById('preview-mobile-msg');
+        
+        // モバイル（特にiOS）の判定
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // モバイルの場合はインライン表示ができないことが多いため、
+            // 直接新しいタブで開くことを促す
+            iframe.classList.add('hidden');
+            mobileMsg.classList.remove('hidden');
+        } else {
+            // #toolbar=0 でツールバー（ダウンロードボタン等）を隠す指示を出す
+            iframe.src = currentPreviewUrl + '#toolbar=0&navpanes=0&scrollbar=0';
+            iframe.classList.remove('hidden');
+            mobileMsg.classList.add('hidden');
+        }
+        
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden'); // 背景スクロール禁止
+        
+    } catch (err) {
+        console.error('[Preview] Error caught:', err);
+        handleValidationErrors(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    
+    modal.classList.add('hidden');
+    iframe.src = '';
+    document.body.classList.remove('overflow-hidden');
+    
+    if (currentPreviewUrl) {
+        window.URL.revokeObjectURL(currentPreviewUrl);
+        currentPreviewUrl = null;
+    }
+}
+
+function openPdfDirectly() {
+    if (currentPreviewUrl) {
+        window.open(currentPreviewUrl, '_blank');
+    }
+}
+
+async function downloadPDF() {
+    const data = collectFormData();
+    const btn = document.querySelector('button[onclick="previewPDF()"]') || document.querySelector('button[onclick="downloadPDF()"]');
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
+
+    try {
+        const blob = await Api.previewPDF(data);
+        const url = window.URL.createObjectURL(blob);
+        
+        // ファイル名の生成
+        const appTypeMap = { 'new': '新規', 'change': '変更', 'delete': '削除' };
+        const appTypeJp = appTypeMap[data.app_type] || '新規';
+        const eventName = data.event.name || '無題の催事';
+        const startDate = data.facilities[0]?.start_date?.replace(/-/g, '') || '未定';
+        const filename = `運用連絡票_${appTypeJp}_${eventName}_${startDate}.pdf`;
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        
+        showToast('PDFをダウンロードしました', 'success');
+    } catch (err) {
+        console.error(err);
+        handleValidationErrors(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
 async function downloadExcel() {
     const data = collectFormData();
     const btn = document.querySelector('button[onclick="downloadExcel()"]');
@@ -246,12 +468,21 @@ async function downloadExcel() {
     try {
         const blob = await Api.downloadExcel(data);
         const url = window.URL.createObjectURL(blob);
+        
+        // ファイル名の生成
+        const appTypeMap = { 'new': '新規', 'change': '変更', 'delete': '削除' };
+        const appTypeJp = appTypeMap[data.app_type] || '新規';
+        const eventName = data.event.name || '無題の催事';
+        const startDate = data.facilities[0]?.start_date?.replace(/-/g, '') || '未定';
+        const filename = `運用連絡票_${appTypeJp}_${eventName}_${startDate}.xlsx`;
+
         const a = document.createElement('a');
         a.href = url;
-        a.download = `運用連絡票_${new Date().toISOString().slice(0,10)}.xlsx`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
+        showToast('Excelをダウンロードしました', 'success');
     } catch (err) {
         console.error(err);
         handleValidationErrors(err);
@@ -259,127 +490,12 @@ async function downloadExcel() {
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
-}
-
-async function previewPDF() {
-    const data = collectFormData();
-    const btn = document.querySelector('button[onclick="previewPDF()"]');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
-
-    try {
-        const blob = await Api.previewPDF(data);
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-    } catch (err) {
-        console.error(err);
-        handleValidationErrors(err);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-}
-
-async function sendCompletionFlexMessage(data) {
-    if (typeof WoffService === 'undefined' || !WoffService.isInClient()) return;
-
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    // 施設名のリストを作成
-    const facilityNames = data.facilities.map(f => f.name).join(' / ');
-
-    const flexContents = {
-        "type": "bubble",
-        "size": "kilo",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "運用調整届 送信完了",
-                    "weight": "bold",
-                    "color": "#ffffff",
-                    "size": "sm"
-                }
-            ],
-            "backgroundColor": "#00c300"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": data.event.name || "無題の催事",
-                    "weight": "bold",
-                    "size": "md",
-                    "wrap": true
-                },
-                {
-                    "type": "separator",
-                    "margin": "md"
-                },
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "margin": "md",
-                    "spacing": "sm",
-                    "contents": [
-                        {
-                            "type": "box",
-                            "layout": "baseline",
-                            "spacing": "sm",
-                            "contents": [
-                                { "type": "text", "text": "使用者", "color": "#aaaaaa", "size": "xs", "flex": 2 },
-                                { "type": "text", "text": data.user.name || "未入力", "wrap": true, "color": "#666666", "size": "xs", "flex": 5 }
-                            ]
-                        },
-                        {
-                            "type": "box",
-                            "layout": "baseline",
-                            "spacing": "sm",
-                            "contents": [
-                                { "type": "text", "text": "施設", "color": "#aaaaaa", "size": "xs", "flex": 2 },
-                                { "type": "text", "text": facilityNames, "wrap": true, "color": "#666666", "size": "xs", "flex": 5 }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "type": "text",
-                    "text": `送信日時: ${timestamp}`,
-                    "size": "xxs",
-                    "color": "#cccccc",
-                    "margin": "xl",
-                    "align": "end"
-                }
-            ]
-        }
-    };
-
-    console.log('[WOFF] Attempting to send completion flex message...');
-    const result = await WoffService.sendFlexMessage(flexContents);
-    console.log(`[WOFF] Message send result:`, result);
 }
 
 async function sendEmail() {
     if (!confirm('運用調整届を特ラ機構へ送信してもよろしいですか？')) return;
 
     const data = collectFormData();
-    
-    // WOFF環境の場合、channelIdを取得してサーバーへ渡す (PDF自動送信のため)
-    if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
-        try {
-            data.channelId = await WoffService.getChannelId();
-            console.log(`[WOFF] Collected channelId: ${data.channelId}`);
-        } catch (e) {
-            console.error('[WOFF] Failed to collect channelId:', e);
-        }
-    }
-
     const btn = document.getElementById('send-email-btn');
     const originalText = btn.innerHTML;
     
@@ -388,19 +504,7 @@ async function sendEmail() {
 
     try {
         await Api.sendEmail(data);
-        
-        // WOFF環境の場合、トークルームへ完了メッセージを送信 (Flex Message)
-        await sendCompletionFlexMessage(data);
-
-        alert('送信が完了しました。');
-
-        // WOFF環境の場合、送信完了後にウィンドウを閉じる
-        if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
-            console.log('[WOFF] Closing window in 2 seconds...');
-            setTimeout(() => {
-                woff.closeWindow();
-            }, 2000);
-        }
+        showToast('特ラ機構への送信が完了しました', 'success');
     } catch (err) {
         console.error(err);
         handleValidationErrors(err);

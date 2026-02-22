@@ -4,5 +4,5 @@ from . import views
 app_name = 'accounts'
 
 urlpatterns = [
-    path('woff/profile/', views.get_user_profile, name='woff_profile'),
+    # 今後SSOやプロフ取得を追加する場合はここに記述
 ]
