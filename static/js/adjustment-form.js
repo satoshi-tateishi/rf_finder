@@ -369,6 +369,17 @@ async function sendEmail() {
     if (!confirm('運用調整届を特ラ機構へ送信してもよろしいですか？')) return;
 
     const data = collectFormData();
+    
+    // WOFF環境の場合、channelIdを取得してサーバーへ渡す (PDF自動送信のため)
+    if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
+        try {
+            data.channelId = await WoffService.getChannelId();
+            console.log(`[WOFF] Collected channelId: ${data.channelId}`);
+        } catch (e) {
+            console.error('[WOFF] Failed to collect channelId:', e);
+        }
+    }
+
     const btn = document.getElementById('send-email-btn');
     const originalText = btn.innerHTML;
     
@@ -382,6 +393,14 @@ async function sendEmail() {
         await sendCompletionFlexMessage(data);
 
         alert('送信が完了しました。');
+
+        // WOFF環境の場合、送信完了後にウィンドウを閉じる
+        if (typeof WoffService !== 'undefined' && WoffService.isInClient()) {
+            console.log('[WOFF] Closing window in 2 seconds...');
+            setTimeout(() => {
+                woff.closeWindow();
+            }, 2000);
+        }
     } catch (err) {
         console.error(err);
         handleValidationErrors(err);

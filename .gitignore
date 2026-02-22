@@ -43,5 +43,6 @@ db.sqlite3
 
 # Project Specific
 csv/
+keys/
 sample_app/
 .playwright-mcp/

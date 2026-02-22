@@ -53,6 +53,12 @@
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
 
+    {% if is_woff and not woff_valid %}
+    <div class="bg-red-600 text-white text-center py-2 text-xs font-bold sticky top-0 z-[100]">
+        <i class="fa-solid fa-triangle-exclamation"></i> セキュリティ検証に失敗しました。公式メニューから開き直してください。
+    </div>
+    {% endif %}
+
     <!-- Header -->
     <nav class="bg-[#00c300] text-white p-4 shadow-md sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
@@ -61,7 +67,10 @@
             </h1>
             <div id="woff-test-tools" class="hidden flex gap-2">
                 <button onclick="testSendMessage()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded border border-white/40 transition-colors">
-                    <i class="fa-solid fa-vial"></i> Test Msg
+                    <i class="fa-solid fa-comment-dots"></i> Test Msg
+                </button>
+                <button onclick="testSendFile()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded border border-white/40 transition-colors">
+                    <i class="fa-solid fa-file-pdf"></i> Test PDF
                 </button>
             </div>
         </div>
@@ -307,12 +316,6 @@
             <p>施設を検索してキープリストに追加してください</p>
         </div>
 
-        <!-- WOFF Debug Footer -->
-        <div id="woff-debug-status" class="fixed bottom-0 left-0 w-full bg-black/80 text-white text-[10px] p-2 flex justify-between items-center z-[9999]">
-            <span id="woff-debug-text">WOFF: Waiting...</span>
-            <button onclick="woff.login();" class="bg-blue-600 px-2 py-1 rounded text-white font-bold">Force Re-consent</button>
-        </div>
-
     </div>
 
     <!-- Device Data -->
@@ -339,67 +342,6 @@
 
     <!-- Initialization -->
     <script>
-        async function testSendMessage() {
-            if (!WoffService.isInClient()) {
-                alert('WOFFアプリ内でのみ送信可能です');
-                return;
-            }
-            
-            const confirmed = confirm('テストFlexメッセージを送信しますか？');
-            if (!confirmed) return;
-
-            // シンプルなFlex Messageサンプル
-            const flexContents = {
-                "type": "bubble",
-                "size": "kilo",
-                "header": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "WOFF Test Message",
-                            "weight": "bold",
-                            "color": "#ffffff",
-                            "size": "sm"
-                        }
-                    ],
-                    "backgroundColor": "#00c300"
-                },
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "送信テスト成功！",
-                            "weight": "bold",
-                            "size": "md",
-                            "margin": "md"
-                        },
-                        {
-                            "type": "text",
-                            "text": "RF FinderからのFlex Messageテスト送信です。",
-                            "size": "xs",
-                            "color": "#888888",
-                            "wrap": true,
-                            "margin": "sm"
-                        }
-                    ]
-                }
-            };
-
-            const result = await WoffService.sendFlexMessage(flexContents);
-            if (result.success) {
-                console.log('[WOFF] Test Flex Message sent');
-            } else {
-                const error = result.error || {};
-                const errorMsg = `送信に失敗しました。\nCode: ${error.code || 'unknown'}\nMessage: ${error.message || 'No details'}`;
-                alert(errorMsg);
-                console.error('[WOFF] Message send error details:', error);
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', async () => {
             const woffId = "{{ woff_id }}";
             await WoffService.init(woffId);

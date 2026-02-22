@@ -1,6 +1,7 @@
 # プロジェクト: 特ラ運用調整支援アプリ (LINE WORKS WOFF)
 
 ## 0. 基本方針
+- **動作環境**: 本アプリケーションは Docker 環境で動作します。開発、テスト、デプロイは Docker コンテナ内で行うことを前提とします。
 - **言語**: ユーザーへの回答および解説は、常に日本語で行うこと。
 - **Playwright MCP**: UI の修正を行った際は、Playwright MCP を使用して自動的に表示チェックを行うこと。Playwright MCP の使用については、ユーザーからの事前の承諾が得られているものとする。
 
@@ -12,7 +13,7 @@
 - Backend: Django (Python)
 - Database: MySQL
 - Libraries: reportlab (PDF), openpyxl (Excel)
-- Infrastructure: Docker / nginx / Let's Encrypt
+- Infrastructure: Docker (開発・本番環境) / nginx / Let's Encrypt
 
 ## 3. 重要な業務ロジック・計算規則
 

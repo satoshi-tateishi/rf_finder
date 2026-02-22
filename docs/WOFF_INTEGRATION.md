@@ -13,6 +13,7 @@ HTML の `<head>` または `<body>` 末尾で SDK を読み込む。
 ### 主要な API
 - `woff.init()`: 初期化（必須）。
 - `woff.getProfile()`: ユーザー名、ユーザーIDの取得。
+- `woff.getChannelId()`: 現在のトークルームの `channelId` を取得 (モバイル版のみ)。
 - `woff.sendMessage()`: トークルームへのメッセージ送信。
 - `woff.isInClient()`: LINE WORKS アプリ内かどうかの判定。
 - `woff.closeWindow()`: WOFF ウィンドウを閉じる。
@@ -42,17 +43,22 @@ HTML の `<head>` または `<body>` 末尾で SDK を読み込む。
     - メール送信成功のコールバック内で `woff.sendFlexMessage()` を実行。
     - 催事名、使用者、施設リストを含むリッチなカード形式での通知を実装。
 
-### Phase 4: Bot API 連携とセキュリティの最適化
+### Phase 4: Bot API 連携とセキュリティの最適化 (Completed)
 本番運用に向けた信頼性と利便性の向上。
-- [ ] **Bot API によるファイル送信**:
-    - サーバー側で生成した PDF を、LINE WORKS Bot API を使用してトークルームへ直接送信。
-    - WOFF から取得した `chatId` または `channelId` をサーバーへ渡す仕組みの構築。
-- [ ] **署名検証 (Signature Verification)**:
-    - サーバーサイドでの `signature` チェック。不正な直接アクセスを防止。
-- [ ] **ウィンドウ制御**:
-    - 送信完了後、`woff.closeWindow()` で自動的に閉じる UX の提供。
-- [ ] **UI/デバッグのクリーンアップ**:
-    - テスト用ボタン (`Test Msg`) やデバッグバーの整理。
+
+- [x] **Bot API によるファイル送信**:
+    - サーバーサイド (`apps/adjustments/services/line_bot_service.py`) で LINE WORKS Bot API を使用してトークルームへ PDF ファイルを直接送信する機能を実装。
+    - フロントエンド (`static/js/woff-service.js`) から `woff.getChannelId()` で取得した `channelId` をサーバーへ渡す仕組みを構築。
+- [x] **署名検証 (Signature Verification)**:
+    - `apps/facilities/views.py` の `index` ビューで `timestamp`, `nonce`, `signature` を使用し、WOFF URL からのリダイレクトであることの検証を実装。
+    - 検証失敗時には、フロントエンドに警告を表示。
+- [x] **ウィンドウ制御**:
+    - 送信完了後、`woff.closeWindow()` で WOFF アプリのウィンドウが自動的に閉じる UX を提供 (`static/js/adjustment-form.js`)。
+- [x] **UI/デバッグのクリーンアップ**:
+    - `templates/index.html` からテスト用ボタンやデバッグバーを削除。
+    - **デバッグ用テスト機能の追加**: 開発・デバッグ用に「Test Msg (テキスト)」および「Test PDF (ファイル)」送信ボタンを UI (`templates/index.html`) に再導入。
+        - これらのボタンは `static/js/woff-service.js` および `static/js/api.js` からバックエンドの新しい API エンドポイント (`/api/adjustments/test-send-text-message/`, `/api/adjustments/test-send-pdf-message/`) を呼び出す。
+        - モバイル環境での `channelId` 取得のデバッグを容易にするため、`woff.getChannelId()` の結果をバックエンドに送信しログに記録する機能 (`/api/adjustments/log-woff-channel-id-result/`) を追加。
 
 ---
 
@@ -96,7 +102,40 @@ WOFF で取得したアクセストークンを使用して、サーバーサイ
 
 ---
 
-## 6. 実装のヒント
+## 7. Bot API によるファイル送信 (Server-side)
+
+サーバー側から特定のトークルーム (channelId) へ PDF を送信する際の手順。
+
+### 7.1 認証 (Service Account)
+- **Endpoint**: `POST https://auth.worksmobile.com/oauth2/v2.0/token`
+- **Auth Type**: JWT (RS256)
+- **Required Scopes**: `bot`, `bot.message`
+
+### 7.2 ファイルのアップロード
+1. **アップロード URL の取得**:
+   - `POST https://www.worksapis.com/v1.0/bots/{botId}/attachments`
+   - Body: `{"fileName": "request.pdf"}`
+   - Response: `uploadUrl`, `fileId`
+2. **バイナリのアップロード**:
+   - `POST {uploadUrl}`
+   - `Content-Type`: `multipart/form-data`
+   - Form field: `FileData` にバイナリをセット。
+
+### 7.3 メッセージの送信
+- **Endpoint**: `POST https://www.worksapis.com/v1.0/bots/{botId}/channels/{channelId}/messages`
+- **Body**:
+```json
+{
+  "content": {
+    "type": "file",
+    "fileId": "{fileId}"
+  }
+}
+```
+
+---
+
+## 8. 実装のヒント
 （再掲）
 
 - **SSO 連携**: 外部ブラウザでユーザー情報を取得したい場合は `woff.isLoggedIn()` でチェックし、必要に応じて `woff.login()` を呼び出す。

@@ -141,3 +141,16 @@ ADJUSTMENT_EMAIL_TO = env('ADJUSTMENT_EMAIL_TO', default='rm-unyo@radiomic.org')
 
 # WOFF Settings
 WOFF_ID = env('WOFF_ID', default='')
+WOFF_SECRET_KEY = env('WOFF_SECRET_KEY', default='')
+
+# LINE WORKS Bot API Settings
+LINE_WORKS_CLIENT_ID = env('LINE_WORKS_CLIENT_ID', default='')
+LINE_WORKS_CLIENT_SECRET = env('LINE_WORKS_CLIENT_SECRET', default='')
+LINE_WORKS_SERVICE_ACCOUNT = env('LINE_WORKS_SERVICE_ACCOUNT', default='')
+LINE_WORKS_PRIVATE_KEY_PATH = env('LINE_WORKS_PRIVATE_KEY_PATH', default='')
+if LINE_WORKS_PRIVATE_KEY_PATH and os.path.exists(LINE_WORKS_PRIVATE_KEY_PATH):
+    with open(LINE_WORKS_PRIVATE_KEY_PATH, 'r') as f:
+        LINE_WORKS_PRIVATE_KEY = f.read()
+else:
+    LINE_WORKS_PRIVATE_KEY = '' # Fallback or error if file not found
+LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')

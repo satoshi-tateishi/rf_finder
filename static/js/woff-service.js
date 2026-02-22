@@ -64,6 +64,29 @@ const WoffService = (function() {
     }
 
     /**
+     * 現在のトークルームのチャンネルIDを取得する
+     */
+    async function getChannelId() {
+        if (!isInClient()) return null;
+        try {
+            const result = await woff.getChannelId();
+            // デバッグログをバックエンドに送信
+            Api.logWoffChannelIdResult(result).catch(e => console.error('[WOFF] Failed to log channel ID result to backend:', e));
+            // resultが文字列ならそのまま、オブジェクトならresult.channelIdを返す
+            if (typeof result === 'string') {
+                return result;
+            } else if (result && typeof result.channelId === 'string') {
+                return result.channelId;
+            }
+            return null;
+        } catch (error) {
+            Api.logWoffChannelIdResult({ error: error.code || 'unknown', message: error.message }).catch(e => console.error('[WOFF] Failed to log channel ID error to backend:', e));
+            console.error('[WOFF] Failed to get channel ID:', error);
+            return null;
+        }
+    }
+
+    /**
      * アクセストークンを取得する
      */
     async function getAccessToken() {
@@ -122,13 +145,60 @@ const WoffService = (function() {
         }
     }
 
+    async function _sendTestMessageToBackend(messageType) {
+        if (!isInClient()) {
+            alert('WOFFアプリ内でのみ送信可能です');
+            return;
+        }
+
+        const confirmed = confirm(`テスト${messageType}メッセージを送信しますか？`);
+        if (!confirmed) return;
+
+        const channelId = await getChannelId();
+        if (!channelId) {
+            alert('チャネルIDが取得できませんでした。トークルーム内で開いていますか？');
+            return;
+        }
+
+        try {
+            let result;
+            if (messageType === 'text') {
+                result = await Api.sendTestTextMessage(channelId, "これはテストメッセージです。");
+            } else if (messageType === 'file') {
+                // PDF 生成はサーバーサイドで行う
+                result = await Api.sendTestPdfMessage(channelId);
+            } else {
+                alert('不明なメッセージタイプです。');
+                return;
+            }
+            
+            if (result && result.message) { // result.successではなくresult.messageの存在で成功を判断
+                alert(`テスト${messageType}メッセージの送信に成功しました！`);
+                console.log(`[WOFF] Test ${messageType} Message sent:`, result);
+            } else {
+                const error = result.error || {};
+                const errorMsg = `送信に失敗しました。\nCode: ${error.code || 'unknown'}\nMessage: ${error.message || 'No details'}`;
+                alert(errorMsg);
+                console.error(`[WOFF] Test ${messageType} Message send error details:`, error);
+            }
+        } catch (e) {
+            alert(`テスト${messageType}メッセージの送信中にエラーが発生しました。\n${e.message}`);
+            console.error(`[WOFF] Error sending test ${messageType} message:`, e);
+        }
+    }
+
+    // グローバルスコープに公開するための関数
+    window.testSendMessage = async () => _sendTestMessageToBackend('text');
+    window.testSendFile = async () => _sendTestMessageToBackend('file');
+
     return {
         init,
         isInClient,
         getProfile,
+        getChannelId,
         getAccessToken,
         getDetailedProfile,
         sendMessage,
-        sendFlexMessage
+        sendFlexMessage,
     };
 })();
