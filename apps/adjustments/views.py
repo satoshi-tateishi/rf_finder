@@ -106,7 +106,25 @@ def send_email(request, data):
                 event_name = data.get('event', {}).get('name', '無題の催事')
                 user_name = data.get('user', {}).get('name', '不明')
 
-                msg = f"【運用調整届 送信通知】\n区分: {app_type_jp}\n催事名: {event_name}\n申請者: {user_name}\n\n上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。"
+                # 施設情報の整形
+                facilities = data.get('facilities', [])
+                facility_lines = []
+                for i, f in enumerate(facilities):
+                    name = f.get('name', '不明')
+                    start = f.get('start_date', '').replace('-', '/')
+                    end = f.get('end_date', '').replace('-', '/')
+                    facility_lines.append(f"{i + 1}.{name}\n{start} - {end}")
+
+                facility_text = "\n\n".join(facility_lines)
+
+                msg = (
+                    f"【運用調整届 送信通知】\n"
+                    f"区分: {app_type_jp}\n"
+                    f"催事名: {event_name}\n"
+                    f"申請者: {user_name}\n\n"
+                    f"施設:\n{facility_text}\n\n"
+                    f"上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。"
+                )
 
                 # テキストメッセージとPDFを送信
                 bot_service.send_text_message(notify_channel_id, msg)
