@@ -13,7 +13,7 @@
 - Backend: Django (Python)
 - Database: MySQL
 - Libraries: reportlab (PDF), openpyxl (Excel), Pillow (Image)
-- Infrastructure: Docker (開発・本番環境) / nginx / Let's Encrypt
+- Infrastructure: Docker (開発・本番環境) / Apache (mod_auth_mellon) / Let's Encrypt
 
 ## 3. 重要な業務ロジック・計算規則
 

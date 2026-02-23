@@ -31,13 +31,14 @@ services:
     networks:
       - rf_network
 
-  nginx:
-    image: nginx:latest
-    container_name: rf_finder_nginx
+  apache:
+    build:
+      context: .
+      dockerfile: docker/apache/Dockerfile
+    container_name: rf_finder_apache
     ports:
       - "8084:80"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
       - ./static:/static
       - ./media:/media
     depends_on:
