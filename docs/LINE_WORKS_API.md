@@ -55,7 +55,7 @@ LINE WORKS Bot API および構成員情報の取得に関する技術リファ�
 
 ### 3.2 メッセージの送信
 - **Endpoint**: `POST https://www.worksapis.com/v1.0/bots/{botId}/channels/{channelId}/messages`
-- **Body**:
+- **Body (File)**:
 ```json
 {
   "content": {
@@ -64,8 +64,29 @@ LINE WORKS Bot API および構成員情報の取得に関する技術リファ�
   }
 }
 ```
+- **Body (Text)**:
+```json
+{
+  "content": {
+    "type": "text",
+    "text": "Your message here"
+  }
+}
+```
 
 ---
+
+## 4. 自動通知機能
+
+メール送信時に、特定の LINE WORKS グループへ通知を送る機能を実装しています。
+
+### 設定方法
+`.env` ファイルに以下の設定を追加します。
+- `LINE_WORKS_NOTIFICATION_CHANNEL_ID`: 通知を送るグループのトークルーム ID。
+
+### 動作
+1.  メール送信が成功すると、上記 ID のトークルームに通知メッセージが送信されます。
+2.  続けて、メールに添付したものと同じ PDF ファイルが送信されます。
 
 ## 4. メニュー管理コマンド
 

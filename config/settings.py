@@ -151,3 +151,4 @@ if LINE_WORKS_PRIVATE_KEY_PATH and os.path.exists(LINE_WORKS_PRIVATE_KEY_PATH):
 else:
     LINE_WORKS_PRIVATE_KEY = '' # Fallback or error if file not found
 LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')
+LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', default='')

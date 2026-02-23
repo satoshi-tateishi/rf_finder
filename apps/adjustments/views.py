@@ -82,15 +82,37 @@ def send_email(request, data):
         # 2. メール送信
         send_adjustment_email(data, member, pdf_buffer)
 
-        # 3. LINE Bot連携 (将来用: channelIdがあれば送信)
+        # 3. LINE Bot連携
+        bot_service = LineBotService()
+        filename = get_adjustment_filename(data, 'pdf')
+        pdf_content = pdf_buffer.getvalue()
+
+        # 3.1 依頼元の個別トークルームへ送信 (channelIdがあれば)
         channel_id = data.get('channelId')
         if channel_id:
             try:
-                bot_service = LineBotService()
-                filename = get_adjustment_filename(data, 'pdf')
-                bot_service.send_pdf(channel_id, pdf_buffer.getvalue(), file_name=filename)
+                bot_service.send_pdf(channel_id, pdf_content, file_name=filename)
             except Exception as bot_err:
-                print(f'Error sending PDF via LINE Bot: {bot_err}')
+                print(f'Error sending PDF to requester: {bot_err}')
+
+        # 3.2 指定の通知グループへ送信 (設定があれば)
+        from django.conf import settings
+        notify_channel_id = getattr(settings, 'LINE_WORKS_NOTIFICATION_CHANNEL_ID', None)
+        if notify_channel_id:
+            try:
+                # メッセージの作成
+                app_type_map = {'new': '新規', 'change': '変更', 'delete': '削除'}
+                app_type_jp = app_type_map.get(data.get('app_type'), '新規')
+                event_name = data.get('event', {}).get('name', '無題の催事')
+                user_name = data.get('user', {}).get('name', '不明')
+
+                msg = f"【運用調整届 送信通知】\n区分: {app_type_jp}\n催事名: {event_name}\n申請者: {user_name}\n\n上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。"
+
+                # テキストメッセージとPDFを送信
+                bot_service.send_text_message(notify_channel_id, msg)
+                bot_service.send_pdf(notify_channel_id, pdf_content, file_name=filename)
+            except Exception as notify_err:
+                print(f'Error sending notification to LW group: {notify_err}')
 
         return api_success({'message': 'Email sent successfully'})
     except Exception as e:

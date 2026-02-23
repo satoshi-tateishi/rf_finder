@@ -82,9 +82,11 @@ class AdjustmentLogicTest(TestCase):
         self.assertIn('taro@ex.com', sent.cc)
         self.assertIn('boss@example.com', sent.cc)
         self.assertEqual(len(sent.attachments), 1)
-        # ファイル名が正しく生成されているか（運用連絡票_新規_無題の催事_20260220.pdf）
-        self.assertIn('運用連絡票', sent.attachments[0][0])
-        self.assertIn('20260220', sent.attachments[0][0])
+        # MIMEApplication の場合は get_filename() などで取得
+        attachment = sent.attachments[0]
+        filename = attachment.get_filename()
+        self.assertIn('運用連絡票', filename)
+        self.assertIn('20260220', filename)
 
 
 class AdjustmentAPITest(TestCase):
