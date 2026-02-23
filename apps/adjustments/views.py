@@ -8,6 +8,7 @@ from apps.accounts.models import Member
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
 from .services import (
     LineBotService,
+    WSMService,
     generate_adjustment_excel,
     generate_adjustment_pdf,
     send_adjustment_email,
@@ -95,4 +96,32 @@ def send_email(request, data):
     except Exception as e:
         print(f'Error sending email: {e}')
         traceback.print_exc()
+        return api_error(str(e), status=500)
+
+
+@csrf_exempt
+@json_api_view(validate=False)
+def export_wsm(request, data):
+    """
+    指定された施設とチャンネル選択に基づき、WSM用CSVを生成して返却する。
+    """
+    facility_id = data.get('facility_id')
+    selected_channels = data.get('selected_channels', [])
+
+    try:
+        from apps.facilities.models import Facility
+        facility = Facility.objects.get(pk=facility_id)
+        csv_content = WSMService.generate_csv(facility, selected_channels)
+
+        # ファイル名を生成
+        import datetime
+        date_str = datetime.datetime.now().strftime('%Y%m%d')
+        filename = f"wsm_{facility.name}_{date_str}.csv"
+
+        response = HttpResponse(csv_content, content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Facility.DoesNotExist:
+        return api_error('Facility not found', status=404)
+    except Exception as e:
         return api_error(str(e), status=500)

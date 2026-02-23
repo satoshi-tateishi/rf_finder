@@ -16,7 +16,7 @@ class EventInfoForm(forms.Form):
 class AdjustmentRequestForm(forms.Form):
     app_type = forms.ChoiceField(choices=[('new', '新規'), ('change', '変更'), ('delete', '削除')], required=True)
     extra_53ch = forms.CharField(max_length=1, required=False)
-    
+
     # バリデーション結果を保持するためのフィールド（実際にはJSONが来る）
     facilities = forms.CharField(required=False)
     mic_counts = forms.CharField(required=False)

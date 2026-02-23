@@ -71,6 +71,18 @@ const Api = {
         return await this._handleResponse(res);
     },
 
+    async exportWSM(facilityId, selectedChannels) {
+        const res = await fetch('/api/adjustments/export-wsm/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                facility_id: facilityId,
+                selected_channels: selectedChannels
+            })
+        });
+        return await this._handleBlobOrError(res);
+    },
+
     /**
      * Utility: Format channel numbers (e.g. [13, 14, 15, 20] -> "13-15, 20")
      */

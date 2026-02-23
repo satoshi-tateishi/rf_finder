@@ -28,6 +28,24 @@ function updateAdjustmentButtonState() {
     }
 }
 
+function updateWsmButtonState(facilityId) {
+    const btn = document.getElementById(`wsm-btn-${facilityId}`);
+    if (!btn) return;
+
+    const facility = window.keepList.find(f => f.id === facilityId);
+    const hasSelection = facility && facility.selectedChannels && facility.selectedChannels.length > 0;
+
+    if (hasSelection) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+        btn.classList.add('bg-orange-500', 'hover:bg-orange-600');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+        btn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+    }
+}
+
 function renderChannelSelection() {
     const container = document.getElementById('facility-channels-container');
     if (!container) return;
@@ -42,7 +60,7 @@ function renderChannelSelection() {
         const zipDisplay = f.postal_code ? `<span class="mr-1">〒${f.postal_code}</span>` : '';
 
         section.innerHTML = `
-            <div class="mb-4">
+            <div class="mb-4 flex justify-between items-start">
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-1 flex-wrap">
                         <span class="font-bold text-sm text-gray-800">${f.name}</span>
@@ -51,12 +69,16 @@ function renderChannelSelection() {
                     </div>
                     <div class="text-[10px] text-gray-400">${zipDisplay}${f.address}</div>
                 </div>
+                <button id="wsm-btn-${f.id}" onclick="handleExportWSM(${f.id})" class="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold py-1.5 px-3 rounded shadow-sm transition-colors flex items-center gap-1 shrink-0 opacity-50 cursor-not-allowed bg-gray-400" disabled>
+                    <i class="fa-solid fa-file-csv"></i> WSM CSV
+                </button>
             </div>
             <div id="grid-${f.id}" class="ch-grid"></div>
         `;
         
         container.appendChild(section);
         renderRFGrid(f, document.getElementById(`grid-${f.id}`));
+        updateWsmButtonState(f.id);
     });
 
     updateAdjustmentButtonState();
@@ -87,6 +109,7 @@ function renderRFGrid(facility, gridElement) {
                     facility.selectedChannels.push(ch);
                     btn.classList.add('selected');
                 }
+                updateWsmButtonState(facility.id);
                 updateAdjustmentButtonState();
             };
             
@@ -192,3 +215,43 @@ window.addEventListener('DOMContentLoaded', () => {
     // 初期状態のボタン更新
     updateAdjustmentButtonState();
 });
+
+/**
+ * Handle WSM CSV export for a specific facility
+ */
+async function handleExportWSM(facilityId) {
+    const facility = window.keepList.find(f => f.id === facilityId);
+    if (!facility) return;
+
+    if (!facility.selectedChannels || facility.selectedChannels.length === 0) {
+        showToast('チャンネルが選択されていません', 'error');
+        return;
+    }
+
+    try {
+        const blob = await Api.exportWSM(facilityId, facility.selectedChannels);
+        
+        // ファイル名を生成
+        const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const filename = `wsm_${facility.name}_${dateStr}.csv`;
+        
+        // ダウンロード実行
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.style.display = 'none';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }, 100);
+        
+        showToast('CSVのダウンロードを開始しました', 'success');
+    } catch (err) {
+        console.error(err);
+        showToast('CSVの生成に失敗しました: ' + err.message, 'error');
+    }
+}

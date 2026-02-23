@@ -1,4 +1,3 @@
-import json
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
@@ -23,7 +22,7 @@ class LineBotServiceTest(TestCase):
         )
 
         service = LineBotService()
-        
+
         # 1回目：リクエストが発生する
         token1 = service._get_access_token()
         self.assertEqual(token1, 'test_token_123')
@@ -55,7 +54,7 @@ class LineBotServiceTest(TestCase):
 
             self.assertTrue(success)
             self.assertEqual(mock_post.call_count, 4)
-            
+
             # 最後のメッセージ送信の引数チェック
             last_call_args = mock_post.call_args_list[-1]
             self.assertIn('/bots/test_bot/channels/ch_001/messages', last_call_args[0][0])
@@ -77,7 +76,7 @@ class LineBotServiceTest(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(mock_post.call_count, 2)
-        
+
         # 引数チェック
         last_call_args = mock_post.call_args_list[-1]
         self.assertEqual(last_call_args[1]['json']['content']['type'], 'flex')
@@ -90,7 +89,7 @@ class LineBotServiceTest(TestCase):
 
         service = LineBotService()
         token = service._get_access_token()
-        
+
         self.assertIsNone(token)
         self.assertEqual(mock_post.call_count, 1)
 
@@ -110,7 +109,7 @@ class LineBotServiceTest(TestCase):
 
             self.assertTrue(success)
             self.assertEqual(mock_post.call_count, 2)
-            
+
             # リクエスト内容の確認
             last_call_args = mock_post.call_args_list[-1]
             self.assertIn('/bots/test_bot/persistentmenu', last_call_args[0][0])

@@ -28,7 +28,7 @@ class LineBotService:
         # Prevent re-initialization if the instance already exists
         if hasattr(self, '_initialized') and self._initialized:
             return
-        
+
         self.client_id = settings.LINE_WORKS_CLIENT_ID
         self.client_secret = settings.LINE_WORKS_CLIENT_SECRET
         self.service_account = settings.LINE_WORKS_SERVICE_ACCOUNT
@@ -84,7 +84,7 @@ class LineBotService:
                     expires_in = int(res_data.get("expires_in", self.TOKEN_EXPIRY))
                 except (ValueError, TypeError):
                     expires_in = self.TOKEN_EXPIRY
-                
+
                 # Ensure we don't cache for longer than the actual expiry
                 cache_time = min(expires_in - 60, self.TOKEN_EXPIRY)
                 cache.set(self.CACHE_KEY, token, cache_time)
@@ -290,7 +290,7 @@ class LineBotService:
         }
         # WOFFアプリのURLスキーム
         woff_url = f"https://woff.worksmobile.com/woff/{woff_id}"
-        
+
         data = {
             "content": {
                 "actions": [

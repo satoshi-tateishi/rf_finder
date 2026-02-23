@@ -38,7 +38,7 @@ class Command(BaseCommand):
             for m in menus:
                 bot_service.delete_rich_menu(m['richmenu_id'] if 'richmenu_id' in m else m.get('richmenuId'))
                 self.stdout.write(f'Deleted rich menu: {m.get("richmenuId")}')
-            
+
             # 固定メニューの削除
             if bot_service.delete_persistent_menu():
                 self.stdout.write(self.style.SUCCESS('固定メニューを削除しました。'))
@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
         if options['rich_menu']:
             self.stdout.write('リッチメニュー（画像メニュー）を設定中...')
-            
+
             # 1. 既存メニューの削除（オプション）
             if options['clean']:
                 menus = bot_service.list_rich_menus()
@@ -94,14 +94,14 @@ class Command(BaseCommand):
 
         else:
             self.stdout.write(f'WOFF ID: {woff_id} を使用して固定メニューを設定中...')
-            
+
             # リッチメニューが存在すると固定メニューを設定できないため、まず削除を試みる
             menus = bot_service.list_rich_menus()
             if menus:
                 self.stdout.write(f'{len(menus)} 個の既存リッチメニューを削除します...')
                 for m in menus:
                     bot_service.delete_rich_menu(m['richmenu_id'] if 'richmenu_id' in m else m.get('richmenuId'))
-            
+
             success = bot_service.set_persistent_menu(woff_id)
 
             if success:
@@ -116,11 +116,11 @@ class Command(BaseCommand):
         width, height = 2500, 843
         background_color = (0, 195, 0)  # LINE WORKS Green
         text = "RF Finder を起動"
-        
+
         # 画像作成
         img = Image.new('RGB', (width, height), color=background_color)
         draw = ImageDraw.Draw(img)
-        
+
         # フォント設定
         font_path = os.path.join(settings.BASE_DIR, 'static/fonts/NotoSansJP-Regular.ttf')
         try:
@@ -135,9 +135,9 @@ class Command(BaseCommand):
         text_width = right - left
         text_height = bottom - top
         position = ((width - text_width) // 2, (height - text_height) // 2 - 40)
-        
+
         draw.text(position, text, fill=(255, 255, 255), font=font)
-        
+
         # アイコン（簡易）
         draw.rectangle([width // 2 - 400, height - 120, width // 2 + 400, height - 110], fill=(255, 255, 255))
 

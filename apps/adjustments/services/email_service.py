@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 
 from apps.accounts.models import EmailTemplate
+
 from ..utils import get_adjustment_filename
 
 
@@ -41,7 +42,7 @@ def send_adjustment_email(data, member, pdf_buffer):
     subject = template.subject
     body = template.body
     cc_raw = template.cc_address
-    
+
     # プレースホルダーの置換
     replacements = {
         '{ユーザー名}': user_name,
@@ -75,15 +76,15 @@ def send_adjustment_email(data, member, pdf_buffer):
 
     # PDFを添付 (Gmail文字化け対策: MIMEApplicationを直接操作)
     from email.mime.application import MIMEApplication
-    
+
     pdf_buffer.seek(0)
     filename = get_adjustment_filename(data, 'pdf')
-    
+
     attachment = MIMEApplication(pdf_buffer.getvalue(), _subtype='pdf')
     # add_headerで直接RFC 2231形式のパラメータを指定する
     # Python 3.x の email モジュールは、日本語を渡すと自動的に RFC 2231 (filename*) 形式でエンコードします
     attachment.add_header('Content-Disposition', 'attachment', filename=filename)
-    
+
     # DjangoのEmailMessageにMIMEパートを直接追加
     email.attach(attachment)
 

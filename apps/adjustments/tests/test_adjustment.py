@@ -6,7 +6,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import EmailTemplate, Member
-
 from apps.adjustments.services import (
     generate_adjustment_excel,
     generate_adjustment_pdf,
@@ -247,7 +246,7 @@ class AdjustmentUtilityTest(TestCase):
         """各申請区分が正しく日本語に変換されること"""
         from apps.adjustments.utils import get_adjustment_filename
         base_data = {'event': {'name': 'テスト'}, 'facilities': []}
-        
+
         self.assertIn('新規', get_adjustment_filename({**base_data, 'app_type': 'new'}))
         self.assertIn('変更', get_adjustment_filename({**base_data, 'app_type': 'change'}))
         self.assertIn('削除', get_adjustment_filename({**base_data, 'app_type': 'delete'}))
@@ -269,9 +268,9 @@ class EmailServiceDetailTest(TestCase):
             'facilities': [{'start_date': '2026-05-10'}]
         }
         pdf_buffer = io.BytesIO(b'dummy')
-        
+
         send_adjustment_email(data, member, pdf_buffer)
-        
+
         sent = mail.outbox[0]
         self.assertEqual(sent.subject, '新規:ハムレット')
         self.assertIn('太郎 様 (taro@ex.com)', sent.body)
