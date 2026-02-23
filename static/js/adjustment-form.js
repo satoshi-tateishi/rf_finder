@@ -2,6 +2,65 @@
  * Adjustment Form Management module
  */
 
+function updateRequiredHighlight(el) {
+    if (!el.hasAttribute('required')) return;
+    const val = el.value;
+    const isEmpty = !val || (typeof val === 'string' && val.trim() === "");
+    
+    if (isEmpty) {
+        el.classList.add('required-empty');
+    } else {
+        el.classList.remove('required-empty');
+    }
+}
+
+function updateMicCountsHighlight() {
+    const container = document.getElementById('mic-counts-table-container');
+    if (!container) return;
+
+    const inputs = container.querySelectorAll('input, select');
+    let hasValue = false;
+    inputs.forEach(input => {
+        if (input.value && input.value.trim() !== "") {
+            hasValue = true;
+        }
+    });
+
+    if (!hasValue) {
+        container.classList.add('required-empty');
+    } else {
+        container.classList.remove('required-empty');
+    }
+}
+
+function checkAllRequiredFields() {
+    const container = document.getElementById('adjustment-form-section');
+    if (!container) return;
+    const inputs = container.querySelectorAll('input[required], select[required], textarea[required]');
+    inputs.forEach(input => updateRequiredHighlight(input));
+    
+    // マイク数テーブルのチェック
+    updateMicCountsHighlight();
+}
+
+// Global delegated listeners for required fields
+document.addEventListener('input', (e) => {
+    if (e.target.hasAttribute('required')) updateRequiredHighlight(e.target);
+    
+    // マイク数テーブル内の入力変更を監視
+    if (e.target.closest('#mic-counts-table-container')) {
+        updateMicCountsHighlight();
+    }
+});
+document.addEventListener('change', (e) => {
+    if (e.target.hasAttribute('required')) updateRequiredHighlight(e.target);
+    
+    // マイク数テーブル内の選択変更を監視
+    if (e.target.closest('#mic-counts-table-container')) {
+        updateMicCountsHighlight();
+    }
+});
+
 function goToAdjustment() {
     if (window.keepList.length === 0) {
         showToast('施設を選択してください', 'info');
@@ -26,21 +85,21 @@ function goToAdjustment() {
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用開始日</label>
+                    <label class="text-[10px] text-gray-500 block mb-1">使用開始日 <span class="text-red-500">*</span></label>
                     <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用終了日</label>
+                    <label class="text-[10px] text-gray-500 block mb-1">使用終了日 <span class="text-red-500">*</span></label>
                     <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-3">
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用開始時間</label>
+                    <label class="text-[10px] text-gray-500 block mb-1">使用開始時間 <span class="text-red-500">*</span></label>
                     <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="09:00" required>
                 </div>
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用終了時間</label>
+                    <label class="text-[10px] text-gray-500 block mb-1">使用終了時間 <span class="text-red-500">*</span></label>
                     <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="22:00" required>
                 </div>
             </div>
@@ -51,6 +110,10 @@ function goToAdjustment() {
     document.getElementById('ch-selection-section').classList.add('hidden');
     document.getElementById('keep-list-section').classList.add('hidden');
     document.getElementById('adjustment-form-section').classList.remove('hidden');
+    
+    // バリデーション用ハイライト初期化
+    checkAllRequiredFields();
+
     window.scrollTo(0, 0);
 }
 
@@ -359,11 +422,11 @@ async function restoreFormState() {
             window.keepList = [];
             for (const sf of state.facilities) {
                 try {
-                    const facilityBase = await Api.getFacilityDetail(sf.id);
+                    const data = await Api.getFacilityDetail(sf.id);
                     window.keepList.push({
-                        ...facilityBase,
+                        ...data.facility, // 施設基本情報を展開 (name, address等)
                         selectedChannels: sf.selectedChannels || [],
-                        availableChannels: facilityBase.available_channels
+                        availableChannels: data.available_channels
                     });
                 } catch (e) { console.error(`Failed to restore facility ${sf.id}:`, e); }
             }
@@ -389,6 +452,10 @@ async function restoreFormState() {
                 });
             }
         }
+        
+        // ハイライトの更新
+        checkAllRequiredFields();
+        
         showToast('前回の入力内容を復元しました', 'info');
     } catch (e) {
         console.error('Failed to restore form state:', e);

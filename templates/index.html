@@ -90,6 +90,12 @@
         .toast-success { background-color: #22c55e; } /* green-500 */
         .toast-error { background-color: #ef4444; }   /* red-500 */
         .toast-info { background-color: #3b82f6; }    /* blue-500 */
+
+        /* Required field styling */
+        .required-empty {
+            border-color: #ef4444 !important; /* red-500 */
+            background-color: #fef2f2 !important; /* red-50 */
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
@@ -206,20 +212,20 @@
                     <label class="block text-sm font-bold text-gray-700 mb-3">現地使用者</label>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="text-xs text-gray-500">氏名</label>
-                            <input type="text" id="user_name" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="新音 太郎" value="">
+                            <label class="text-xs text-gray-500">氏名 <span class="text-red-500">*</span></label>
+                            <input type="text" id="user_name" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="新音 太郎" value="" required>
                         </div>
                         <div>
-                            <label class="text-xs text-gray-500">ふりがな</label>
-                            <input type="text" id="user_kana" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="しんおん たろう" value="">
+                            <label class="text-xs text-gray-500">ふりがな <span class="text-red-500">*</span></label>
+                            <input type="text" id="user_kana" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="しんおん たろう" value="" required>
                         </div>
                         <div>
-                            <label class="text-xs text-gray-500">Tel</label>
-                            <input type="tel" id="user_tel" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="090-1234-5678">
+                            <label class="text-xs text-gray-500">Tel <span class="text-red-500">*</span></label>
+                            <input type="tel" id="user_tel" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="090-1234-5678" required>
                         </div>
                         <div>
-                            <label class="text-xs text-gray-500">E-mail</label>
-                            <input type="email" id="user_email" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@shin-on1981.com">
+                            <label class="text-xs text-gray-500">E-mail <span class="text-red-500">*</span></label>
+                            <input type="email" id="user_email" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@shin-on1981.com" required>
                         </div>
                     </div>
                 </div>
@@ -259,9 +265,9 @@
 
                 <!-- Microphone Counts (Matrix) -->
                 <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">使用マイク数</label>                    
+                    <label class="block text-sm font-bold text-gray-700 mb-2">使用マイク数 <span class="text-red-500">*</span></label>                    
                     
-                    <div class="overflow-x-auto" id="mic-counts-table-container">
+                    <div class="overflow-x-auto border-2 border-transparent rounded-lg transition-all" id="mic-counts-table-container">
                         <table class="w-full text-center text-[10px] border-collapse min-w-[700px]">
                             <thead>
                                 <tr class="bg-red-50 text-red-600 font-bold">
@@ -334,7 +340,8 @@
                         </table>
                     </div>
                     <div class="mt-2 flex items-center justify-between border border-gray-300 p-2 rounded text-[9px] text-blue-600">
-                        <span>TVWSの使用申請で、状況により「53ch」を併用する可能性がある場合：右枠に○印をご記入下さい。</span>
+                        <span>TVWSの使用申請で、状況により「53ch」を併用する可能性がある場合：右枠に○印をご記入下さい。<br>
+                        (注)使用マイク数はすべてTVWS枠に記入してください。</span>
                         <div id="toggle-53ch" class="w-8 h-8 border border-gray-400 flex items-center justify-center text-lg font-bold bg-white cursor-pointer select-none transition-colors hover:bg-gray-50 active:bg-gray-100" onclick="this.innerText = (this.innerText === '○' ? '' : '○')"></div>
                     </div>
                 </div>
@@ -406,6 +413,11 @@
             if (typeof restoreFormState === 'function') {
                 await restoreFormState();
                 initChangeWatchers();
+            }
+            
+            // 初回のバリデーションハイライト
+            if (typeof checkAllRequiredFields === 'function') {
+                checkAllRequiredFields();
             }
         });
     </script>

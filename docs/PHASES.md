@@ -56,6 +56,7 @@
     - 静的解析ツール (`ruff`) の導入とコード標準化
 
 ## Phase 7: ブラッシュアップと本番デプロイ
+- [x] **開発環境の Apache 化**: Nginx から Apache (mod_auth_mellon) への移行完了 (SSO検証基盤の構築)
 - [ ] UI/UX の微調整 (サンプルアプリを参考にした操作感の向上)
 - [ ] LINE WORKS SSO 連携の実装 (Standalone環境での認証)
 - [ ] 本番用ドメイン/SSL (Let's Encrypt) 設定
