@@ -7,21 +7,26 @@ import jwt
 import requests
 from django.conf import settings
 from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from apps.adjustments.services import LineBotService
 
 from .models import UserProfile
+from .utils import normalize_phonetic
 
 logger = logging.getLogger(__name__)
+
 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('facilities:index')
     return render(request, 'login.html')
+
 
 def lineworks_login(request):
     # State生成
@@ -46,6 +51,7 @@ def lineworks_login(request):
     # URL生成
     query = "&".join([f"{k}={v}" for k, v in params.items()])
     return redirect(f"{auth_base}?{query}")
+
 
 def lineworks_callback(request):
     code = request.GET.get('code')
@@ -81,23 +87,49 @@ def lineworks_callback(request):
         decoded = jwt.decode(id_token, options={"verify_signature": False})
 
         # ドメイン検証
-        email = decoded.get('email')
+        email = decoded.get('email', '')
         allowed_domain = getattr(settings, 'LINE_WORKS_DOMAIN', 'shin-on1981')
 
         if email and email.endswith(f"@{allowed_domain}") and not email.endswith(".com"):
-             email = f"{email}.com"
+            email = f"{email}.com"
 
         # ユーザー情報の取得・作成
-        sub = decoded.get('sub') # LINE WORKS User ID
+        sub = decoded.get('sub')  # LINE WORKS User ID (UUID)
+        email = decoded.get('email', '')
 
-        # 名前を FamilyName GivenName の順に構成
-        family_name = decoded.get('family_name', '')
-        given_name = decoded.get('given_name', '')
+        # 追加情報の取得 (Users API を使用)
+        # 以前の調査で UUID (sub) は 403 (Scope不足)、email は 404 だったため、
+        # user.read スコープを付与した状態で再度 UUID を使用します
+        bot_service = LineBotService()
+        lw_user_data = bot_service.get_user_info(sub)
 
-        if family_name and given_name:
-            full_name = f"{family_name} {given_name}"
+        if not lw_user_data:
+            logger.warning(f"Failed to fetch additional info for sub={sub}, email={email} from Users API")
         else:
-            full_name = decoded.get('name') or decoded.get('email') or 'Guest'
+            logger.info(f"Successfully fetched info for sub={sub}")
+
+        family_name = ""
+        given_name = ""
+        phonetic_family = ""
+        phonetic_given = ""
+        phone = ""
+
+        # 取得できた情報でマッピング
+        if lw_user_data:
+            # 氏名情報
+            name_info = lw_user_data.get('userName', {})
+            family_name = name_info.get('lastName', '')
+            given_name = name_info.get('firstName', '')
+            phonetic_family = normalize_phonetic(name_info.get('phoneticLastName', ''))
+            phonetic_given = normalize_phonetic(name_info.get('phoneticFirstName', ''))
+
+            full_name = f"{family_name} {given_name}".strip() or name_info.get('fullName') or decoded.get('name')
+            phone = lw_user_data.get('telephone') or lw_user_data.get('cellPhone') or ''
+            email = lw_user_data.get('privateEmail') or lw_user_data.get('email') or email
+        else:
+            family_name = decoded.get('family_name', '')
+            given_name = decoded.get('given_name', '')
+            full_name = f"{family_name} {given_name}".strip() or decoded.get('name') or decoded.get('email') or 'Guest'
 
         user, created = User.objects.get_or_create(
             username=sub,
@@ -106,6 +138,16 @@ def lineworks_callback(request):
                 'first_name': full_name,
             }
         )
+
+        # Profile情報の同期
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.family_name = family_name
+        profile.given_name = given_name
+        profile.phonetic_family_name = phonetic_family
+        profile.phonetic_given_name = phonetic_given
+        profile.phone_number = phone
+        profile.email = email
+        profile.save()
 
         if not created:
             if full_name and user.first_name != full_name:
@@ -118,6 +160,25 @@ def lineworks_callback(request):
     except Exception as e:
         logger.error(f"SSO Callback Error: {e}", exc_info=True)
         return render(request, 'login.html', {'error': 'ログイン処理中にエラーが発生しました。'})
+
+
+@login_required
+def get_my_profile(request):
+    """ログインユーザーのプロフィール情報を返すAPI"""
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    data = {
+        'family_name': profile.family_name,
+        'given_name': profile.given_name,
+        'phonetic_family_name': profile.phonetic_family_name,
+        'phonetic_given_name': profile.phonetic_given_name,
+        'full_name': profile.full_name,
+        'full_kana': profile.full_kana,
+        'phone_number': profile.phone_number,
+        'email': profile.email,
+        'role': profile.role,
+    }
+    return JsonResponse({'status': 'success', 'data': data})
+
 
 def initiate_otp_flow(request, user):
     """OTPを生成・送信し、認証画面へリダイレクト"""
@@ -138,10 +199,8 @@ def initiate_otp_flow(request, user):
 
     # LINE WORKS Botで送信
     # 1-on-1メッセージ用のエンドポイントを使用する
-    # ID形式: user@domain (内部ドメインの場合は.comを含まない形式が多い)
     lw_id = user.email
     if lw_id and lw_id.endswith('.com'):
-        # shin-on1981 ドメイン等の場合、.com を取った形式が LINE WORKS ID になるケースがある
         allowed_domain = getattr(settings, 'LINE_WORKS_DOMAIN', 'shin-on1981')
         if f'@{allowed_domain}.com' in lw_id:
             lw_id = lw_id.replace('.com', '')
@@ -161,6 +220,7 @@ def initiate_otp_flow(request, user):
     # セッションにユーザーIDを一時保存
     request.session['otp_user_id'] = user.id
     return redirect('accounts:otp_verify')
+
 
 def otp_verify(request):
     user_id = request.session.get('otp_user_id')
@@ -187,7 +247,7 @@ def otp_verify(request):
         # コード検証
         if code and check_password(code, profile.otp_code):
             # 認証成功
-            profile.otp_code = None
+            profile.otp_code = ''
             profile.otp_attempts = 0
             profile.save()
 
@@ -208,6 +268,7 @@ def otp_verify(request):
 
     return render(request, 'otp_verify.html')
 
+
 def otp_resend(request):
     user_id = request.session.get('otp_user_id')
     if not user_id:
@@ -219,7 +280,7 @@ def otp_resend(request):
     except User.DoesNotExist:
         return redirect('accounts:login')
 
+
 def logout_view(request):
     logout(request)
     return redirect('accounts:login')
-

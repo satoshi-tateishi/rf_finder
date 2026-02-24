@@ -90,7 +90,26 @@ def callback(request):
 
 ---
 
-## 4. shin-on_wiki 実装の特徴 (推奨ポイント)
+## 4. ユーザープロフィールの詳細同期 (Users API)
+
+SSO ログイン後、`LineBotService.get_user_info` を使用して LINE WORKS の **Users API** から詳細情報を取得し、データベース (`UserProfile`) を同期します。
+
+### 同期される項目と優先順位
+- **氏名**: `lastName` + `firstName` を結合。
+- **ふりがな**: `phoneticLastName` + `phoneticFirstName` を結合し、**ひらがなに正規化**して保存。
+- **電話番号**: `telephone` (外線) を優先し、空であれば `cellPhone` (携帯) を取得。
+- **メールアドレス**: `privateEmail` (個人メール) を優先し、空であれば標準の `email` を取得。
+
+### 権限 (Role) 管理
+`UserProfile.role` フィールドにより、ユーザーごとに以下の権限を設定可能です。
+- **admin**: 管理者（全機能）
+- **editor**: 編集者（編集・削除可）
+- **general**: 一般ユーザー（標準操作、初期値）
+- **viewer**: 閲覧専用（入力・送信不可の読み取り専用モード）
+
+---
+
+## 5. shin-on_wiki 実装の特徴 (推奨ポイント)
 
 - **セキュアなコード交換**: `id_token` がブラウザの履歴やログに残るリスクを排除。
 - **PKCE (Proof Key for Code Exchange)**: セッションハイジャック対策として `code_verifier` と `code_challenge` の併用を推奨（`shin-on_wiki` で実装済み）。

@@ -104,6 +104,11 @@ const Api = {
         return await this._handleResponse(res);
     },
 
+    async getMyProfile() {
+        const res = await fetch('/auth/me/');
+        return await this._handleResponse(res);
+    },
+
     /**
      * Utility: Format channel numbers (e.g. [13, 14, 15, 20] -> "13-15, 20")
      */

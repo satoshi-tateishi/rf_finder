@@ -14,7 +14,7 @@ class LineBotService:
     LINE WORKS Bot API Service for sending files to talk rooms.
     """
 
-    CACHE_KEY = 'line_works_access_token'
+    CACHE_KEY = 'line_works_access_token_v2'
     TOKEN_EXPIRY = 86400 - 300  # 24 hours - 5 minutes buffer
 
     _instance = None
@@ -68,7 +68,7 @@ class LineBotService:
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "scope": "bot"
+            "scope": "bot,user.read"
         }
         headers = {
             "Content-Type": "application/x-www-form-urlencoded"
@@ -306,6 +306,30 @@ class LineBotService:
         except Exception as e:
             logger.error(f"[LineBotService] Error sending user message: {e}")
             return False
+
+    def get_user_info(self, user_id):
+        """
+        Fetch user details from LINE WORKS Users API.
+        """
+        access_token = self._get_access_token()
+        if not access_token:
+            return None
+
+        url = f"https://www.worksapis.com/v1.0/users/{user_id}"
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"[LineBotService] Failed to fetch user info for {user_id}: {response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"[LineBotService] Error fetching user info: {e}")
+            return None
 
     def set_persistent_menu(self, woff_id):
         """

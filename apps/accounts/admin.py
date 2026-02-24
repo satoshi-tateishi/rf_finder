@@ -3,8 +3,28 @@ from django.contrib import admin
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 
-from .models import EmailTemplate, Member
+from .models import EmailTemplate, Member, UserProfile
 from .resources import EmailTemplateResource, MemberResource
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'role', 'full_name', 'phone_number', 'email')
+    list_filter = ('role',)
+    search_fields = ('user__username', 'family_name', 'given_name', 'email')
+    readonly_fields = ('otp_code', 'otp_expires_at', 'otp_locked_until')
+    fieldsets = (
+        ('基本情報', {'fields': ('user', 'role')}),
+        ('LINE WORKS同期情報', {'fields': (
+            ('family_name', 'given_name'),
+            ('phonetic_family_name', 'phonetic_given_name'),
+            'phone_number', 'email'
+        )}),
+        ('セキュリティ (OTP)', {
+            'fields': ('otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 class MemberAdminForm(forms.ModelForm):

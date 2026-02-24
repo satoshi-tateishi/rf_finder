@@ -465,6 +465,24 @@
             }{% if not forloop.last %},{% endif %}
             {% endfor %}
         ];
+
+        // ユーザー情報をグローバル変数として保持
+        window.currentUser = {
+            isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }},
+            {% if user.is_authenticated %}
+            role: "{{ user.profile.role }}",
+            fullName: "{{ user.profile.full_name|escapejs }}",
+            fullKana: "{{ user.profile.full_kana|escapejs }}",
+            phone: "{{ user.profile.phone_number|escapejs }}",
+            email: "{{ user.profile.email|escapejs }}"
+            {% else %}
+            role: "guest",
+            fullName: "",
+            fullKana: "",
+            phone: "",
+            email: ""
+            {% endif %}
+        };
     </script>
 
     <!-- Modular JS Files -->

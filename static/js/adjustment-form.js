@@ -69,6 +69,11 @@ function goToAdjustment() {
         return;
     }
 
+    // 新規作成時のみユーザー情報を初期入力
+    if (!window.currentAdjustmentId) {
+        prefillUserInfo();
+    }
+
     // 使用場所・日程リストの生成
     const container = document.getElementById('form-facilities-list');
     container.innerHTML = '';
@@ -113,10 +118,67 @@ function goToAdjustment() {
     document.getElementById('keep-list-section').classList.add('hidden');
     document.getElementById('adjustment-form-section').classList.remove('hidden');
     
+    // ロールに応じた権限制限の適用
+    applyRoleConstraints();
+
     // バリデーション用ハイライト初期化
     checkAllRequiredFields();
 
     window.scrollTo(0, 0);
+}
+
+function prefillUserInfo() {
+    const user = window.currentUser;
+    if (!user || !user.isAuthenticated) return;
+
+    const nameEl = document.getElementById('user_name');
+    const kanaEl = document.getElementById('user_kana');
+    const telEl = document.getElementById('user_tel');
+    const emailEl = document.getElementById('user_email');
+
+    // 既に値がある場合は上書きしない
+    if (!nameEl.value) nameEl.value = user.fullName || '';
+    if (!kanaEl.value) kanaEl.value = user.fullKana || '';
+    if (!telEl.value) telEl.value = user.phone || '';
+    if (!emailEl.value) emailEl.value = user.email || '';
+}
+
+function applyRoleConstraints() {
+    const role = window.currentUser?.role || 'guest';
+    const isViewer = (role === 'viewer');
+    
+    // 閲覧者(viewer)の場合、アクションボタンを無効化
+    const actionButtons = [
+        '#send-email-btn',
+        'button[onclick="saveAdjustmentDraft()"]',
+        'button[onclick="downloadPDF()"]',
+        'button[onclick="downloadExcel()"]'
+    ];
+
+    actionButtons.forEach(selector => {
+        const btn = document.querySelector(selector);
+        if (btn) {
+            btn.disabled = isViewer;
+            if (isViewer) btn.classList.add('opacity-50', 'cursor-not-allowed');
+            else btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    });
+
+    // 入力フィールドの制限 (viewerの場合)
+    const inputs = document.querySelectorAll('#adjustment-form-section input, #adjustment-form-section textarea, #adjustment-form-section select');
+    inputs.forEach(el => {
+        if (isViewer) {
+            el.setAttribute('disabled', 'true');
+            el.classList.add('bg-gray-100');
+        } else {
+            el.removeAttribute('disabled');
+            el.classList.remove('bg-gray-100');
+        }
+    });
+
+    if (isViewer) {
+        showToast('閲覧専用モードです（編集・送信はできません）', 'info');
+    }
 }
 
 function backToSelection() {
@@ -586,6 +648,7 @@ async function loadAdjustment(id) {
 
         await applyStateToForm(data);
         closeHistoryModal();
+        applyRoleConstraints(); // ロール制限を再適用
         showToast('データを読み込みました', 'success');
         FormStorage.save(data); // 復元用ストレージも同期
     } catch (err) {
