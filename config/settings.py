@@ -156,3 +156,8 @@ LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', d
 # SSO Settings
 LINE_WORKS_REDIRECT_URI = env('LINE_WORKS_REDIRECT_URI', default='http://localhost:8084/auth/lineworks/callback/')
 LINE_WORKS_DOMAIN = env('LINE_WORKS_DOMAIN', default='shin-on1981')
+
+# Dropbox Backup Settings
+DROPBOX_APP_KEY = env('DROPBOX_APP_KEY', default='')
+DROPBOX_APP_SECRET = env('DROPBOX_APP_SECRET', default='')
+DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:8084/auth/dropbox/callback/')

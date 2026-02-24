@@ -136,8 +136,40 @@ def log_user_login(sender, request, user, **kwargs):
     log_action(user=user, action='LOGIN', description='ログイン成功', request=request)
 
 
-@receiver(user_login_failed)
-def log_user_login_failed(sender, credentials, request, **kwargs):
-    from .utils import log_action
-    username = credentials.get('username', 'unknown')
-    log_action(user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request)
+    @receiver(user_login_failed)
+    def log_user_login_failed(sender, credentials, request, **kwargs):
+        from .utils import log_action
+        username = credentials.get('username', 'unknown')
+        log_action(user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request)
+
+
+class DropboxToken(models.Model):
+    """Dropbox APIのOAuth2トークン情報を保持するモデル"""
+    service_name = models.CharField(max_length=50, default='backup', verbose_name='サービス名')
+    access_token = models.TextField(verbose_name='アクセストークン')
+    refresh_token = models.TextField(null=True, blank=True, verbose_name='リフレッシュトークン')
+    token_type = models.CharField(max_length=20, default='Bearer')
+    account_id = models.CharField(max_length=100, null=True, blank=True, verbose_name='アカウントID')
+    account_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='アカウント名')
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name='有効期限')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Dropboxトークン'
+        verbose_name_plural = 'Dropboxトークン'
+
+    def __str__(self):
+        return f"Dropbox Token ({self.account_name or self.service_name})"
+
+    def is_access_token_expired(self):
+        """アクセストークンが期限切れか判定する"""
+        if not self.expires_at:
+            return True
+        # 5分前の余裕を持って判定
+        return timezone.now() > (self.expires_at - timedelta(minutes=5))
+
+    def has_valid_refresh_token(self):
+        """リフレッシュトークンを持っているか判定する"""
+        return bool(self.refresh_token)
+

@@ -14,10 +14,10 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from apps.adjustments.services import LineBotService
+from apps.adjustments.services import LineBotService, DropboxService
 
-from .models import UserProfile, AuditLog
-from .utils import normalize_phonetic
+from .models import UserProfile, AuditLog, DropboxToken
+from .utils import normalize_phonetic, log_action
 
 logger = logging.getLogger(__name__)
 
@@ -327,3 +327,46 @@ def otp_resend(request):
 def logout_view(request):
     logout(request)
     return redirect('accounts:login')
+
+
+@login_required
+def dropbox_login(request):
+    """Dropbox連携を開始する (管理者のみ)"""
+    if request.user.profile.role != 'admin':
+        return redirect('facilities:index')
+
+    service = DropboxService()
+    redirect_uri = settings.DROPBOX_REDIRECT_URI
+    auth_url = service.get_auth_url(redirect_uri)
+    return redirect(auth_url)
+
+
+@login_required
+def dropbox_callback(request):
+    """Dropbox認証のコールバック"""
+    code = request.GET.get('code')
+    if not code:
+        return render(request, 'index.html', {'error': 'Dropbox認証がキャンセルされました。'})
+
+    service = DropboxService()
+    redirect_uri = settings.DROPBOX_REDIRECT_URI
+    try:
+        service.finish_auth(code, redirect_uri)
+        return redirect('/admin/accounts/dropboxtoken/')
+    except Exception as e:
+        logger.error(f"Dropbox Callback Error: {e}")
+        return render(request, 'index.html', {'error': f'Dropbox認証に失敗しました: {str(e)}'})
+
+
+@login_required
+def run_db_backup(request):
+    """手動でデータベースバックアップを実行する"""
+    if request.user.profile.role != 'admin':
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+    service = DropboxService()
+    try:
+        result = service.create_db_backup()
+        return JsonResponse({'status': 'success', 'data': result})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
