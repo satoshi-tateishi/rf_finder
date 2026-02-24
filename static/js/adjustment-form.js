@@ -2,6 +2,8 @@
  * Adjustment Form Management module
  */
 
+window.currentAdjustmentId = null;
+
 function updateRequiredHighlight(el) {
     if (!el.hasAttribute('required')) return;
     const val = el.value;
@@ -180,6 +182,7 @@ function collectFormData() {
     };
 
     return {
+        id: window.currentAdjustmentId,
         app_type: appType,
         user: user,
         event: event,
@@ -340,7 +343,14 @@ async function downloadExcel() {
 }
 
 async function sendEmail() {
-    if (!confirm('運用調整届を特ラ機構へ送信してもよろしいですか？')) return;
+    const confirmed = await showDecisionModal({
+        title: '特ラ機構へ送信',
+        message: '運用調整届を特ラ機構へ送信してもよろしいですか？',
+        okText: '送信する',
+        cancelText: '戻る',
+        iconClass: 'fa-paper-plane'
+    });
+    if (!confirmed) return;
 
     const data = collectFormData();
     const btn = document.getElementById('send-email-btn');
@@ -367,9 +377,16 @@ async function sendEmail() {
 async function restoreFormState() {
     const state = FormStorage.load();
     if (!state) return;
+    await applyStateToForm(state);
+    showToast('前回の入力内容を復元しました', 'info');
+}
+
+async function applyStateToForm(state) {
+    if (!state) return;
 
     try {
-        console.log('[Form] Restoring state...', state);
+        console.log('[Form] Applying state...', state);
+        window.currentAdjustmentId = state.id || null;
 
         const radio = document.querySelector(`input[name="app_type"][value="${state.app_type}"]`);
         if (radio) radio.checked = true;
@@ -456,10 +473,123 @@ async function restoreFormState() {
         // ハイライトの更新
         checkAllRequiredFields();
         
-        showToast('前回の入力内容を復元しました', 'info');
     } catch (e) {
-        console.error('Failed to restore form state:', e);
-        FormStorage.clear();
+        console.error('Failed to apply state to form:', e);
+        throw e;
+    }
+}
+
+/**
+ * History / Persistence Actions
+ */
+async function saveAdjustmentDraft() {
+    console.log('[Draft] Starting save process...');
+    try {
+        const data = collectFormData();
+        console.log('[Draft] Collected data:', data);
+        const result = await Api.saveAdjustment(data);
+        console.log('[Draft] Server response:', result);
+        window.currentAdjustmentId = result.id;
+        showToast('下書きを保存しました', 'success');
+    } catch (err) {
+        console.error('[Draft] Save failed:', err);
+        showToast(`保存に失敗しました: ${err.message}`, 'error');
+    }
+}
+
+function openHistoryModal() {
+    document.getElementById('history-modal').classList.remove('hidden');
+    refreshHistory();
+}
+
+function closeHistoryModal() {
+    document.getElementById('history-modal').classList.add('hidden');
+}
+
+async function refreshHistory() {
+    const event_name = document.getElementById('history-search-event').value;
+    const facility_name = document.getElementById('history-search-facility').value;
+    const user_name = document.getElementById('history-search-user').value;
+    
+    const container = document.getElementById('history-list');
+    container.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin fa-2x text-gray-300"></i></div>';
+    
+    try {
+        const items = await Api.listAdjustments({ event_name, facility_name, user_name });
+        container.innerHTML = '';
+        
+        if (items.length === 0) {
+            container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">データが見つかりません</div>';
+            return;
+        }
+        
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-white border rounded-xl hover:border-blue-500 cursor-pointer transition-all shadow-sm';
+            div.onclick = () => loadAdjustment(item.id);
+            
+            const statusColor = item.status === '下書き' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700';
+            
+            // 申請区分の色分け
+            let typeColor = 'bg-gray-100 text-gray-600';
+            if (item.app_type === '新規') typeColor = 'bg-blue-100 text-blue-700';
+            if (item.app_type === '変更') typeColor = 'bg-yellow-100 text-yellow-700';
+            if (item.app_type === '削除') typeColor = 'bg-red-100 text-red-700';
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-1">
+                    <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
+                    <span class="text-[10px] text-gray-400">${item.created_at}</span>
+                </div>
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="font-bold text-gray-800 flex-1">${item.event_name || '（催事名なし）'}</div>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColor} shrink-0">${item.app_type}</span>
+                </div>
+                <div class="text-xs text-gray-500 truncate">${item.facility_names.join(', ')}</div>
+                <div class="text-[10px] text-gray-400 mt-1">${item.user_name}</div>
+            `;
+            container.appendChild(div);
+        });
+    } catch (err) {
+        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm">エラー: ${err.message}</div>`;
+    }
+}
+
+async function loadAdjustment(id) {
+    const confirmed = await showDecisionModal({
+        title: 'データの読み込み',
+        message: '現在入力中の内容は破棄されます。<br>よろしいですか？',
+        okText: '読み込む',
+        cancelText: 'キャンセル'
+    });
+    if (!confirmed) return;
+    
+    try {
+        const data = await Api.getAdjustment(id);
+        
+        // 送信済みのデータを再利用する場合の処理
+        if (data.status === 'submitted') {
+            const isChange = await showDecisionModal({
+                title: '送信済みデータの再利用',
+                message: '既に送信済みの申請データです。次に行う操作を選択してください。',
+                okText: '変更申請を作成',
+                cancelText: '削除申請を作成',
+                cancelColor: 'red',
+                iconClass: 'fa-rotate-right'
+            });
+            
+            data.app_type = isChange ? 'change' : 'delete';
+            data.id = null; // 元のレコードを上書きしないようIDをクリア
+            window.currentAdjustmentId = null; 
+            showToast(`送信済みデータから「${isChange ? '変更' : '削除'}」申請を作成します`, 'info');
+        }
+
+        await applyStateToForm(data);
+        closeHistoryModal();
+        showToast('データを読み込みました', 'success');
+        FormStorage.save(data); // 復元用ストレージも同期
+    } catch (err) {
+        showToast(`読み込みに失敗しました: ${err.message}`, 'error');
     }
 }
 

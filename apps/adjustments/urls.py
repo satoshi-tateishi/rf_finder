@@ -9,4 +9,7 @@ urlpatterns = [
     path('preview-excel/', views.preview_excel, name='preview_excel'),
     path('send-email/', views.send_email, name='send_email'),
     path('export-wsm/', views.export_wsm, name='export_wsm'),
+    path('save/', views.save_adjustment, name='save_adjustment'),
+    path('list/', views.list_adjustments, name='list_adjustments'),
+    path('<int:pk>/', views.get_adjustment, name='get_adjustment'),
 ]

@@ -4,8 +4,10 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
+from apps.facilities.models import Facility
 
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
+from .models import OperationAdjustment
 from .services import (
     LineBotService,
     WSMService,
@@ -44,6 +46,118 @@ def validate_adjustment_data(data):
     return True, None
 
 
+def _save_adjustment_internal(request, data, status='draft'):
+    """内部用：データをモデルに保存する"""
+    adjustment_id = data.get('id')
+    if adjustment_id:
+        try:
+            adjustment = OperationAdjustment.objects.get(pk=adjustment_id)
+        except OperationAdjustment.DoesNotExist:
+            adjustment = OperationAdjustment()
+    else:
+        adjustment = OperationAdjustment()
+
+    if request.user.is_authenticated:
+        adjustment.user = request.user
+
+    adjustment.app_type = data.get('app_type', 'new')
+
+    user_data = data.get('user', {})
+    adjustment.user_name = user_data.get('name', '')
+    adjustment.user_kana = user_data.get('kana', '')
+    adjustment.user_tel = user_data.get('tel', '')
+    adjustment.user_email = user_data.get('email', '')
+
+    event_data = data.get('event', {})
+    adjustment.event_name = event_data.get('name', '')
+    adjustment.event_comment = event_data.get('comment', '')
+
+    adjustment.facilities_json = data.get('facilities', [])
+    adjustment.mic_counts_json = data.get('mic_counts', {})
+    adjustment.selected_channels_json = data.get('selected_channels', [])
+    adjustment.extra_53ch = data.get('extra_53ch') == '○'
+
+    adjustment.status = status
+    adjustment.save()
+
+    # M2M 施設の紐付け
+    facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
+    if facility_ids:
+        adjustment.facilities.set(Facility.objects.filter(id__in=facility_ids))
+
+    return adjustment
+
+
+@csrf_exempt
+@json_api_view(validate=False)
+def save_adjustment(request, data):
+    """手動保存（下書き）"""
+    try:
+        adjustment = _save_adjustment_internal(request, data, status='draft')
+        return api_success({'id': adjustment.id, 'message': 'Saved as draft'})
+    except Exception as e:
+        traceback.print_exc()
+        return api_error(str(e), status=500)
+
+
+def list_adjustments(request):
+    """保存済み一覧の取得"""
+    event_name = request.GET.get('event_name')
+    facility_name = request.GET.get('facility_name')
+    user_name = request.GET.get('user_name')
+
+    queryset = OperationAdjustment.objects.all()
+
+    if event_name:
+        queryset = queryset.filter(event_name__icontains=event_name)
+    if facility_name:
+        queryset = queryset.filter(facilities__name__icontains=facility_name).distinct()
+    if user_name:
+        queryset = queryset.filter(user_name__icontains=user_name)
+
+    results = []
+    for adj in queryset[:20]:
+        results.append({
+            'id': adj.id,
+            'event_name': adj.event_name,
+            'user_name': adj.user_name,
+            'app_type': adj.get_app_type_display(),
+            'status': adj.get_status_display(),
+            'created_at': adj.created_at.strftime('%Y/%m/%d %H:%M'),
+            'facility_names': [f.name for f in adj.facilities.all()]
+        })
+
+    return api_success(results)
+
+
+def get_adjustment(request, pk):
+    """単一データの取得"""
+    try:
+        adj = OperationAdjustment.objects.get(pk=pk)
+        data = {
+            'id': adj.id,
+            'app_type': adj.app_type,
+            'user': {
+                'name': adj.user_name,
+                'kana': adj.user_kana,
+                'tel': adj.user_tel,
+                'email': adj.user_email,
+            },
+            'event': {
+                'name': adj.event_name,
+                'comment': adj.event_comment,
+            },
+            'facilities': adj.facilities_json,
+            'mic_counts': adj.mic_counts_json,
+            'selected_channels': adj.selected_channels_json,
+            'extra_53ch': '○' if adj.extra_53ch else '',
+            'status': adj.status
+        }
+        return api_success(data)
+    except OperationAdjustment.DoesNotExist:
+        return api_error('Not found', status=404)
+
+
 @csrf_exempt
 @json_api_view(validate=True)
 def preview_excel(request, data):
@@ -76,6 +190,11 @@ def preview_pdf(request, data):
 def send_email(request, data):
     member = Member.objects.first()
     try:
+        # 0. データを保存 (status='submitted')
+        adjustment = _save_adjustment_internal(request, data, status='submitted')
+        # IDを返却データに含めるためにdataを更新（必要なら）
+        data['id'] = adjustment.id
+
         # 1. PDFを生成
         pdf_buffer = generate_adjustment_pdf(data, member)
 

@@ -38,4 +38,69 @@
             }, { once: true });
         }, duration);
     };
+
+    /**
+     * Show a custom decision modal (Promise-based confirm).
+     * @param {Object} options - { title, message, okText, cancelText, iconClass }
+     * @returns {Promise<boolean>}
+     */
+    window.showDecisionModal = function(options = {}) {
+        console.log('[Modal] showDecisionModal called', options);
+        const modal = document.getElementById('decision-modal');
+        const titleEl = document.getElementById('decision-title');
+        const msgEl = document.getElementById('decision-message');
+        const okBtn = document.getElementById('decision-ok-btn');
+        const cancelBtn = document.getElementById('decision-cancel-btn');
+        const iconEl = document.getElementById('decision-fa-icon');
+
+        if (!modal) {
+            console.warn('[Modal] decision-modal not found in DOM');
+            return Promise.resolve(confirm(options.message));
+        }
+
+        titleEl.textContent = options.title || '確認';
+        msgEl.innerHTML = options.message || '';
+        okBtn.textContent = options.okText || 'OK';
+        cancelBtn.textContent = options.cancelText || 'キャンセル';
+        
+        // Cancel button color customization
+        if (options.cancelColor === 'red') {
+            cancelBtn.classList.remove('text-gray-500');
+            cancelBtn.classList.add('text-red-500');
+        } else {
+            cancelBtn.classList.remove('text-red-500');
+            cancelBtn.classList.add('text-gray-500');
+        }
+        
+        if (options.iconClass) {
+            iconEl.className = `fa-solid ${options.iconClass} fa-2xl`;
+        } else {
+            iconEl.className = 'fa-solid fa-circle-question fa-2xl';
+        }
+
+        console.log('[Modal] Removing hidden class from decision-modal');
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex'; // Ensure display is flex
+
+        return new Promise((resolve) => {
+            const handleOk = () => {
+                cleanup();
+                resolve(true);
+            };
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            const cleanup = () => {
+                console.log('[Modal] cleanup called');
+                okBtn.removeEventListener('click', handleOk);
+                cancelBtn.removeEventListener('click', handleCancel);
+                modal.classList.add('hidden');
+                modal.style.display = ''; // Clear inline style to allow 'hidden' class to work
+            };
+
+            okBtn.addEventListener('click', handleOk);
+            cancelBtn.addEventListener('click', handleCancel);
+        });
+    };
 })();

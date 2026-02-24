@@ -129,6 +129,14 @@
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fa-solid fa-tower-broadcast"></i> RF Finder
             </h1>
+            <div class="flex items-center gap-3">
+                <span id="user-display" class="text-xs opacity-80">
+                    {% if user.is_authenticated %}{{ user.first_name|default:user.username }}{% else %}Guest{% endif %}
+                </span>
+                <button onclick="openHistoryModal()" class="text-white p-2 hover:bg-green-600 rounded-lg transition-colors">
+                    <i class="fa-solid fa-clock-rotate-left fa-lg"></i>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -350,6 +358,9 @@
 
             <!-- Form Actions -->
             <div class="flex flex-col gap-3">
+                <button onclick="saveAdjustmentDraft()" class="w-full bg-blue-50 text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> 下書き保存
+                </button>
                 <button onclick="previewPDF()" class="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
                     <i class="fa-solid fa-eye"></i> 内容をプレビュー
                 </button>
@@ -377,7 +388,62 @@
 
     </div>
 
-    <!-- Device Data -->
+    <!-- History Modal -->
+            <div id="history-modal" class="fixed inset-0 z-[150] hidden bg-black/60 flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-green-600"></i> 申請履歴・下書き
+                        </h3>
+                        <button onclick="closeHistoryModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fa-solid fa-xmark fa-lg"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Search in History -->
+                    <div class="p-3 bg-gray-50 border-b space-y-2">
+                        <div class="flex gap-2">
+                            <input type="text" id="history-search-event" placeholder="催事名..." class="flex-1 border p-2 rounded-lg text-sm">
+                            <input type="text" id="history-search-facility" placeholder="施設名..." class="flex-1 border p-2 rounded-lg text-sm">
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="history-search-user" placeholder="作成者..." class="flex-1 border p-2 rounded-lg text-sm">
+                            <button onclick="refreshHistory()" class="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold flex-none">
+                                検索
+                            </button>
+                        </div>
+                    </div>
+    
+                                    <div id="history-list" class="overflow-y-auto p-2 space-y-2 h-[400px]">
+                                        <!-- History items dynamic -->
+                                    </div>
+                                        <div class="p-4 border-t text-center text-xs text-gray-400">
+                        過去の申請を選択して再編集・再送信できます。
+                    </div>
+                </div>
+            </div>
+    
+    <!-- Decision Modal (Custom Confirm) -->
+    <div id="decision-modal" class="fixed inset-0 z-[1000] hidden bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-6 text-center">
+                <div id="decision-icon" class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i id="decision-fa-icon" class="fa-solid fa-circle-question fa-2xl"></i>
+                </div>
+                <h3 id="decision-title" class="text-lg font-bold text-gray-900 mb-2">確認</h3>
+                <p id="decision-message" class="text-sm text-gray-500 leading-relaxed"></p>
+            </div>
+            <div class="flex border-t">
+                <button id="decision-cancel-btn" class="flex-1 px-4 py-4 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors border-r">
+                    キャンセル
+                </button>
+                <button id="decision-ok-btn" class="flex-1 px-4 py-4 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+        <!-- Device Data -->
     <script>
         // Djangoテンプレートからデータを取得し、グローバル変数として保持
         window.devices = [
@@ -393,13 +459,13 @@
     </script>
 
     <!-- Modular JS Files -->
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/notifications.js"></script>
-    <script src="/static/js/form-storage.js"></script>
-    <script src="/static/js/pdf-preview.js"></script>
-    <script src="/static/js/keep-list.js"></script>
-    <script src="/static/js/adjustment-form.js"></script>
-    <script src="/static/js/ui-controller.js"></script>
+    <script src="/static/js/api.js?v=1.1"></script>
+    <script src="/static/js/notifications.js?v=1.1"></script>
+    <script src="/static/js/form-storage.js?v=1.1"></script>
+    <script src="/static/js/pdf-preview.js?v=1.1"></script>
+    <script src="/static/js/keep-list.js?v=1.1"></script>
+    <script src="/static/js/adjustment-form.js?v=1.1"></script>
+    <script src="/static/js/ui-controller.js?v=1.1"></script>
 
     <!-- Initialization -->
     <script>

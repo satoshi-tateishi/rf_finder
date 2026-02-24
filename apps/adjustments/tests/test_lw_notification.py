@@ -1,5 +1,5 @@
 import io
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -34,7 +34,7 @@ class LWNotificationTest(TestCase):
         # Mocking
         mock_pdf_buffer = io.BytesIO(b'dummy pdf')
         mock_gen_pdf.return_value = mock_pdf_buffer
-        
+
         mock_bot_instance = mock_bot_class.return_value
         mock_bot_instance.send_text_message.return_value = True
         mock_bot_instance.send_pdf.return_value = True
@@ -73,14 +73,14 @@ class LWNotificationTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        
+
         # 依頼元へのPDF送信
         mock_bot_instance.send_pdf.assert_any_call('user_456', b'dummy pdf', file_name=ANY)
-        
+
         # グループへの通知メッセージ送信
         mock_bot_instance.send_text_message.assert_called_with('group_123', ANY)
         # グループへのPDF送信
         mock_bot_instance.send_pdf.assert_any_call('group_123', b'dummy pdf', file_name=ANY)
-        
+
         self.assertEqual(mock_bot_instance.send_pdf.call_count, 2)
         self.assertEqual(mock_bot_instance.send_text_message.call_count, 1)

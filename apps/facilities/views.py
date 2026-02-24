@@ -62,6 +62,8 @@ def facility_detail(request, facility_id):
                 'name': facility.name,
                 'address': facility.address,
                 'postal_code': facility.postal_code,
+                'category': facility.category,
+                'applied_area': facility.applied_area,
             },
             'available_channels': available_channels,
         }

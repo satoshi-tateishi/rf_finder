@@ -83,6 +83,27 @@ const Api = {
         return await this._handleBlobOrError(res);
     },
 
+    async saveAdjustment(data) {
+        console.log('[Api] saveAdjustment calling POST /api/adjustments/save/');
+        const res = await fetch('/api/adjustments/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return await this._handleResponse(res);
+    },
+
+    async listAdjustments(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        const res = await fetch(`/api/adjustments/list/?${query}`);
+        return await this._handleResponse(res);
+    },
+
+    async getAdjustment(id) {
+        const res = await fetch(`/api/adjustments/${id}/`);
+        return await this._handleResponse(res);
+    },
+
     /**
      * Utility: Format channel numbers (e.g. [13, 14, 15, 20] -> "13-15, 20")
      */
