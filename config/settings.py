@@ -152,3 +152,7 @@ else:
     LINE_WORKS_PRIVATE_KEY = '' # Fallback or error if file not found
 LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')
 LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', default='')
+
+# SSO Settings
+LINE_WORKS_REDIRECT_URI = env('LINE_WORKS_REDIRECT_URI', default='http://localhost:8084/auth/lineworks/callback/')
+LINE_WORKS_DOMAIN = env('LINE_WORKS_DOMAIN', default='shin-on1981')

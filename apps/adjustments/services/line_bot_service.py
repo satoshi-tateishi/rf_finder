@@ -237,7 +237,7 @@ class LineBotService:
 
     def send_text_message(self, channel_id, text):
         """
-        Send simple text message to talk room.
+        Send simple text message to a talk room (group/channel).
         """
         if not self.bot_id or not channel_id:
             logger.warning("[LineBotService] Bot ID or Channel ID is missing.")
@@ -269,6 +269,42 @@ class LineBotService:
                 return False
         except Exception as e:
             logger.error(f"[LineBotService] Error sending text message: {e}")
+            return False
+
+    def send_user_message(self, user_id, text):
+        """
+        Send simple text message to a specific user (1-on-1).
+        """
+        if not self.bot_id or not user_id:
+            logger.warning("[LineBotService] Bot ID or User ID is missing.")
+            return False
+
+        access_token = self._get_access_token()
+        if not access_token:
+            return False
+
+        url = f"https://www.worksapis.com/v1.0/bots/{self.bot_id}/users/{user_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "content": {
+                "type": "text",
+                "text": text
+            }
+        }
+
+        try:
+            response = requests.post(url, json=data, headers=headers, timeout=10)
+            if response.status_code == 201:
+                logger.info(f"[LineBotService] Successfully sent text message to user {user_id}")
+                return True
+            else:
+                logger.error(f"[LineBotService] Failed to send user message: {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"[LineBotService] Error sending user message: {e}")
             return False
 
     def set_persistent_menu(self, woff_id):

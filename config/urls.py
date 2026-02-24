@@ -8,7 +8,8 @@ urlpatterns = [
     path('', include('apps.facilities.urls')),
     path('api/facilities/', include('apps.facilities.urls')),
     path('api/adjustments/', include('apps.adjustments.urls')),
-    path('api/accounts/', include('apps.accounts.urls')),
+    # path('api/accounts/', include('apps.accounts.urls')), # Removed to avoid duplicate namespace
+    path('auth/', include('apps.accounts.urls')), # Web画面用
 ]
 
 if settings.DEBUG:

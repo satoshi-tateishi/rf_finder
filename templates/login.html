@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - RF Finder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @font-face {
+            font-family: 'Noto Sans JP';
+            src: url('/static/fonts/NotoSansJP-Regular.ttf') format('truetype');
+        }
+        body { font-family: 'Noto Sans JP', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <nav class="bg-[#00c300] text-white p-4 shadow-md">
+        <div class="container mx-auto">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-tower-broadcast"></i> RF Finder
+            </h1>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden p-8 text-center animate-in fade-in zoom-in duration-300">
+            <div class="mb-3 flex justify-center">
+                <img src="{% static 'img/logo.png' %}" alt="shin•on Logo" class="h-16 w-auto">
+            </div>
+            
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">RF Finder</h2>
+            <p class="text-sm text-gray-500 mb-8">
+                特定ラジオマイク運用調整支援システム
+            </p>
+
+            {% if error %}
+            <div class="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-6 border border-red-200">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <a href="{% url 'accounts:lineworks_login' %}" class="block w-full bg-[#00c300] hover:bg-green-600 text-white font-bold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-3 shadow-md hover:shadow-lg transform active:scale-95 duration-100">
+                <i class="fa-solid fa-comment-dots fa-xl"></i>
+                <span>LINE WORKS でログイン</span>
+            </a>
+
+        </div>
+    </div>
+</body>
+</html>

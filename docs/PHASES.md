@@ -71,9 +71,11 @@
     - [x] **UI/UX 改善**:
         - [x] カスタム意思決定モーダル（showDecisionModal）の実装
         - [x] 送信済みデータからの「変更・削除」申請作成フローの自動化
-- [ ] **Phase 8.2: LINE WORKS SSO の実装 (Authentication)**
-    - [ ] LINE WORKS OIDC 連携の実装
-    - [ ] ログインユーザーと `OperationAdjustment` の自動紐付け
+- [x] **Phase 8.2: LINE WORKS SSO の実装 (Authentication)**
+    - [x] LINE WORKS OIDC (Authorization Code Flow) 連携の実装
+    - [x] **2段階認証 (OTP)** の実装: LINE WORKS Bot 経由で認証コードを送信
+    - [x] ログイン必須化（Guestアクセスの制限）
+    - [x] ログインユーザーと `OperationAdjustment` の自動紐付け
 - [ ] **Phase 8.3: 修正・再送信フローの確立 (Workflow)**
     - [ ] 過去データからのコピー作成機能
     - [ ] ステータス管理と履歴表示の改善

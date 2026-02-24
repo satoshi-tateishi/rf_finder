@@ -1,4 +1,37 @@
+from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+class UserProfile(models.Model):
+    """ユーザーごとの追加情報（OTPなど）"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+
+    # OTP関連
+    otp_code = models.CharField(max_length=255, blank=True, default='', verbose_name='OTPコード(ハッシュ)')
+    otp_expires_at = models.DateTimeField(blank=True, null=True, verbose_name='OTP有効期限')
+    otp_attempts = models.IntegerField(default=0, verbose_name='試行回数')
+    otp_locked_until = models.DateTimeField(blank=True, null=True, verbose_name='ロック解除日時')
+
+    class Meta:
+        verbose_name = 'ユーザープロフィール'
+        verbose_name_plural = 'ユーザープロフィール'
+
+    def __str__(self):
+        return self.user.username
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    if hasattr(instance, 'profile'):
+        instance.profile.save()
 
 
 class Member(models.Model):
