@@ -3,13 +3,30 @@ from django.contrib import admin
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 
-from .models import EmailTemplate, Member, UserProfile
+from .models import EmailTemplate, Member, UserProfile, AuditLog
 from .resources import EmailTemplateResource, MemberResource
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'user', 'action', 'description', 'ip_address')
+    list_filter = ('action', 'timestamp', 'user')
+    search_fields = ('description', 'user__username', 'ip_address')
+    readonly_fields = ('user', 'action', 'description', 'ip_address', 'timestamp', 'content_type', 'object_id', 'content_object')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'role', 'full_name', 'phone_number', 'email')
+    list_display = ('get_lw_uuid', 'role', 'full_name', 'phone_number', 'email')
     list_filter = ('role',)
     search_fields = ('user__username', 'family_name', 'given_name', 'email')
     readonly_fields = ('otp_code', 'otp_expires_at', 'otp_locked_until')
@@ -25,6 +42,10 @@ class UserProfileAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    @admin.display(description='LW_UUID', ordering='user__username')
+    def get_lw_uuid(self, obj):
+        return obj.user.username
 
 
 class MemberAdminForm(forms.ModelForm):

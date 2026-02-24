@@ -16,10 +16,41 @@ from django.utils import timezone
 
 from apps.adjustments.services import LineBotService
 
-from .models import UserProfile
+from .models import UserProfile, AuditLog
 from .utils import normalize_phonetic
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+def list_audit_logs(request):
+    """管理者用：監査ログの一覧を取得する"""
+    if request.user.profile.role != 'admin':
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+    action = request.GET.get('action')
+    description = request.GET.get('description')
+
+    queryset = AuditLog.objects.all().select_related('user')
+
+    if action:
+        queryset = queryset.filter(action=action)
+    if description:
+        queryset = queryset.filter(description__icontains=description)
+
+    results = []
+    for log in queryset[:100]:  # 直近100件
+        results.append({
+            'id': log.id,
+            'user': log.user.username if log.user else 'System',
+            'user_display': log.user.first_name if log.user else 'System',
+            'action': log.action,
+            'description': log.description,
+            'ip_address': log.ip_address,
+            'timestamp': log.timestamp.strftime('%Y/%m/%d %H:%M:%S'),
+        })
+
+    return JsonResponse({'status': 'success', 'data': results})
 
 
 def login_view(request):
@@ -135,7 +166,8 @@ def lineworks_callback(request):
             username=sub,
             defaults={
                 'email': email,
-                'first_name': full_name,
+                'last_name': family_name,
+                'first_name': given_name,
             }
         )
 
@@ -150,8 +182,19 @@ def lineworks_callback(request):
         profile.save()
 
         if not created:
-            if full_name and user.first_name != full_name:
-                user.first_name = full_name
+            # 既存ユーザーの情報更新
+            changed = False
+            if family_name and user.last_name != family_name:
+                user.last_name = family_name
+                changed = True
+            if given_name and user.first_name != given_name:
+                user.first_name = given_name
+                changed = True
+            if email and user.email != email:
+                user.email = email
+                changed = True
+            
+            if changed:
                 user.save()
 
         # OTPフロー開始

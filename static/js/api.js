@@ -104,6 +104,12 @@ const Api = {
         return await this._handleResponse(res);
     },
 
+    async listAuditLogs(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        const res = await fetch(`/auth/audit-logs/?${query}`);
+        return await this._handleResponse(res);
+    },
+
     async getMyProfile() {
         const res = await fetch('/auth/me/');
         return await this._handleResponse(res);

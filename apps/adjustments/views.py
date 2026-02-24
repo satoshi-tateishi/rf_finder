@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
+from apps.accounts.utils import log_action
 from apps.facilities.models import Facility
 
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
@@ -165,6 +166,8 @@ def preview_excel(request, data):
     buffer = generate_adjustment_excel(data, member)
     filename = get_adjustment_filename(data, 'xlsx')
 
+    log_action(user=request.user, action='EXCEL_EXPORT', description=f'Excel出力: {filename}', request=request)
+
     response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
@@ -178,6 +181,9 @@ def preview_pdf(request, data):
     try:
         buffer = generate_adjustment_pdf(data, member)
         filename = get_adjustment_filename(data, 'pdf')
+
+        log_action(user=request.user, action='PDF_EXPORT', description=f'PDF出力: {filename}', request=request)
+
         response = HttpResponse(buffer, content_type='application/pdf')
         response['Content-Disposition'] = f'inline; filename="{filename}"'
         return response
@@ -200,6 +206,9 @@ def send_email(request, data):
 
         # 2. メール送信
         send_adjustment_email(data, member, pdf_buffer)
+
+        # 監査ログの記録
+        log_action(user=request.user, action='EMAIL_SEND', description=f'メール送信: {adjustment.event_name} (ID: {adjustment.id})', request=request, obj=adjustment)
 
         # 3. LINE Bot連携
         bot_service = LineBotService()
@@ -276,6 +285,8 @@ def export_wsm(request, data):
         import datetime
         date_str = datetime.datetime.now().strftime('%Y%m%d')
         filename = f"wsm_{facility.name}_{date_str}.csv"
+
+        log_action(user=request.user, action='WSM_EXPORT', description=f'WSM CSV出力: {facility.name}', request=request, obj=facility)
 
         response = HttpResponse(csv_content, content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'

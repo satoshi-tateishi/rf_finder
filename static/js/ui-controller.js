@@ -2,6 +2,80 @@
  * UI Controller module
  */
 
+function toggleMenu() {
+    const menu = document.getElementById('side-menu');
+    if (menu) {
+        menu.classList.toggle('hidden');
+    }
+}
+
+function openAuditLogModal() {
+    toggleMenu();
+    const modal = document.getElementById('audit-log-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        refreshAuditLogs();
+    }
+}
+
+function closeAuditLogModal() {
+    const modal = document.getElementById('audit-log-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function refreshAuditLogs() {
+    const list = document.getElementById('audit-log-list');
+    const action = document.getElementById('audit-filter-action').value;
+    const description = document.getElementById('audit-search-desc').value;
+
+    if (list) {
+        list.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-gray-300 fa-2x"></i></div>';
+    }
+
+    try {
+        const logs = await Api.listAuditLogs({ action, description });
+        renderAuditLogs(logs);
+    } catch (err) {
+        console.error(err);
+        showToast('監査ログの取得に失敗しました', 'error');
+    }
+}
+
+function renderAuditLogs(logs) {
+    const list = document.getElementById('audit-log-list');
+    if (!list) return;
+
+    if (!logs || logs.length === 0) {
+        list.innerHTML = '<div class="text-center py-20 text-gray-400">ログがありません</div>';
+        return;
+    }
+
+    list.innerHTML = '';
+    logs.forEach(log => {
+        const div = document.createElement('div');
+        div.className = 'p-3 rounded-lg border border-gray-100 shadow-sm bg-white hover:bg-gray-50 transition-all';
+        
+        let actionColor = 'bg-gray-100 text-gray-600';
+        if (log.action === 'LOGIN') actionColor = 'bg-green-100 text-green-700';
+        if (log.action === 'LOGIN_FAILED') actionColor = 'bg-red-100 text-red-700';
+        if (log.action.includes('EXPORT')) actionColor = 'bg-blue-100 text-blue-700';
+        if (log.action === 'EMAIL_SEND') actionColor = 'bg-purple-100 text-purple-700';
+
+        div.innerHTML = `
+            <div class="flex justify-between items-start mb-1">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${actionColor}">${log.action}</span>
+                <span class="text-[10px] text-gray-400">${log.timestamp}</span>
+            </div>
+            <div class="text-sm font-medium text-gray-800 mb-1">${log.description}</div>
+            <div class="flex justify-between text-[10px] text-gray-500">
+                <span>ユーザー: ${log.user_display || log.user}</span>
+                <span>IP: ${log.ip_address || '---'}</span>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
 // デバイス名に基づく色設定
 function getDeviceColor(name) {
     if (name.includes('SR2050')) return '#f97316'; // オレンジ (Tailwind orange-500)
