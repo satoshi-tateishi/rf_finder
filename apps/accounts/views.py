@@ -16,8 +16,8 @@ from django.utils import timezone
 
 from apps.adjustments.services import LineBotService, DropboxService
 
-from .models import UserProfile, AuditLog, DropboxToken
-from .utils import normalize_phonetic, log_action
+from .models import UserProfile, AuditLog
+from .utils import normalize_phonetic
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +40,17 @@ def list_audit_logs(request):
 
     results = []
     for log in queryset[:100]:  # 直近100件
-        results.append({
-            'id': log.id,
-            'user': log.user.username if log.user else 'System',
-            'user_display': log.user.first_name if log.user else 'System',
-            'action': log.action,
-            'description': log.description,
-            'ip_address': log.ip_address,
-            'timestamp': log.timestamp.strftime('%Y/%m/%d %H:%M:%S'),
-        })
+        results.append(
+            {
+                'id': log.id,
+                'user': log.user.username if log.user else 'System',
+                'user_display': log.user.first_name if log.user else 'System',
+                'action': log.action,
+                'description': log.description,
+                'ip_address': log.ip_address,
+                'timestamp': log.timestamp.strftime('%Y/%m/%d %H:%M:%S'),
+            }
+        )
 
     return JsonResponse({'status': 'success', 'data': results})
 
@@ -69,19 +71,19 @@ def lineworks_login(request):
     redirect_uri = settings.LINE_WORKS_REDIRECT_URI
     domain = getattr(settings, 'LINE_WORKS_DOMAIN', 'shin-on1981')
 
-    auth_base = "https://auth.worksmobile.com/oauth2/v2.0/authorize"
+    auth_base = 'https://auth.worksmobile.com/oauth2/v2.0/authorize'
     params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "openid profile email",
-        "response_type": "code",
-        "state": state,
-        "domain": domain
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'scope': 'openid profile email',
+        'response_type': 'code',
+        'state': state,
+        'domain': domain,
     }
 
     # URL生成
-    query = "&".join([f"{k}={v}" for k, v in params.items()])
-    return redirect(f"{auth_base}?{query}")
+    query = '&'.join([f'{k}={v}' for k, v in params.items()])
+    return redirect(f'{auth_base}?{query}')
 
 
 def lineworks_callback(request):
@@ -90,20 +92,20 @@ def lineworks_callback(request):
     error = request.GET.get('error')
 
     if error:
-        logger.error(f"LINE WORKS Auth Error: {error}")
+        logger.error(f'LINE WORKS Auth Error: {error}')
         return render(request, 'login.html', {'error': '認証がキャンセルされたか、エラーが発生しました。'})
 
     if not code or state != request.session.get('oidc_state'):
         return render(request, 'login.html', {'error': '不正な遷移です（State不一致）。'})
 
     # Token交換
-    token_url = "https://auth.worksmobile.com/oauth2/v2.0/token"
+    token_url = 'https://auth.worksmobile.com/oauth2/v2.0/token'
     payload = {
-        "code": code,
-        "grant_type": "authorization_code",
-        "client_id": settings.LINE_WORKS_CLIENT_ID,
-        "client_secret": settings.LINE_WORKS_CLIENT_SECRET,
-        "redirect_uri": settings.LINE_WORKS_REDIRECT_URI,
+        'code': code,
+        'grant_type': 'authorization_code',
+        'client_id': settings.LINE_WORKS_CLIENT_ID,
+        'client_secret': settings.LINE_WORKS_CLIENT_SECRET,
+        'redirect_uri': settings.LINE_WORKS_REDIRECT_URI,
     }
 
     try:
@@ -113,16 +115,16 @@ def lineworks_callback(request):
         id_token = tokens.get('id_token')
 
         if not id_token:
-            raise ValueError("No id_token received")
+            raise ValueError('No id_token received')
 
-        decoded = jwt.decode(id_token, options={"verify_signature": False})
+        decoded = jwt.decode(id_token, options={'verify_signature': False})
 
         # ドメイン検証
         email = decoded.get('email', '')
         allowed_domain = getattr(settings, 'LINE_WORKS_DOMAIN', 'shin-on1981')
 
-        if email and email.endswith(f"@{allowed_domain}") and not email.endswith(".com"):
-            email = f"{email}.com"
+        if email and email.endswith(f'@{allowed_domain}') and not email.endswith('.com'):
+            email = f'{email}.com'
 
         # ユーザー情報の取得・作成
         sub = decoded.get('sub')  # LINE WORKS User ID (UUID)
@@ -135,15 +137,15 @@ def lineworks_callback(request):
         lw_user_data = bot_service.get_user_info(sub)
 
         if not lw_user_data:
-            logger.warning(f"Failed to fetch additional info for sub={sub}, email={email} from Users API")
+            logger.warning(f'Failed to fetch additional info for sub={sub}, email={email} from Users API')
         else:
-            logger.info(f"Successfully fetched info for sub={sub}")
+            logger.info(f'Successfully fetched info for sub={sub}')
 
-        family_name = ""
-        given_name = ""
-        phonetic_family = ""
-        phonetic_given = ""
-        phone = ""
+        family_name = ''
+        given_name = ''
+        phonetic_family = ''
+        phonetic_given = ''
+        phone = ''
 
         # 取得できた情報でマッピング
         if lw_user_data:
@@ -154,13 +156,13 @@ def lineworks_callback(request):
             phonetic_family = normalize_phonetic(name_info.get('phoneticLastName', ''))
             phonetic_given = normalize_phonetic(name_info.get('phoneticFirstName', ''))
 
-            full_name = f"{family_name} {given_name}".strip() or name_info.get('fullName') or decoded.get('name')
+            full_name = f'{family_name} {given_name}'.strip() or name_info.get('fullName') or decoded.get('name')
             phone = lw_user_data.get('telephone') or lw_user_data.get('cellPhone') or ''
             email = lw_user_data.get('privateEmail') or lw_user_data.get('email') or email
         else:
             family_name = decoded.get('family_name', '')
             given_name = decoded.get('given_name', '')
-            full_name = f"{family_name} {given_name}".strip() or decoded.get('name') or decoded.get('email') or 'Guest'
+            full_name = f'{family_name} {given_name}'.strip() or decoded.get('name') or decoded.get('email') or 'Guest'
 
         user, created = User.objects.get_or_create(
             username=sub,
@@ -168,7 +170,7 @@ def lineworks_callback(request):
                 'email': email,
                 'last_name': family_name,
                 'first_name': given_name,
-            }
+            },
         )
 
         # Profile情報の同期
@@ -193,7 +195,7 @@ def lineworks_callback(request):
             if email and user.email != email:
                 user.email = email
                 changed = True
-            
+
             if changed:
                 user.save()
 
@@ -201,7 +203,7 @@ def lineworks_callback(request):
         return initiate_otp_flow(request, user)
 
     except Exception as e:
-        logger.error(f"SSO Callback Error: {e}", exc_info=True)
+        logger.error(f'SSO Callback Error: {e}', exc_info=True)
         return render(request, 'login.html', {'error': 'ログイン処理中にエラーが発生しました。'})
 
 
@@ -231,10 +233,12 @@ def initiate_otp_flow(request, user):
     # ロック確認
     if profile.otp_locked_until and profile.otp_locked_until > timezone.now():
         remaining = int((profile.otp_locked_until - timezone.now()).total_seconds() / 60) + 1
-        return render(request, 'login.html', {'error': f'試行回数が上限に達しました。{remaining}分後に再度お試しください。'})
+        return render(
+            request, 'login.html', {'error': f'試行回数が上限に達しました。{remaining}分後に再度お試しください。'}
+        )
 
     # OTP生成 (6桁)
-    otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     profile.otp_code = make_password(otp)
     profile.otp_expires_at = timezone.now() + timedelta(minutes=10)
     profile.otp_attempts = 0
@@ -251,12 +255,12 @@ def initiate_otp_flow(request, user):
     bot_service = LineBotService()
 
     # OTPを3桁ずつに整形 (例: 123 456)
-    formatted_otp = f"{otp[:3]} {otp[3:]}"
-    msg = f"{formatted_otp}\n\n【RF Finder】ログイン認証コード\n有効期限: 10分"
+    formatted_otp = f'{otp[:3]} {otp[3:]}'
+    msg = f'{formatted_otp}\n\n【RF Finder】ログイン認証コード\n有効期限: 10分'
 
     success = bot_service.send_user_message(lw_id, msg)
     if not success:
-        logger.error(f"Failed to send OTP to {lw_id}")
+        logger.error(f'Failed to send OTP to {lw_id}')
         if not settings.DEBUG:
             return render(request, 'login.html', {'error': '認証コードの送信に失敗しました。'})
 
@@ -304,10 +308,14 @@ def otp_verify(request):
                 profile.otp_locked_until = timezone.now() + timedelta(minutes=10)
                 profile.otp_attempts = 0
                 profile.save()
-                return render(request, 'otp_verify.html', {'error': '試行回数が上限に達したため、10分間ロックされました。'})
+                return render(
+                    request, 'otp_verify.html', {'error': '試行回数が上限に達したため、10分間ロックされました。'}
+                )
 
             profile.save()
-            return render(request, 'otp_verify.html', {'error': f'コードが正しくありません（残り{5 - profile.otp_attempts}回）。'})
+            return render(
+                request, 'otp_verify.html', {'error': f'コードが正しくありません（残り{5 - profile.otp_attempts}回）。'}
+            )
 
     return render(request, 'otp_verify.html')
 
@@ -337,7 +345,8 @@ def dropbox_login(request):
 
     service = DropboxService()
     redirect_uri = settings.DROPBOX_REDIRECT_URI
-    auth_url = service.get_auth_url(redirect_uri)
+    # セッションを渡す
+    auth_url = service.get_auth_url(redirect_uri, request.session)
     return redirect(auth_url)
 
 
@@ -351,10 +360,11 @@ def dropbox_callback(request):
     service = DropboxService()
     redirect_uri = settings.DROPBOX_REDIRECT_URI
     try:
-        service.finish_auth(code, redirect_uri)
+        # クエリパラメータ全体とセッションを渡す
+        service.finish_auth(request.GET, request.session, redirect_uri)
         return redirect('/admin/accounts/dropboxtoken/')
     except Exception as e:
-        logger.error(f"Dropbox Callback Error: {e}")
+        logger.error(f'Dropbox Callback Error: {e}')
         return render(request, 'index.html', {'error': f'Dropbox認証に失敗しました: {str(e)}'})
 
 

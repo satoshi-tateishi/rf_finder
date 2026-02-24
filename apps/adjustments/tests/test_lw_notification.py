@@ -10,19 +10,9 @@ from apps.facilities.models import Facility, TVChannelStatus
 
 class LWNotificationTest(TestCase):
     def setUp(self):
-        self.member = Member.objects.create(
-            name='テスト会員',
-            member_id_1='123',
-            member_id_2='456'
-        )
-        EmailTemplate.objects.create(
-            to_address='dest@example.com',
-            subject='{タイプ}:{催事名}',
-            body='{ユーザー名} 様'
-        )
-        self.facility = Facility.objects.create(
-            name='テスト施設', prefecture='東京都', address='渋谷区'
-        )
+        self.member = Member.objects.create(name='テスト会員', member_id_1='123', member_id_2='456')
+        EmailTemplate.objects.create(to_address='dest@example.com', subject='{タイプ}:{催事名}', body='{ユーザー名} 様')
+        self.facility = Facility.objects.create(name='テスト施設', prefecture='東京都', address='渋谷区')
         TVChannelStatus.objects.create(facility=self.facility, channel_number=13, is_available=True)
 
     @patch('apps.adjustments.views.LineBotService')
@@ -41,16 +31,8 @@ class LWNotificationTest(TestCase):
 
         data = {
             'app_type': 'new',
-            'user': {
-                'name': '太郎',
-                'kana': 'たろう',
-                'tel': '090',
-                'email': 'taro@ex.com'
-            },
-            'event': {
-                'name': 'テスト催事',
-                'comment': 'メモ'
-            },
+            'user': {'name': '太郎', 'kana': 'たろう', 'tel': '090', 'email': 'taro@ex.com'},
+            'event': {'name': 'テスト催事', 'comment': 'メモ'},
             'facilities': [
                 {
                     'id': self.facility.id,
@@ -58,19 +40,15 @@ class LWNotificationTest(TestCase):
                     'end_date': '2026-03-01',
                     'start_time': '10:00',
                     'end_time': '12:00',
-                    'selectedChannels': [13]
+                    'selectedChannels': [13],
                 }
             ],
             'mic_counts': {'analog_rm': {'10mw': '1'}},
             'extra_53ch': '',
-            'channelId': 'user_456' # 依頼元
+            'channelId': 'user_456',  # 依頼元
         }
 
-        response = self.client.post(
-            reverse('adjustments:send_email'),
-            data=data,
-            content_type='application/json'
-        )
+        response = self.client.post(reverse('adjustments:send_email'), data=data, content_type='application/json')
 
         self.assertEqual(response.status_code, 200)
 

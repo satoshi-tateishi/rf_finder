@@ -27,7 +27,7 @@ class AdjustmentRequestForm(forms.Form):
 
         # 1. 施設リストのバリデーション
         facilities = data.get('facilities', [])
-        print(f"[Debug] facilities count: {len(facilities)}")
+        print(f'[Debug] facilities count: {len(facilities)}')
         if not facilities:
             self.add_error('facilities', '施設を1つ以上選択してください')
         else:
@@ -51,7 +51,7 @@ class AdjustmentRequestForm(forms.Form):
             return s
 
         total_mics = sum_mics(mc)
-        print(f"[Debug] total_mics: {total_mics}, 12g_lmh: {mc.get('12g_lmh')}")
+        print(f'[Debug] total_mics: {total_mics}, 12g_lmh: {mc.get("12g_lmh")}')
         if total_mics == 0 and not mc.get('12g_lmh'):
             self.add_error('mic_counts', '使用マイク数を少なくとも1箇所入力してください')
 

@@ -17,8 +17,7 @@ class LineBotServiceTest(TestCase):
         """アクセストークンがキャッシュされ、2回目以降はリクエストが発生しないこと"""
         # 1回目のレスポンス設定
         mock_post.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {'access_token': 'test_token_123', 'expires_in': 3600}
+            status_code=200, json=lambda: {'access_token': 'test_token_123', 'expires_in': 3600}
         )
 
         service = LineBotService()
@@ -45,7 +44,7 @@ class LineBotServiceTest(TestCase):
             # 3. _upload_file
             MagicMock(status_code=200),
             # 4. send_pdf (final message)
-            MagicMock(status_code=201)
+            MagicMock(status_code=201),
         ]
 
         with self.settings(LINE_WORKS_BOT_ID='test_bot'):
@@ -67,11 +66,11 @@ class LineBotServiceTest(TestCase):
             # 1. _get_access_token
             MagicMock(status_code=200, json=lambda: {'access_token': 'fake_token'}),
             # 2. send_flex_message
-            MagicMock(status_code=201)
+            MagicMock(status_code=201),
         ]
 
         service = LineBotService()
-        flex_content = {"type": "bubble", "body": {"type": "box", "layout": "vertical", "contents": []}}
+        flex_content = {'type': 'bubble', 'body': {'type': 'box', 'layout': 'vertical', 'contents': []}}
         success = service.send_flex_message(channel_id='ch_001', flex_content=flex_content)
 
         self.assertTrue(success)
@@ -100,7 +99,7 @@ class LineBotServiceTest(TestCase):
             # 1. _get_access_token
             MagicMock(status_code=200, json=lambda: {'access_token': 'fake_token'}),
             # 2. set_persistent_menu
-            MagicMock(status_code=200)
+            MagicMock(status_code=200),
         ]
 
         with self.settings(LINE_WORKS_BOT_ID='test_bot'):

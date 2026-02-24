@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from .models import AuditLog
 from .utils import log_action
 
+
 class AuditLogTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')

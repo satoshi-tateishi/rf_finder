@@ -72,12 +72,12 @@ class Command(BaseCommand):
 
             # 4. 画像のアップロード (2段階プロセス)
             self.stdout.write('メニュー画像をアップロード中...')
-            upload_url, file_id = bot_service._get_upload_url("menu.png")
+            upload_url, file_id = bot_service._get_upload_url('menu.png')
             if not upload_url or not file_id:
                 self.stderr.write(self.style.ERROR('アップロードURLの取得に失敗しました。'))
                 return
 
-            if not bot_service._upload_file(upload_url, image_content, "menu.png"):
+            if not bot_service._upload_file(upload_url, image_content, 'menu.png'):
                 self.stderr.write(self.style.ERROR('画像のバイナリアップロードに失敗しました。'))
                 return
 
@@ -105,7 +105,11 @@ class Command(BaseCommand):
             success = bot_service.set_persistent_menu(woff_id)
 
             if success:
-                self.stdout.write(self.style.SUCCESS('固定メニュー（RF Finder を開く）の設定に成功しました。トークルームの入力エリア横の「三」アイコンから確認してください。'))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        '固定メニュー（RF Finder を開く）の設定に成功しました。トークルームの入力エリア横の「三」アイコンから確認してください。'
+                    )
+                )
             else:
                 self.stderr.write(self.style.ERROR('固定メニューの設定に失敗しました。'))
 
@@ -115,7 +119,7 @@ class Command(BaseCommand):
         """
         width, height = 2500, 843
         background_color = (0, 195, 0)  # LINE WORKS Green
-        text = "RF Finder を起動"
+        text = 'RF Finder を起動'
 
         # 画像作成
         img = Image.new('RGB', (width, height), color=background_color)

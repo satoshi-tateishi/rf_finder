@@ -6,6 +6,9 @@ from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
+from django.utils import timezone
+from datetime import timedelta
+
 
 class UserProfile(models.Model):
     """ユーザーごとの追加情報（OTP、役割、プロフィールなど）"""
@@ -38,15 +41,15 @@ class UserProfile(models.Model):
         verbose_name_plural = 'ユーザープロフィール'
 
     def __str__(self):
-        return f"{self.user.username} ({self.get_role_display()})"
+        return f'{self.user.username} ({self.get_role_display()})'
 
     @property
     def full_name(self):
-        return f"{self.family_name} {self.given_name}".strip() or self.user.first_name
+        return f'{self.family_name} {self.given_name}'.strip() or self.user.first_name
 
     @property
     def full_kana(self):
-        return f"{self.phonetic_family_name} {self.phonetic_given_name}".strip()
+        return f'{self.phonetic_family_name} {self.phonetic_given_name}'.strip()
 
     def save(self, *args, **kwargs):
         # ロールに基づいて User の権限を同期
@@ -61,8 +64,9 @@ class UserProfile(models.Model):
                 self.user.is_staff = False
                 self.user.is_superuser = False
                 self.user.save(update_fields=['is_staff', 'is_superuser'])
-        
+
         super().save(*args, **kwargs)
+
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
@@ -95,7 +99,13 @@ class Member(models.Model):
 
 class EmailTemplate(models.Model):
     to_address = models.EmailField(verbose_name='送信先アドレス')
-    cc_address = models.CharField(max_length=255, blank=True, default='', verbose_name='CC', help_text='カンマ区切りで複数指定可能。{ユーザーEメールアドレス} も使用できます。')
+    cc_address = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='CC',
+        help_text='カンマ区切りで複数指定可能。{ユーザーEメールアドレス} も使用できます。',
+    )
     subject = models.CharField(max_length=255, verbose_name='件名')
     body = models.TextField(verbose_name='本文')
 
@@ -109,6 +119,7 @@ class EmailTemplate(models.Model):
 
 class AuditLog(models.Model):
     """システムの監査ログ（操作履歴）"""
+
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='ユーザー')
     action = models.CharField(max_length=50, verbose_name='操作種別')
     description = models.TextField(verbose_name='操作詳細')
@@ -126,25 +137,29 @@ class AuditLog(models.Model):
         ordering = ['-timestamp']
 
     def __str__(self):
-        user_str = self.user.username if self.user else "System"
-        return f"{self.timestamp} - {user_str} - {self.action}"
+        user_str = self.user.username if self.user else 'System'
+        return f'{self.timestamp} - {user_str} - {self.action}'
 
 
 @receiver(user_logged_in)
 def log_user_login(sender, request, user, **kwargs):
     from .utils import log_action
-    log_action(user=user, action='LOGIN', description='ログイン成功', request=request)
 
+    log_action(user=user, action='LOGIN', description='ログイン成功', request=request)
 
     @receiver(user_login_failed)
     def log_user_login_failed(sender, credentials, request, **kwargs):
         from .utils import log_action
+
         username = credentials.get('username', 'unknown')
-        log_action(user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request)
+        log_action(
+            user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request
+        )
 
 
 class DropboxToken(models.Model):
     """Dropbox APIのOAuth2トークン情報を保持するモデル"""
+
     service_name = models.CharField(max_length=50, default='backup', verbose_name='サービス名')
     access_token = models.TextField(verbose_name='アクセストークン')
     refresh_token = models.TextField(null=True, blank=True, verbose_name='リフレッシュトークン')
@@ -160,7 +175,7 @@ class DropboxToken(models.Model):
         verbose_name_plural = 'Dropboxトークン'
 
     def __str__(self):
-        return f"Dropbox Token ({self.account_name or self.service_name})"
+        return f'Dropbox Token ({self.account_name or self.service_name})'
 
     def is_access_token_expired(self):
         """アクセストークンが期限切れか判定する"""
@@ -172,4 +187,3 @@ class DropboxToken(models.Model):
     def has_valid_refresh_token(self):
         """リフレッシュトークンを持っているか判定する"""
         return bool(self.refresh_token)
-

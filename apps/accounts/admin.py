@@ -37,7 +37,16 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'user', 'action', 'description', 'ip_address')
     list_filter = ('action', 'timestamp', 'user')
     search_fields = ('description', 'user__username', 'ip_address')
-    readonly_fields = ('user', 'action', 'description', 'ip_address', 'timestamp', 'content_type', 'object_id', 'content_object')
+    readonly_fields = (
+        'user',
+        'action',
+        'description',
+        'ip_address',
+        'timestamp',
+        'content_type',
+        'object_id',
+        'content_object',
+    )
 
     def has_add_permission(self, request):
         return False
@@ -57,15 +66,21 @@ class UserProfileAdmin(admin.ModelAdmin):
     readonly_fields = ('otp_code', 'otp_expires_at', 'otp_locked_until')
     fieldsets = (
         ('基本情報', {'fields': ('user', 'role')}),
-        ('LINE WORKS同期情報', {'fields': (
-            ('family_name', 'given_name'),
-            ('phonetic_family_name', 'phonetic_given_name'),
-            'phone_number', 'email'
-        )}),
-        ('セキュリティ (OTP)', {
-            'fields': ('otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until'),
-            'classes': ('collapse',)
-        }),
+        (
+            'LINE WORKS同期情報',
+            {
+                'fields': (
+                    ('family_name', 'given_name'),
+                    ('phonetic_family_name', 'phonetic_given_name'),
+                    'phone_number',
+                    'email',
+                )
+            },
+        ),
+        (
+            'セキュリティ (OTP)',
+            {'fields': ('otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until'), 'classes': ('collapse',)},
+        ),
     )
 
     @admin.display(description='LW_UUID', ordering='user__username')
@@ -80,6 +95,7 @@ class DropboxAuthHelper(models.Model):
         verbose_name_plural = '1. Dropbox連携を開始する'
         managed = False
 
+
 @admin.register(DropboxAuthHelper)
 class DropboxAuthAdmin(admin.ModelAdmin):
     def has_module_permission(self, request):
@@ -89,6 +105,7 @@ class DropboxAuthAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         from django.shortcuts import redirect
+
         return redirect('/auth/dropbox/login/')
 
 

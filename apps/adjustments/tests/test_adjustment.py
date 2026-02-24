@@ -67,7 +67,7 @@ class AdjustmentLogicTest(TestCase):
         data = {
             'app_type': 'change',
             'user': {'name': '太郎', 'email': 'taro@ex.com'},
-            'facilities': [{'start_date': '2026-02-20'}]
+            'facilities': [{'start_date': '2026-02-20'}],
         }
         pdf_buffer = io.BytesIO(b'dummy pdf content')
 
@@ -92,11 +92,7 @@ class AdjustmentLogicTest(TestCase):
 class AdjustmentAPITest(TestCase):
     def setUp(self):
         Member.objects.create(name='テスト会員')
-        EmailTemplate.objects.create(
-            subject='テスト件名',
-            body='テスト本文',
-            to_address='test@example.com'
-        )
+        EmailTemplate.objects.create(subject='テスト件名', body='テスト本文', to_address='test@example.com')
         self.valid_data = {
             'app_type': 'new',
             'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090-1234-5678', 'email': 'u@ex.com'},
@@ -216,24 +212,23 @@ class AdjustmentAPITest(TestCase):
     def test_validation_error_zero_mics(self):
         """マイク数がすべて0の場合にエラーになること"""
         invalid_data = self.valid_data.copy()
-        invalid_data['mic_counts'] = {
-            'analog_rm': {'10mw': 0},
-            'digital_rm': {'10mw': '0', '20mw': 0}
-        }
+        invalid_data['mic_counts'] = {'analog_rm': {'10mw': 0}, 'digital_rm': {'10mw': '0', '20mw': 0}}
         response = self.client.post(
             reverse('adjustments:preview_pdf'), data=json.dumps(invalid_data), content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('mic_counts', response.json()['errors'])
 
+
 class AdjustmentUtilityTest(TestCase):
     def test_get_adjustment_filename_sanitization(self):
         """ファイル名に使用できない文字がサニタイズされること"""
         from apps.adjustments.utils import get_adjustment_filename
+
         data = {
             'app_type': 'change',
             'event': {'name': '催事 / ハムレット : "復讐" *'},
-            'facilities': [{'start_date': '2026-02-22'}]
+            'facilities': [{'start_date': '2026-02-22'}],
         }
         filename = get_adjustment_filename(data, 'pdf')
         # 禁止文字 / : " * が除外され、ファイル名が妥当であることを確認
@@ -247,27 +242,30 @@ class AdjustmentUtilityTest(TestCase):
     def test_get_adjustment_filename_app_types(self):
         """各申請区分が正しく日本語に変換されること"""
         from apps.adjustments.utils import get_adjustment_filename
+
         base_data = {'event': {'name': 'テスト'}, 'facilities': []}
 
         self.assertIn('新規', get_adjustment_filename({**base_data, 'app_type': 'new'}))
         self.assertIn('変更', get_adjustment_filename({**base_data, 'app_type': 'change'}))
         self.assertIn('削除', get_adjustment_filename({**base_data, 'app_type': 'delete'}))
 
+
 class EmailServiceDetailTest(TestCase):
     def test_template_full_replacement(self):
         """すべてのプレースホルダーが正しく置換されること"""
         from apps.adjustments.services import send_adjustment_email
+
         member = Member.objects.create(name='テスト会員')
         EmailTemplate.objects.create(
             subject='{タイプ}:{催事名}',
             body='{ユーザー名} 様 ({ユーザーEメールアドレス})\n運用日: {運用日}',
-            to_address='to@ex.com'
+            to_address='to@ex.com',
         )
         data = {
             'app_type': 'new',
             'user': {'name': '太郎', 'email': 'taro@ex.com'},
             'event': {'name': 'ハムレット'},
-            'facilities': [{'start_date': '2026-05-10'}]
+            'facilities': [{'start_date': '2026-05-10'}],
         }
         pdf_buffer = io.BytesIO(b'dummy')
 
@@ -277,4 +275,3 @@ class EmailServiceDetailTest(TestCase):
         self.assertEqual(sent.subject, '新規:ハムレット')
         self.assertIn('太郎 様 (taro@ex.com)', sent.body)
         self.assertIn('運用日: 2026年5月10日', sent.body)
-

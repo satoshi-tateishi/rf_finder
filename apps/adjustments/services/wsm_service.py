@@ -18,15 +18,13 @@ class WSMService:
         writer = csv.writer(output, lineterminator='\n', delimiter=';')
 
         # ヘッダー
-        writer.writerow([
-            "name", "type", "frequency", "tolerance", "minfrequency",
-            "maxfrequency", "priority", "squelchlevel"
-        ])
+        writer.writerow(
+            ['name', 'type', 'frequency', 'tolerance', 'minfrequency', 'maxfrequency', 'priority', 'squelchlevel']
+        )
 
         # チャンネル状態を全取得 (13-53)
         channels_status = {
-            cs.channel_number: cs.is_available
-            for cs in TVChannelStatus.objects.filter(facility=facility)
+            cs.channel_number: cs.is_available for cs in TVChannelStatus.objects.filter(facility=facility)
         }
 
         # 13CHから53CHまでループ
@@ -63,18 +61,20 @@ class WSMService:
             row_type = 2 if is_selected else 3
             priority = 2 if is_selected else 4
 
-            writer.writerow([
-                f"TV {ch}",
-                row_type,
-                0,  # frequency
-                0,  # tolerance
-                min_f,
-                max_f,
-                priority,
-                5   # squelchlevel (固定)
-            ])
+            writer.writerow(
+                [
+                    f'TV {ch}',
+                    row_type,
+                    0,  # frequency
+                    0,  # tolerance
+                    min_f,
+                    max_f,
+                    priority,
+                    5,  # squelchlevel (固定)
+                ]
+            )
 
         # Blocked (A帯域外の除外)
-        writer.writerow(["Blocked", 3, 0, 0, 714000, 798000, 4, 5])
+        writer.writerow(['Blocked', 3, 0, 0, 714000, 798000, 4, 5])
 
         return output.getvalue()

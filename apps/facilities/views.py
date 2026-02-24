@@ -21,9 +21,13 @@ def index(request):
             default=3,
         )
     ).order_by('custom_order', 'model_name')
-    return render(request, 'index.html', {
-        'devices': devices,
-    })
+    return render(
+        request,
+        'index.html',
+        {
+            'devices': devices,
+        },
+    )
 
 
 def facility_search(request):

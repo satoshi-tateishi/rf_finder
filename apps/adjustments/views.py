@@ -41,7 +41,7 @@ def validate_adjustment_data(data):
         all_errors.update({f'event_{k}': v for k, v in event_form.errors.items()})
 
     if all_errors:
-        print(f"[Validation Error] {all_errors}")
+        print(f'[Validation Error] {all_errors}')
         return False, all_errors
 
     return True, None
@@ -118,15 +118,17 @@ def list_adjustments(request):
 
     results = []
     for adj in queryset[:20]:
-        results.append({
-            'id': adj.id,
-            'event_name': adj.event_name,
-            'user_name': adj.user_name,
-            'app_type': adj.get_app_type_display(),
-            'status': adj.get_status_display(),
-            'created_at': adj.created_at.strftime('%Y/%m/%d %H:%M'),
-            'facility_names': [f.name for f in adj.facilities.all()]
-        })
+        results.append(
+            {
+                'id': adj.id,
+                'event_name': adj.event_name,
+                'user_name': adj.user_name,
+                'app_type': adj.get_app_type_display(),
+                'status': adj.get_status_display(),
+                'created_at': adj.created_at.strftime('%Y/%m/%d %H:%M'),
+                'facility_names': [f.name for f in adj.facilities.all()],
+            }
+        )
 
     return api_success(results)
 
@@ -152,7 +154,7 @@ def get_adjustment(request, pk):
             'mic_counts': adj.mic_counts_json,
             'selected_channels': adj.selected_channels_json,
             'extra_53ch': '○' if adj.extra_53ch else '',
-            'status': adj.status
+            'status': adj.status,
         }
         return api_success(data)
     except OperationAdjustment.DoesNotExist:
@@ -176,7 +178,7 @@ def preview_excel(request, data):
 @csrf_exempt
 @json_api_view(validate=True)
 def preview_pdf(request, data):
-    print(">>> preview_pdf called")
+    print('>>> preview_pdf called')
     member = Member.objects.first()
     try:
         buffer = generate_adjustment_pdf(data, member)
@@ -208,7 +210,13 @@ def send_email(request, data):
         send_adjustment_email(data, member, pdf_buffer)
 
         # 監査ログの記録
-        log_action(user=request.user, action='EMAIL_SEND', description=f'メール送信: {adjustment.event_name} (ID: {adjustment.id})', request=request, obj=adjustment)
+        log_action(
+            user=request.user,
+            action='EMAIL_SEND',
+            description=f'メール送信: {adjustment.event_name} (ID: {adjustment.id})',
+            request=request,
+            obj=adjustment,
+        )
 
         # 3. LINE Bot連携
         bot_service = LineBotService()
@@ -225,6 +233,7 @@ def send_email(request, data):
 
         # 3.2 指定の通知グループへ送信 (設定があれば)
         from django.conf import settings
+
         notify_channel_id = getattr(settings, 'LINE_WORKS_NOTIFICATION_CHANNEL_ID', None)
         if notify_channel_id:
             try:
@@ -241,17 +250,17 @@ def send_email(request, data):
                     name = f.get('name', '不明')
                     start = f.get('start_date', '').replace('-', '/')
                     end = f.get('end_date', '').replace('-', '/')
-                    facility_lines.append(f"{i + 1}.{name}\n{start} - {end}")
+                    facility_lines.append(f'{i + 1}.{name}\n{start} - {end}')
 
-                facility_text = "\n\n".join(facility_lines)
+                facility_text = '\n\n'.join(facility_lines)
 
                 msg = (
-                    f"【運用調整届 送信通知】\n"
-                    f"区分: {app_type_jp}\n"
-                    f"催事名: {event_name}\n"
-                    f"申請者: {user_name}\n\n"
-                    f"施設:\n{facility_text}\n\n"
-                    f"上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。"
+                    f'【運用調整届 送信通知】\n'
+                    f'区分: {app_type_jp}\n'
+                    f'催事名: {event_name}\n'
+                    f'申請者: {user_name}\n\n'
+                    f'施設:\n{facility_text}\n\n'
+                    f'上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。'
                 )
 
                 # テキストメッセージとPDFを送信
@@ -278,15 +287,23 @@ def export_wsm(request, data):
 
     try:
         from apps.facilities.models import Facility
+
         facility = Facility.objects.get(pk=facility_id)
         csv_content = WSMService.generate_csv(facility, selected_channels)
 
         # ファイル名を生成
         import datetime
-        date_str = datetime.datetime.now().strftime('%Y%m%d')
-        filename = f"wsm_{facility.name}_{date_str}.csv"
 
-        log_action(user=request.user, action='WSM_EXPORT', description=f'WSM CSV出力: {facility.name}', request=request, obj=facility)
+        date_str = datetime.datetime.now().strftime('%Y%m%d')
+        filename = f'wsm_{facility.name}_{date_str}.csv'
+
+        log_action(
+            user=request.user,
+            action='WSM_EXPORT',
+            description=f'WSM CSV出力: {facility.name}',
+            request=request,
+            obj=facility,
+        )
 
         response = HttpResponse(csv_content, content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
