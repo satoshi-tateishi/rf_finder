@@ -37,7 +37,7 @@ services:
       dockerfile: docker/apache/Dockerfile
     container_name: rf_finder_apache
     ports:
-      - "8084:80"
+      - "8085:80"
     volumes:
       - ./static:/static
     depends_on:

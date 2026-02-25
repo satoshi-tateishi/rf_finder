@@ -10,7 +10,7 @@ RF Finder (特ラ運用調整支援アプリ) を自宅サーバーの Docker �
                                            └─ Docker (RF Finder)
                                                ├─ web (Django/Gunicorn): 8000
                                                ├─ db (MySQL:8.0): 3306 (Host: 3309)
-                                               └─ apache (Static配信/Mellon): 80 (Host: 8084)
+                                               └─ apache (Static配信/Mellon): 80 (Host: 8085)
 ```
 
 **デプロイフロー**: `git push origin main` → GitHub Actions → SSH経由で本番サーバー更新
@@ -54,7 +54,7 @@ RF Finder は独自ドメイン `rff.shin-on1981.com` でアクセスします�
 
 | ドメイン | アプリ | ポート | 備考 |
 |-------------|--------|--------|------|
-| `rff.shin-on1981.com` | RF Finder | 8084 | 特定ラジオマイク運用調整支援 |
+| `rff.shin-on1981.com` | RF Finder | 8085 | 特定ラジオマイク運用調整支援 |
 
 **ルーター ポートフォワーディング**:
 - 80 (HTTP) -> サーバー:80
@@ -181,10 +181,10 @@ sudo certbot certonly --apache -d rff.shin-on1981.com
     SSLCertificateKeyFile /etc/letsencrypt/live/rff.shin-on1981.com/privkey.pem
     Include /etc/letsencrypt/options-ssl-apache.conf
 
-    # DockerのApacheコンテナ(ポート8084)へ転送
+    # DockerのApacheコンテナ(ポート8085)へ転送
     ProxyPreserveHost On
-    ProxyPass / http://localhost:8084/
-    ProxyPassReverse / http://localhost:8084/
+    ProxyPass / http://localhost:8085/
+    ProxyPassReverse / http://localhost:8085/
 
     # プロトコル情報をDjangoに伝えるためのヘッダー
     RequestHeader set X-Forwarded-Proto "https"
