@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import time
+import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import jwt
@@ -16,13 +17,13 @@ logger = logging.getLogger(__name__)
 
 class LineBotService:
     """
-    LINE WORKS Bot API Service for sending files to talk rooms.
+    トークルームへファイルを送信するための LINE WORKS Bot API サービス。
     """
 
     CACHE_KEY = 'line_works_access_token_v2'
-    TOKEN_EXPIRY = 86400 - 300  # 24 hours - 5 minutes buffer
+    TOKEN_EXPIRY = 86400 - 300  # 24時間 - 5分のバッファ
     
-    # API Base URLs
+    # API ベース URL
     AUTH_BASE_URL = getattr(settings, 'LINE_WORKS_AUTH_BASE_URL', 'https://auth.worksmobile.com')
     API_BASE_URL = getattr(settings, 'LINE_WORKS_API_BASE_URL', 'https://www.worksapis.com')
 
@@ -33,12 +34,13 @@ class LineBotService:
         self.private_key = settings.LINE_WORKS_PRIVATE_KEY
         self.bot_id = settings.LINE_WORKS_BOT_ID
         
-        # Session configuration with retry logic
+        # リトライロジックを含むセッション設定
         self.session = requests.Session()
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]  # POSTもリトライ対象に含める
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
@@ -46,21 +48,21 @@ class LineBotService:
 
     def _generate_jwt(self) -> str:
         """
-        Generate JWT for Service Account authentication.
+        サービスアカウント認証用の JWT を生成する。
         """
         now = int(time.time())
         payload = {
             'iss': self.client_id,
             'sub': self.service_account,
             'iat': now,
-            'exp': now + 3600,  # 1 hour (for JWT itself)
+            'exp': now + 3600,  # 1時間 (JWT自体の有効期限)
         }
         headers = {'alg': 'RS256', 'typ': 'JWT'}
         return jwt.encode(payload, self.private_key, algorithm='RS256', headers=headers)
 
     def _get_access_token(self) -> Optional[str]:
         """
-        Get access token using JWT or from cache.
+        JWT を使用してアクセストークンを取得、またはキャッシュから取得する。
         """
         # 安全装置: テストモード時のモックトークン
         if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
@@ -70,11 +72,12 @@ class LineBotService:
         if token:
             return token
 
-        # レースコンディション対策（簡易ロック）
+        # レースコンディション対策（識別子付きロック）
         lock_key = f"{self.CACHE_KEY}_lock"
-        if not cache.add(lock_key, "locked", 10):
+        lock_id = str(uuid.uuid4())
+        if not cache.add(lock_key, lock_id, 10):
             # 他のプロセスが取得中の場合は少し待ってからキャッシュを確認
-            time.sleep(1)
+            time.sleep(1.5)
             return cache.get(self.CACHE_KEY)
 
         try:
@@ -109,11 +112,13 @@ class LineBotService:
             logger.error(f'[LineBotService] Error getting access token: {e}')
             return None
         finally:
-            cache.delete(lock_key)
+            # 自分がセットしたロックのみを削除
+            if cache.get(lock_key) == lock_id:
+                cache.delete(lock_key)
 
     def _request(self, method: str, path: str, access_token: str, **kwargs) -> requests.Response:
         """
-        共通リクエストメソッド
+        共通リクエストメソッド。ベースURLと認証ヘッダーを自動付与する。
         """
         url = f'{self.API_BASE_URL}/v1.0{path}'
         headers = kwargs.pop('headers', {})
@@ -123,7 +128,7 @@ class LineBotService:
 
     def _get_upload_url(self, access_token: str, file_name: str) -> Tuple[Optional[str], Optional[str]]:
         """
-        Get upload URL and file ID for the bot.
+        Bot 用のアップロード URL とファイル ID を取得する。
         """
         path = f'/bots/{self.bot_id}/attachments'
         data = {'fileName': file_name}
@@ -142,7 +147,7 @@ class LineBotService:
 
     def _upload_file(self, upload_url: str, access_token: str, file_content: bytes, file_name: str) -> bool:
         """
-        Upload file binary to the given upload URL.
+        指定されたアップロード URL にファイルをアップロードする。
         """
         headers = {'Authorization': f'Bearer {access_token}'}
         # requests の files パラメータには bytes を直接渡すのが最も確実です
@@ -161,7 +166,7 @@ class LineBotService:
 
     def send_pdf(self, channel_id: str, file_content: bytes, file_name: str = 'adjustment_request.pdf') -> bool:
         """
-        Public method to send a PDF file to a talk room.
+        PDF ファイルをトークルームに送信する。
         """
         if not self.bot_id or not channel_id:
             logger.warning('[LineBotService] Bot ID or Channel ID is missing.')
@@ -176,22 +181,22 @@ class LineBotService:
         if not access_token:
             return False
 
-        # 1. Get Upload URL
+        # 1. アップロード URL の取得
         upload_url, file_id = self._get_upload_url(access_token, file_name)
         if not upload_url or not file_id:
             return False
 
-        # 2. Upload File (トークンを渡すように修正)
+        # 2. ファイルのアップロード
         if not self._upload_file(upload_url, access_token, file_content, file_name):
             return False
 
-        # 3. Send Message
+        # 3. メッセージの送信
         path = f'/bots/{self.bot_id}/channels/{channel_id}/messages'
         data = {'content': {'type': 'file', 'fileId': file_id}}
 
         try:
             response = self._request('POST', path, access_token, json=data, timeout=10)
-            if response.status_code == 201:
+            if response.ok:
                 logger.info(f'[LineBotService] Successfully sent PDF to channel {channel_id}')
                 return True
             else:
@@ -203,7 +208,7 @@ class LineBotService:
 
     def send_flex_message(self, channel_id: str, flex_content: Dict[str, Any], alt_text: str = 'Flex Message') -> bool:
         """
-        Send Flex Message to talk room.
+        Flex Message をトークルームに送信する。
         """
         if not self.bot_id or not channel_id:
             return False
@@ -232,7 +237,7 @@ class LineBotService:
 
     def send_text_message(self, channel_id: str, text: str) -> bool:
         """
-        Send simple text message to a talk room (group/channel).
+        シンプルなテキストメッセージをトークルーム（グループ/チャンネル）に送信する。
         """
         if not self.bot_id or not channel_id:
             return False
@@ -261,7 +266,7 @@ class LineBotService:
 
     def send_user_message(self, user_id: str, text: str) -> bool:
         """
-        Send simple text message to a specific user (1-on-1).
+        特定のユーザーに個別のテキストメッセージを送信する（1対1トーク）。
         """
         if not self.bot_id or not user_id:
             return False
@@ -290,7 +295,7 @@ class LineBotService:
 
     def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch user details from LINE WORKS Users API.
+        LINE WORKS Users API からユーザー詳細情報を取得する。
         """
         access_token = self._get_access_token()
         if not access_token:
@@ -327,7 +332,7 @@ class LineBotService:
             end = f.get('end_date', '').replace('-', '/')
             facility_lines.append(f'{i + 1}.{name}\n{start} - {end}')
 
-        facility_text = '\n\n'.join(facility_lines)
+        facility_text = '\n\n'.join(facility_lines) or "（施設情報なし）"
 
         return (
             f'【運用調整届 送信通知】\n'
