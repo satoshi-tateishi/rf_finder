@@ -181,8 +181,8 @@ sudo certbot certonly --apache -d rff.shin-on1981.com
     Include /etc/letsencrypt/options-ssl-apache.conf
 
     # 静的ファイルの配信 (ホスト側のディレクトリを直接指定)
-    Alias /static/ /var/www/rf_finder/static/
-    <Directory "/var/www/rf_finder/static">
+    Alias /static/ /var/www/rf_finder/static_root/
+    <Directory "/var/www/rf_finder/static_root">
         Options Indexes FollowSymLinks
         AllowOverride None
         Require all granted
