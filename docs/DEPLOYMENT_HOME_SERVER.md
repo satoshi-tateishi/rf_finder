@@ -1,6 +1,6 @@
 # 自宅サーバーデプロイガイド (RF Finder)
 
-RF Finder (特ラ運用調整支援アプリ) を自宅サーバーの Docker 環境で公開し、GitHub Actions で自動デプロイする手順。
+RF Finder (特ラ運用調整支援アプリ) を自宅サーバーの Docker 環境で公開し、GitHub Actions で自動デプロイする手順.
 
 ## 構成概要
 
@@ -8,7 +8,7 @@ RF Finder (特ラ運用調整支援アプリ) を自宅サーバーの Docker �
 インターネット → ルーター(80, 443, 56834) → 自宅サーバー
                                            ├─ Host Apache (SSL終端, リバースプロキシ, 静的ファイル配信)
                                            └─ Docker (RF Finder)
-                                               ├─ web (Django/Gunicorn): 8000 (Host: 8000)
+                                               ├─ web (Django/Gunicorn): 80 (Host: 8085)
                                                └─ db (MySQL:8.0): 3306 (Host: 3309)
 ```
 
@@ -49,11 +49,11 @@ sudo ufw enable
 
 ### MyDNS.JP サブドメイン設定
 
-RF Finder は独自ドメイン `rff.shin-on1981.com` でアクセスします。
+RF Finder は独自ドメイン `rff.shin-on1981.com` でアクセスします.
 
 | ドメイン | アプリ | ポート | 備考 |
 |-------------|--------|--------|------|
-| `rff.shin-on1981.com` | RF Finder | 8000 | 特定ラジオマイク運用調整支援 |
+| `rff.shin-on1981.com` | RF Finder | 8085 | 特定ラジオマイク運用調整支援 |
 
 **ルーター ポートフォワーディング**:
 - 80 (HTTP) -> サーバー:80
@@ -81,17 +81,17 @@ cat ~/.ssh/id_ed25519_deploy_rf.pub >> ~/.ssh/authorized_keys
 | `DEPLOY_PATH` | /var/www/rf_finder |
 
 #### SSH接続でエラー（Permission denied）が出る場合
-`git clone` 時にエラーが出る場合は、以下の手順で鍵の有効化を確認してください。
+`git clone` 時にエラーが出る場合は、以下の手順で鍵の有効化を確認してください.
 
 1. **GitHubへの登録確認**:
-   `cat ~/.ssh/id_ed25519_deploy_rf.pub` の内容が GitHubリポジトリの [Settings] > [Deploy keys] に正確に登録されているか確認。
+   `cat ~/.ssh/id_ed25519_deploy_rf.pub` の内容が GitHubリポジトリの [Settings] > [Deploy keys] に正確に登録されているか確認.
 2. **SSHエージェントへの追加**:
    ```bash
    eval "$(ssh-agent -s)"
    ssh-add ~/.ssh/id_ed25519_deploy_rf
    ```
 3. **SSH設定の固定化 (推奨)**:
-   毎回 `ssh-add` するのを避けるため、`~/.ssh/config` に以下を記述します。
+   毎回 `ssh-add` するのを避けるため、`~/.ssh/config` に以下を記述します.
    ```text
    Host github.com
      HostName github.com
@@ -103,7 +103,7 @@ cat ~/.ssh/id_ed25519_deploy_rf.pub >> ~/.ssh/authorized_keys
 
 ## 4. 初回デプロイ (サーバー側での手動設定)
 
-自動デプロイを開始する前に、初回のみサーバー側で手動のディレクトリ作成と `.env` 設定が必要です。
+自動デプロイを開始する前に、初回のみサーバー側で手動のディレクトリ作成と `.env` 設定が必要です.
 
 ### 1. プロジェクトディレクトリの作成と権限設定
 ```bash
@@ -121,12 +121,12 @@ git clone git@github.com:satoshi-tateishi/rf_finder.git .
 ```
 
 ### 3. 環境変数 (.env) の作成
-Git管理外の秘密情報（パスワードやAPIキー）を設定します。
+Git管理外の秘密情報（パスワードやAPIキー）を設定します.
 ```bash
 cp .env.sample .env
 nano .env
 ```
-※ `DEBUG=False` や本番用ドメイン、DBパスワードを適切に設定してください。
+※ `DEBUG=False` や本番用ドメイン、DBパスワードを適切に設定してください.
 
 ### 4. 初回起動と初期化
 ```bash
@@ -146,14 +146,14 @@ docker compose -f docker-compose.prod.yml exec web python manage.py createsuperu
 ---
 
 ## 5. 自動デプロイの設定 (GitHub Actions)
-初回デプロイが完了したら、以降の更新は `git push` で自動化できます。
-`.github/workflows/deploy.yml`（未作成の場合は作成）に、`/var/www/rf_finder` で `git pull` とコンテナ再起動を行う設定を追加してください。
+初回デプロイが完了したら、以降の更新は `git push` で自動化できます.
+`.github/workflows/deploy.yml`（未作成の場合は作成）に、`/var/www/rf_finder` で `git pull` とコンテナ再起動を行う設定を追加してください.
 
 ---
 
 ## 6. Host Apache & SSL設定
 
-Host側のApacheをリバースプロキシとして設定し、静的ファイルを配信しつつSSLを終端します。
+Host側のApacheをリバースプロキシとして設定し、静的ファイルを配信しつつSSLを終端します.
 
 ### 1. SSL証明書の取得
 ```bash
@@ -188,11 +188,11 @@ sudo certbot certonly --apache -d rff.shin-on1981.com
         Require all granted
     </Directory>
 
-    # 静的ファイル以外はDockerのDjangoコンテナ(ポート8000)へ転送
+    # 静的ファイル以外はDockerのDjangoコンテナ(ポート8085)へ転送
     ProxyPreserveHost On
     ProxyPass /static/ !
-    ProxyPass / http://localhost:8000/
-    ProxyPassReverse / http://localhost:8000/
+    ProxyPass / http://localhost:8085/
+    ProxyPassReverse / http://localhost:8085/
 
     # プロトコル情報をDjangoに伝えるためのヘッダー
     RequestHeader set X-Forwarded-Proto "https"
@@ -217,24 +217,24 @@ sudo systemctl reload apache2
 
 ### ログの確認
 ```bash
-docker compose logs -f web
+docker compose -f docker-compose.prod.yml logs -f web
 ```
 
 ### 静的ファイルの更新
-CSSやJSを変更した後は、コンテナ内で `collectstatic` を実行する必要があります。
+CSSやJSを変更した後は、コンテナ内で `collectstatic` を実行する必要があります.
 ```bash
-docker compose exec web python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
 ```
 
 ### DBバックアップ
-このプロジェクトには Dropbox への自動バックアップ機能が実装されています。
-管理画面または `scripts/` 内のスクリプト（あれば）から実行可能です。
+このプロジェクトには Dropbox への自動バックアップ機能が実装されています.
+管理画面または `scripts/` 内のスクリプト（あれば）から実行可能です.
 
 ---
 
 ## 8. LINE WORKS SSO / OAuth 設定の注意
 
-ドメインが `rff.shin-on1981.com` に変更されるため、LINE WORKS Developer Console の設定も更新が必要です。
+ドメインが `rff.shin-on1981.com` に変更されるため、LINE WORKS Developer Console の設定も更新が必要です.
 
 - **Redirect URL**: `https://rff.shin-on1981.com/auth/lineworks/callback/`
 - **Domain**: `rff.shin-on1981.com`

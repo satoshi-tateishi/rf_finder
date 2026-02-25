@@ -17,12 +17,11 @@ services:
   web:
     build: .
     container_name: rf_finder_web
-    # 本番では gunicorn 等の使用も検討可能だが、現状は runserver を維持
-    command: python manage.py runserver 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:80
     volumes:
       - .:/code
     ports:
-      - "8000:8000"
+      - '${APP_PORT:-8085}:80'
     env_file:
       - .env
     depends_on:
