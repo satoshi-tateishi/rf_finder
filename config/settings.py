@@ -161,3 +161,15 @@ LINE_WORKS_DOMAIN = env('LINE_WORKS_DOMAIN', default='shin-on1981')
 DROPBOX_APP_KEY = env('DROPBOX_APP_KEY', default='')
 DROPBOX_APP_SECRET = env('DROPBOX_APP_SECRET', default='')
 DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:8084/auth/dropbox/callback/')
+
+# --- 安全装置: テストおよび開発環境の設定 ---
+import sys
+
+TESTING = 'test' in sys.argv
+
+if TESTING:
+    # テスト実行時はメールをインメモリにする
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    # LINE WORKS API をモックモードにする
+    LINE_WORKS_MOCK_MODE = True
+    # その他、テスト時に制限したい項目があれば追加

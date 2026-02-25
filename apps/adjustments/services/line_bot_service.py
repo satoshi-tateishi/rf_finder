@@ -145,6 +145,11 @@ class LineBotService:
             logger.warning('[LineBotService] Bot ID or Channel ID is missing.')
             return False
 
+        # 安全装置: テストモードまたはデバッグモードでの誤送信防止
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+            logger.info(f'[LineBotService][MOCK] Sending PDF to {channel_id}: {file_name} ({len(file_content)} bytes)')
+            return True
+
         # 1. Get Access Token
         access_token = self._get_access_token()
         if not access_token:
@@ -184,6 +189,10 @@ class LineBotService:
             logger.warning('[LineBotService] Bot ID or Channel ID is missing.')
             return False
 
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+            logger.info(f'[LineBotService][MOCK] Sending Flex Message to {channel_id}: {alt_text}')
+            return True
+
         access_token = self._get_access_token()
         if not access_token:
             return False
@@ -212,6 +221,10 @@ class LineBotService:
             logger.warning('[LineBotService] Bot ID or Channel ID is missing.')
             return False
 
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+            logger.info(f'[LineBotService][MOCK] Sending Text to {channel_id}: {text[:50]}...')
+            return True
+
         access_token = self._get_access_token()
         if not access_token:
             return False
@@ -239,6 +252,10 @@ class LineBotService:
         if not self.bot_id or not user_id:
             logger.warning('[LineBotService] Bot ID or User ID is missing.')
             return False
+
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+            logger.info(f'[LineBotService][MOCK] Sending User Message to {user_id}: {text[:50]}...')
+            return True
 
         access_token = self._get_access_token()
         if not access_token:
