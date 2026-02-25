@@ -4,12 +4,28 @@ from email.mime.application import MIMEApplication
 
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 from apps.accounts.models import EmailTemplate
 from ..constants import APP_TYPE_MAP
 from ..utils import get_adjustment_filename
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_replacements(text: str, replacements: dict) -> str:
+    """
+    プレースホルダーを置換する内部ユーティリティ関数。
+    長いプレースホルダーから順に置換することで誤置換を防ぐ。
+    """
+    if not text:
+        return ""
+    # 文字列の長い順にソートして置換（部分一致による誤置換防止）
+    for placeholder in sorted(replacements.keys(), key=len, reverse=True):
+        value = replacements[placeholder] or ''
+        text = text.replace(placeholder, str(value))
+    return text
 
 
 def send_adjustment_email(data, member, pdf_buffer):
@@ -22,8 +38,14 @@ def send_adjustment_email(data, member, pdf_buffer):
     user_email = data.get('user', {}).get('email', '')
 
     # 運用日（最初の施設の開始日）を取得してフォーマット
+    # 安全性の向上: 入力データの構造チェックを厳密化
     facilities = data.get('facilities', [])
-    start_date_raw = facilities[0].get('start_date', '') if facilities else ''
+    start_date_raw = ''
+    if isinstance(facilities, list) and facilities:
+        first_facility = facilities[0]
+        if isinstance(first_facility, dict):
+            start_date_raw = first_facility.get('start_date', '')
+
     start_date_formatted = start_date_raw
     if start_date_raw:
         try:
@@ -51,6 +73,14 @@ def send_adjustment_email(data, member, pdf_buffer):
         logger.error(msg)
         raise RuntimeError(msg)
 
+    # 送信先アドレスのバリデーション
+    try:
+        validate_email(recipient)
+    except ValidationError:
+        msg = f"不正なメールアドレス形式です: {recipient}"
+        logger.error(msg)
+        raise RuntimeError(msg)
+
     # 2. 置換データの準備
     app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
     
@@ -58,11 +88,11 @@ def send_adjustment_email(data, member, pdf_buffer):
     member_name = member.name if member else ''
     manager_name = member.manager_name if member else ''
 
-    subject = template.subject
-    body = template.body
-    cc_raw = template.cc_address or ''
+    # 安全性の向上: None の場合に空文字にする
+    subject_template = template.subject or ''
+    body_template = template.body or ''
+    cc_raw_template = template.cc_address or ''
 
-    # プレースホルダーの置換
     replacements = {
         '{ユーザー名}': user_name,
         '{ユーザーEメールアドレス}': user_email,
@@ -73,12 +103,10 @@ def send_adjustment_email(data, member, pdf_buffer):
         '{運用担当者}': manager_name,
     }
     
-    # 文字列の長い順にソートして置換（部分一致による誤置換防止）
-    for placeholder in sorted(replacements.keys(), key=len, reverse=True):
-        value = replacements[placeholder] or ''
-        subject = subject.replace(placeholder, value)
-        body = body.replace(placeholder, value)
-        cc_raw = cc_raw.replace(placeholder, value)
+    # 置換の実行（共通関数化）
+    subject = _apply_replacements(subject_template, replacements)
+    body = _apply_replacements(body_template, replacements)
+    cc_raw = _apply_replacements(cc_raw_template, replacements)
 
     # CCのリスト化
     cc_list = [addr.strip() for addr in cc_raw.split(',') if addr.strip()]
@@ -112,6 +140,7 @@ def send_adjustment_email(data, member, pdf_buffer):
         else:
             logger.info(f"Email sent successfully: {subject} to {recipient}")
         return sent_count
-    except Exception as e:
-        logger.error(f"Failed to send email: {e}")
+    except Exception:
+        # exc_info=True でスタックトレースをログに出力
+        logger.error("Failed to send email", exc_info=True)
         raise
