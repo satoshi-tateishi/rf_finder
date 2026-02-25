@@ -81,8 +81,8 @@ def _write_common_info(ws, data, member, current_date, pad_func):
 
     # 2. 現地使用者
     user = data.get('user') or {}
-    user_display = f'{user.get("name", "")}（{user.get("kana", "")}）'
-    ws[CELL_USER_NAME] = pad_func(user_display if user_display != '（）' else '')
+    user_display = f'{user.get("name", "") or "未設定"}（{user.get("kana", "") or ""}）'
+    ws[CELL_USER_NAME] = pad_func(user_display)
     ws[CELL_USER_TEL] = pad_func(user.get('tel', ''))
     ws[CELL_USER_EMAIL] = pad_func(user.get('email', ''))
 
@@ -96,24 +96,24 @@ def _write_common_info(ws, data, member, current_date, pad_func):
     ws[CELL_EVENT_COMMENT_LINE2] = pad_func(comment[55:110])
     ws[CELL_EVENT_COMMENT_LINE3] = pad_func(comment[110:165])
 
-    # 4. 使用マイク数
+    # 4. 使用マイク数 (ネストされた辞書への安全なアクセス)
     mc = data.get('mic_counts') or {}
-    ws[CELLS_MIC_COUNTS['analog_rm_10mw']] = mc.get('analog_rm', {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_53ch_rm_10mw']] = mc.get('analog_53ch', {}).get('rm_10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_em_10mw']] = mc.get('analog_em', {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_53ch_em_10mw']] = mc.get('analog_53ch', {}).get('em_10mw', '')
+    ws[CELLS_MIC_COUNTS['analog_rm_10mw']] = (mc.get('analog_rm') or {}).get('10mw', '')
+    ws[CELLS_MIC_COUNTS['analog_53ch_rm_10mw']] = (mc.get('analog_53ch') or {}).get('rm_10mw', '')
+    ws[CELLS_MIC_COUNTS['analog_em_10mw']] = (mc.get('analog_em') or {}).get('10mw', '')
+    ws[CELLS_MIC_COUNTS['analog_53ch_em_10mw']] = (mc.get('analog_53ch') or {}).get('em_10mw', '')
 
-    ws[CELLS_MIC_COUNTS['digital_rm_10mw']] = mc.get('digital_rm', {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_rm_20mw']] = mc.get('digital_rm', {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_rm_50mw']] = mc.get('digital_rm', {}).get('50mw', '')
+    ws[CELLS_MIC_COUNTS['digital_rm_10mw']] = (mc.get('digital_rm') or {}).get('10mw', '')
+    ws[CELLS_MIC_COUNTS['digital_rm_20mw']] = (mc.get('digital_rm') or {}).get('20mw', '')
+    ws[CELLS_MIC_COUNTS['digital_rm_50mw']] = (mc.get('digital_rm') or {}).get('50mw', '')
     
-    ws[CELLS_MIC_COUNTS['digital_53ch_10mw']] = mc.get('digital_53ch', {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_53ch_20mw']] = mc.get('digital_53ch', {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_53ch_50mw']] = mc.get('digital_53ch', {}).get('50mw', '')
+    ws[CELLS_MIC_COUNTS['digital_53ch_10mw']] = (mc.get('digital_53ch') or {}).get('10mw', '')
+    ws[CELLS_MIC_COUNTS['digital_53ch_20mw']] = (mc.get('digital_53ch') or {}).get('20mw', '')
+    ws[CELLS_MIC_COUNTS['digital_53ch_50mw']] = (mc.get('digital_53ch') or {}).get('50mw', '')
 
-    ws[CELLS_MIC_COUNTS['digital_12g_10mw']] = mc.get('digital_12g', {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_12g_20mw']] = mc.get('digital_12g', {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_12g_50mw']] = mc.get('digital_12g', {}).get('50mw', '')
+    ws[CELLS_MIC_COUNTS['digital_12g_10mw']] = (mc.get('digital_12g') or {}).get('10mw', '')
+    ws[CELLS_MIC_COUNTS['digital_12g_20mw']] = (mc.get('digital_12g') or {}).get('20mw', '')
+    ws[CELLS_MIC_COUNTS['digital_12g_50mw']] = (mc.get('digital_12g') or {}).get('50mw', '')
     
     ws[CELL_12G_LMH] = mc.get('12g_lmh', '')
 
@@ -134,14 +134,17 @@ def _write_facilities(ws, facilities_slice, pad_func):
         ws.cell(row=base_row, column=27).value = f.get('end_time', '')
         ws.cell(row=base_row + 2, column=10).value = pad_func(f.get('postal_code', ''))
         
-        address_display = f'{f.get("prefecture", "")}{f.get("address", "")}'
+        address_display = f'{f.get("prefecture", "") or ""}{f.get("address", "") or ""}'
         ws.cell(row=base_row + 2, column=18).value = pad_func(address_display)
         
         ws.cell(row=base_row + 4, column=12).value = pad_func(f.get('category', ''))
         ws.cell(row=base_row + 4, column=18).value = pad_func(f.get('name', ''))
         ws.cell(row=base_row + 6, column=15).value = pad_func(f.get('applied_area', ''))
         
-        channels = f.get('selectedChannels') or []
+        # チャンネルリストの型安全性を確保
+        channels = f.get('selectedChannels')
+        if not isinstance(channels, list):
+            channels = []
         ws.cell(row=base_row + 8, column=15).value = pad_func(format_channels(channels))
 
 
@@ -156,9 +159,8 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
     wb = openpyxl.load_workbook(template_path)
 
     # 施設データの型安全性を確保
-    facilities = data.get('facilities') or []
-    if not isinstance(facilities, list):
-        facilities = []
+    raw_facilities = data.get('facilities') or []
+    facilities = raw_facilities if isinstance(raw_facilities, list) else []
     
     num_facilities = len(facilities)
 
@@ -173,13 +175,15 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
     current_date = timezone.localtime().strftime('%Y/%m/%d')
 
     def pad(val):
-        if not val:
+        # 0 が消えないように None のみチェック
+        if val is None:
             return ''
-        return f' {val}' if for_pdf else str(val)
+        s = str(val)
+        return f' {s}' if for_pdf else s
 
     for sheet_idx, sheet_name in enumerate(target_sheets):
         if sheet_name not in wb.sheetnames:
-            continue
+            raise ValueError(f"Required sheet '{sheet_name}' not found in template.")
 
         ws = wb[sheet_name]
 
