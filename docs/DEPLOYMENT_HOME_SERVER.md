@@ -6,11 +6,10 @@ RF Finder (特ラ運用調整支援アプリ) を自宅サーバーの Docker �
 
 ```
 インターネット → ルーター(80, 443, 56834) → 自宅サーバー
-                                           ├─ Host Apache (SSL終端, リバースプロキシ)
+                                           ├─ Host Apache (SSL終端, リバースプロキシ, 静的ファイル配信)
                                            └─ Docker (RF Finder)
-                                               ├─ web (Django/Gunicorn): 8000
-                                               ├─ db (MySQL:8.0): 3306 (Host: 3309)
-                                               └─ apache (Static配信/Mellon): 80 (Host: 8085)
+                                               ├─ web (Django/Gunicorn): 8000 (Host: 8000)
+                                               └─ db (MySQL:8.0): 3306 (Host: 3309)
 ```
 
 **デプロイフロー**: `git push origin main` → GitHub Actions → SSH経由で本番サーバー更新
@@ -54,7 +53,7 @@ RF Finder は独自ドメイン `rff.shin-on1981.com` でアクセスします�
 
 | ドメイン | アプリ | ポート | 備考 |
 |-------------|--------|--------|------|
-| `rff.shin-on1981.com` | RF Finder | 8085 | 特定ラジオマイク運用調整支援 |
+| `rff.shin-on1981.com` | RF Finder | 8000 | 特定ラジオマイク運用調整支援 |
 
 **ルーター ポートフォワーディング**:
 - 80 (HTTP) -> サーバー:80
@@ -137,7 +136,7 @@ docker compose up -d
 # データベースマイグレーション
 docker compose exec web python manage.py migrate
 
-# 静的ファイルの集約
+# 静的ファイルの集約 (ホスト側の static/ に集約される)
 docker compose exec web python manage.py collectstatic --noinput
 
 # 管理者作成 (管理画面へのログイン用)
@@ -154,7 +153,7 @@ docker compose exec web python manage.py createsuperuser
 
 ## 6. Host Apache & SSL設定
 
-Host側のApacheをリバースプロキシとして設定し、SSLを終端します。
+Host側のApacheをリバースプロキシとして設定し、静的ファイルを配信しつつSSLを終端します。
 
 ### 1. SSL証明書の取得
 ```bash
@@ -181,10 +180,19 @@ sudo certbot certonly --apache -d rff.shin-on1981.com
     SSLCertificateKeyFile /etc/letsencrypt/live/rff.shin-on1981.com/privkey.pem
     Include /etc/letsencrypt/options-ssl-apache.conf
 
-    # DockerのApacheコンテナ(ポート8085)へ転送
+    # 静的ファイルの配信 (ホスト側のディレクトリを直接指定)
+    Alias /static/ /var/www/rf_finder/static/
+    <Directory "/var/www/rf_finder/static">
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    # 静的ファイル以外はDockerのDjangoコンテナ(ポート8000)へ転送
     ProxyPreserveHost On
-    ProxyPass / http://localhost:8085/
-    ProxyPassReverse / http://localhost:8085/
+    ProxyPass /static/ !
+    ProxyPass / http://localhost:8000/
+    ProxyPassReverse / http://localhost:8000/
 
     # プロトコル情報をDjangoに伝えるためのヘッダー
     RequestHeader set X-Forwarded-Proto "https"
@@ -205,7 +213,7 @@ sudo systemctl reload apache2
 
 ---
 
-## 6. 運用・トラブルシューティング
+## 7. 運用・トラブルシューティング
 
 ### ログの確認
 ```bash
@@ -224,7 +232,7 @@ docker compose exec web python manage.py collectstatic --noinput
 
 ---
 
-## 7. LINE WORKS SSO / OAuth 設定の注意
+## 8. LINE WORKS SSO / OAuth 設定の注意
 
 ドメインが `rff.shin-on1981.com` に変更されるため、LINE WORKS Developer Console の設定も更新が必要です。
 
