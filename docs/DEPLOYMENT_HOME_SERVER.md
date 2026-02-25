@@ -81,6 +81,25 @@ cat ~/.ssh/id_ed25519_deploy_rf.pub >> ~/.ssh/authorized_keys
 | `DEPLOY_KEY` | `~/.ssh/id_ed25519_deploy_rf` の内容 |
 | `DEPLOY_PATH` | /var/www/rf_finder |
 
+#### SSH接続でエラー（Permission denied）が出る場合
+`git clone` 時にエラーが出る場合は、以下の手順で鍵の有効化を確認してください。
+
+1. **GitHubへの登録確認**:
+   `cat ~/.ssh/id_ed25519_deploy_rf.pub` の内容が GitHubリポジトリの [Settings] > [Deploy keys] に正確に登録されているか確認。
+2. **SSHエージェントへの追加**:
+   ```bash
+   eval "$(ssh-agent -s)"
+   ssh-add ~/.ssh/id_ed25519_deploy_rf
+   ```
+3. **SSH設定の固定化 (推奨)**:
+   毎回 `ssh-add` するのを避けるため、`~/.ssh/config` に以下を記述します。
+   ```text
+   Host github.com
+     HostName github.com
+     User git
+     IdentityFile ~/.ssh/id_ed25519_deploy_rf
+   ```
+
 ---
 
 ## 4. 初回デプロイ (サーバー側での手動設定)
