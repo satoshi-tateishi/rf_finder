@@ -98,6 +98,13 @@ class Member(models.Model):
 
 
 class EmailTemplate(models.Model):
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        default='default',
+        verbose_name='テンプレート名',
+        help_text='識別用の名前（例: adjustment）。プログラムから参照されます。',
+    )
     to_address = models.EmailField(verbose_name='送信先アドレス')
     cc_address = models.CharField(
         max_length=255,
