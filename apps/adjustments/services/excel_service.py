@@ -197,7 +197,7 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
             ws.page_margins.right = PDF_MARGIN_RIGHT_CM * CM_TO_INCH
             ws.page_margins.header = PDF_MARGIN_HEADER_CM * CM_TO_INCH
             ws.page_margins.footer = PDF_MARGIN_FOOTER_CM * CM_TO_INCH
-            ws.print_area = 'A1:AJ80'
+            ws.print_area = 'A1:AH81'
 
         # 共通情報の書き込み
         _write_common_info(ws, data, member, current_date, pad)
