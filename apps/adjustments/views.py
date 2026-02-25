@@ -1,6 +1,6 @@
 import traceback
 
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
@@ -128,8 +128,12 @@ def preview_excel(request, data):
 
     log_action(user=request.user, action='EXCEL_EXPORT', description=f'Excel出力: {filename}', request=request)
 
-    response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    from django.utils.encoding import escape_uri_path
+    content = buffer.getvalue()
+    response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Length'] = len(content)
+    # 日本語ファイル名対策: RFC 5987形式
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{escape_uri_path(filename)}"
     return response
 
 
@@ -144,8 +148,16 @@ def preview_pdf(request, data):
 
         log_action(user=request.user, action='PDF_EXPORT', description=f'PDF出力: {filename}', request=request)
 
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        from django.utils.encoding import escape_uri_path
+        content = buffer.getvalue()
+        response = HttpResponse(content, content_type='application/pdf')
+        response['Content-Length'] = len(content)
+        
+        # クエリパラメータで強制ダウンロード指定があるか確認（フロントからは未対応だが拡張性のため）
+        disposition = request.GET.get('disposition', 'inline')
+        
+        # デフォルトはインラインだが、ファイル名も指定する
+        response['Content-Disposition'] = f"{disposition}; filename*=UTF-8''{escape_uri_path(filename)}"
         return response
     except Exception as e:
         return api_error(str(e), status=500)

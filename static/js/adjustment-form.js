@@ -359,9 +359,13 @@ async function downloadPDF() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
-        const blob = await Api.previewPDF(data);
-        const url = window.URL.createObjectURL(blob);
+        console.log('[Download] Requesting PDF...');
+        const blob = await Api.previewPDF(data, 'attachment');
+        console.log(`[Download] Received blob: type=${blob.type}, size=${blob.size}`);
         
+        if (blob.size < 1000) throw new Error('PDFの生成に失敗しました。');
+
+        const url = window.URL.createObjectURL(blob);
         const appTypeMap = { 'new': '新規', 'change': '変更', 'delete': '削除' };
         const appTypeJp = appTypeMap[data.app_type] || '新規';
         const eventName = data.event.name || '無題の催事';
@@ -371,9 +375,17 @@ async function downloadPDF() {
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
+        a.style.display = 'none';
         document.body.appendChild(a);
+        
         a.click();
-        a.remove();
+        
+        // 1秒待ってから後片付け
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 1000);
+        
         showToast('PDFをダウンロードしました', 'success');
     } catch (err) {
         handleValidationErrors(err);
@@ -387,13 +399,18 @@ async function downloadExcel() {
     const data = collectFormData();
     const btn = document.querySelector('button[onclick="downloadExcel()"]');
     const originalText = btn.innerHTML;
+    
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
+        console.log('[Download] Requesting Excel...');
         const blob = await Api.downloadExcel(data);
+        console.log(`[Download] Received blob: type=${blob.type}, size=${blob.size}`);
+
+        if (blob.size < 100) throw new Error('Excelの生成に失敗しました。');
+
         const url = window.URL.createObjectURL(blob);
-        
         const appTypeMap = { 'new': '新規', 'change': '変更', 'delete': '削除' };
         const appTypeJp = appTypeMap[data.app_type] || '新規';
         const eventName = data.event.name || '無題の催事';
@@ -403,9 +420,16 @@ async function downloadExcel() {
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
+        a.style.display = 'none';
         document.body.appendChild(a);
+        
         a.click();
-        a.remove();
+
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 1000);
+
         showToast('Excelをダウンロードしました', 'success');
     } catch (err) {
         handleValidationErrors(err);
@@ -644,7 +668,7 @@ async function loadAdjustment(id) {
         if (data.status === 'submitted') {
             const isChange = await showDecisionModal({
                 title: '送信済みデータの再利用',
-                message: '既に送信済みの申請データです。次に行う操作を選択してください。',
+                message: '既に送信済みの申請データです。次に行操作を選択してください。',
                 okText: '変更申請を作成',
                 cancelText: '削除申請を作成',
                 cancelColor: 'red',

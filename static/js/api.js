@@ -71,8 +71,8 @@ const Api = {
         return await this._handleBlobOrError(res);
     },
 
-    async previewPDF(data) {
-        const res = await fetch('/api/adjustments/preview-pdf/', {
+    async previewPDF(data, disposition = 'inline') {
+        const res = await fetch(`/api/adjustments/preview-pdf/?disposition=${disposition}`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
