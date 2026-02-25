@@ -1,5 +1,6 @@
 import io
 import os
+import textwrap
 
 import openpyxl
 from django.conf import settings
@@ -19,114 +20,112 @@ PDF_MARGIN_FOOTER_CM = 0.5
 # 単位変換用定数 (1cm = 0.393701インチ)
 CM_TO_INCH = 0.393701
 
-# Excel セル座標定数
-CELL_SUBMISSION_DATE = 'AD1'
-CELL_APP_TYPE = 'D4'
-CELL_MEMBER_ID_1 = 'M4'
-CELL_MEMBER_ID_2 = 'P4'
-CELL_MEMBER_NAME = 'W4'
-CELL_MEMBER_DEPT = 'M6'
-CELL_MEMBER_MANAGER = 'W6'
-CELL_MEMBER_PHONE = 'M8'
-CELL_MEMBER_EMAIL = 'W8'
 
-CELL_USER_NAME = 'O13'
-CELL_USER_TEL = 'L15'
-CELL_USER_EMAIL = 'W15'
+class Cells:
+    """Excel セル座標定数"""
+    SUBMISSION_DATE = 'AD1'
+    APP_TYPE = 'D4'
+    MEMBER_ID_1 = 'M4'
+    MEMBER_ID_2 = 'P4'
+    MEMBER_NAME = 'W4'
+    MEMBER_DEPT = 'M6'
+    MEMBER_MANAGER = 'W6'
+    MEMBER_PHONE = 'M8'
+    MEMBER_EMAIL = 'W8'
 
-CELL_EVENT_NAME = 'H18'
-CELL_EVENT_COMMENT_LINE1 = 'E20'
-CELL_EVENT_COMMENT_LINE2 = 'B21'
-CELL_EVENT_COMMENT_LINE3 = 'B22'
+    USER_NAME = 'O13'
+    USER_TEL = 'L15'
+    USER_EMAIL = 'W15'
 
-CELL_53CH_EXTRA = 'AF31'
-CELL_12G_LMH = 'AF27'
+    EVENT_NAME = 'H18'
+    EVENT_COMMENT_LINES = ['E20', 'B21', 'B22']
 
-# マイク数セル (Analog / Digital)
-CELLS_MIC_COUNTS = {
-    'analog_rm_10mw': 'K27',
-    'analog_53ch_rm_10mw': 'R27',
-    'analog_em_10mw': 'K28',
-    'analog_53ch_em_10mw': 'R28',
-    'digital_rm_10mw': 'K29',
-    'digital_rm_20mw': 'M29',
-    'digital_rm_50mw': 'O29',
-    'digital_53ch_10mw': 'R29',
-    'digital_53ch_20mw': 'U29',
-    'digital_53ch_50mw': 'W29',
-    'digital_12g_10mw': 'Z29',
-    'digital_12g_20mw': 'AB29',
-    'digital_12g_50mw': 'AD29',
-}
+    EXTRA_53CH = 'AF31'
+    LMH_12G = 'AF27'
+
+    # マイク数セル (Analog / Digital)
+    MIC_COUNTS = {
+        'analog_rm_10mw': 'K27',
+        'analog_53ch_rm_10mw': 'R27',
+        'analog_em_10mw': 'K28',
+        'analog_53ch_em_10mw': 'R28',
+        'digital_rm_10mw': 'K29',
+        'digital_rm_20mw': 'M29',
+        'digital_rm_50mw': 'O29',
+        'digital_53ch_10mw': 'R29',
+        'digital_53ch_20mw': 'U29',
+        'digital_53ch_50mw': 'W29',
+        'digital_12g_10mw': 'Z29',
+        'digital_12g_20mw': 'AB29',
+        'digital_12g_50mw': 'AD29',
+    }
 
 
 def _write_common_info(ws, data, member, current_date, pad_func):
     """共通情報（申請者、催事、マイク数など）をシートに書き込む"""
     
     # 0. 提出日
-    ws[CELL_SUBMISSION_DATE] = current_date
+    ws[Cells.SUBMISSION_DATE] = current_date
 
     # 1. 基本情報
     app_type = data.get('app_type', 'new')
-    ws[CELL_APP_TYPE] = APP_TYPE_MAP.get(app_type, '新規')
+    ws[Cells.APP_TYPE] = APP_TYPE_MAP.get(app_type, '新規')
 
     if member:
-        ws[CELL_MEMBER_ID_1] = member.member_id_1 or ''
-        ws[CELL_MEMBER_ID_2] = member.member_id_2 or ''
-        ws[CELL_MEMBER_NAME] = pad_func(member.name)
-        ws[CELL_MEMBER_DEPT] = pad_func(member.department)
-        ws[CELL_MEMBER_MANAGER] = pad_func(member.manager_name)
-        ws[CELL_MEMBER_PHONE] = pad_func(member.phone)
-        ws[CELL_MEMBER_EMAIL] = pad_func(member.email)
+        ws[Cells.MEMBER_ID_1] = member.member_id_1 or ''
+        ws[Cells.MEMBER_ID_2] = member.member_id_2 or ''
+        ws[Cells.MEMBER_NAME] = pad_func(member.name)
+        ws[Cells.MEMBER_DEPT] = pad_func(member.department)
+        ws[Cells.MEMBER_MANAGER] = pad_func(member.manager_name)
+        ws[Cells.MEMBER_PHONE] = pad_func(member.phone)
+        ws[Cells.MEMBER_EMAIL] = pad_func(member.email)
 
     # 2. 現地使用者
     user = data.get('user') or {}
     user_display = f'{user.get("name", "") or "未設定"}（{user.get("kana", "") or ""}）'
-    ws[CELL_USER_NAME] = pad_func(user_display)
-    ws[CELL_USER_TEL] = pad_func(user.get('tel', ''))
-    ws[CELL_USER_EMAIL] = pad_func(user.get('email', ''))
+    ws[Cells.USER_NAME] = pad_func(user_display)
+    ws[Cells.USER_TEL] = pad_func(user.get('tel', ''))
+    ws[Cells.USER_EMAIL] = pad_func(user.get('email', ''))
 
     # 3. 催事情報
     event = data.get('event') or {}
-    ws[CELL_EVENT_NAME] = pad_func(event.get('name', ''))
+    ws[Cells.EVENT_NAME] = pad_func(event.get('name', ''))
 
-    # 改行を半角スペースに置換して保持
-    comment = (event.get('comment') or '').replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-    ws[CELL_EVENT_COMMENT_LINE1] = pad_func(comment[0:55])
-    ws[CELL_EVENT_COMMENT_LINE2] = pad_func(comment[55:110])
-    ws[CELL_EVENT_COMMENT_LINE3] = pad_func(comment[110:165])
+    # コメントの折り返し処理 (textwrapを使用して堅牢化)
+    comment_raw = (event.get('comment') or '').replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+    comment_lines = textwrap.wrap(comment_raw, width=55)
+    for i, cell_addr in enumerate(Cells.EVENT_COMMENT_LINES):
+        val = comment_lines[i] if i < len(comment_lines) else ''
+        ws[cell_addr] = pad_func(val)
 
-    # 4. 使用マイク数 (ネストされた辞書への安全なアクセス)
+    # 4. 使用マイク数
     mc = data.get('mic_counts') or {}
-    ws[CELLS_MIC_COUNTS['analog_rm_10mw']] = (mc.get('analog_rm') or {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_53ch_rm_10mw']] = (mc.get('analog_53ch') or {}).get('rm_10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_em_10mw']] = (mc.get('analog_em') or {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['analog_53ch_em_10mw']] = (mc.get('analog_53ch') or {}).get('em_10mw', '')
+    ws[Cells.MIC_COUNTS['analog_rm_10mw']] = (mc.get('analog_rm') or {}).get('10mw', '')
+    ws[Cells.MIC_COUNTS['analog_53ch_rm_10mw']] = (mc.get('analog_53ch') or {}).get('rm_10mw', '')
+    ws[Cells.MIC_COUNTS['analog_em_10mw']] = (mc.get('analog_em') or {}).get('10mw', '')
+    ws[Cells.MIC_COUNTS['analog_53ch_em_10mw']] = (mc.get('analog_53ch') or {}).get('em_10mw', '')
 
-    ws[CELLS_MIC_COUNTS['digital_rm_10mw']] = (mc.get('digital_rm') or {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_rm_20mw']] = (mc.get('digital_rm') or {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_rm_50mw']] = (mc.get('digital_rm') or {}).get('50mw', '')
+    ws[Cells.MIC_COUNTS['digital_rm_10mw']] = (mc.get('digital_rm') or {}).get('10mw', '')
+    ws[Cells.MIC_COUNTS['digital_rm_20mw']] = (mc.get('digital_rm') or {}).get('20mw', '')
+    ws[Cells.MIC_COUNTS['digital_rm_50mw']] = (mc.get('digital_rm') or {}).get('50mw', '')
     
-    ws[CELLS_MIC_COUNTS['digital_53ch_10mw']] = (mc.get('digital_53ch') or {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_53ch_20mw']] = (mc.get('digital_53ch') or {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_53ch_50mw']] = (mc.get('digital_53ch') or {}).get('50mw', '')
+    ws[Cells.MIC_COUNTS['digital_53ch_10mw']] = (mc.get('digital_53ch') or {}).get('10mw', '')
+    ws[Cells.MIC_COUNTS['digital_53ch_20mw']] = (mc.get('digital_53ch') or {}).get('20mw', '')
+    ws[Cells.MIC_COUNTS['digital_53ch_50mw']] = (mc.get('digital_53ch') or {}).get('50mw', '')
 
-    ws[CELLS_MIC_COUNTS['digital_12g_10mw']] = (mc.get('digital_12g') or {}).get('10mw', '')
-    ws[CELLS_MIC_COUNTS['digital_12g_20mw']] = (mc.get('digital_12g') or {}).get('20mw', '')
-    ws[CELLS_MIC_COUNTS['digital_12g_50mw']] = (mc.get('digital_12g') or {}).get('50mw', '')
+    ws[Cells.MIC_COUNTS['digital_12g_10mw']] = (mc.get('digital_12g') or {}).get('10mw', '')
+    ws[Cells.MIC_COUNTS['digital_12g_20mw']] = (mc.get('digital_12g') or {}).get('20mw', '')
+    ws[Cells.MIC_COUNTS['digital_12g_50mw']] = (mc.get('digital_12g') or {}).get('50mw', '')
     
-    ws[CELL_12G_LMH] = mc.get('12g_lmh', '')
+    ws[Cells.LMH_12G] = mc.get('12g_lmh', '')
 
     if data.get('extra_53ch') == '○':
-        ws[CELL_53CH_EXTRA] = '○'
+        ws[Cells.EXTRA_53CH] = '○'
 
 
 def _write_facilities(ws, facilities_slice, pad_func):
     """施設リスト（最大4施設）をシートに書き込む"""
     for i, f in enumerate(facilities_slice):
-        if not isinstance(f, dict):
-            continue
-            
         base_row = 34 + (i * 12)
         ws.cell(row=base_row, column=5).value = f.get('start_date', '')
         ws.cell(row=base_row, column=14).value = f.get('end_date', '')
@@ -141,7 +140,6 @@ def _write_facilities(ws, facilities_slice, pad_func):
         ws.cell(row=base_row + 4, column=18).value = pad_func(f.get('name', ''))
         ws.cell(row=base_row + 6, column=15).value = pad_func(f.get('applied_area', ''))
         
-        # チャンネルリストの型安全性を確保
         channels = f.get('selectedChannels')
         if not isinstance(channels, list):
             channels = []
@@ -156,11 +154,12 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
     if not os.path.exists(template_path):
         raise FileNotFoundError(f'Template not found at {template_path}')
 
-    wb = openpyxl.load_workbook(template_path)
+    # テンプレート読み込み (計算済み値を優先的に扱う)
+    wb = openpyxl.load_workbook(template_path, data_only=True)
 
-    # 施設データの型安全性を確保
+    # 施設データの型安全性とフィルタリング
     raw_facilities = data.get('facilities') or []
-    facilities = raw_facilities if isinstance(raw_facilities, list) else []
+    facilities = [f for f in raw_facilities if isinstance(f, dict)]
     
     num_facilities = len(facilities)
 
@@ -175,11 +174,14 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
     current_date = timezone.localtime().strftime('%Y/%m/%d')
 
     def pad(val):
-        # 0 が消えないように None のみチェック
+        """PDF変換時のレイアウト崩れ防止用パディング"""
         if val is None:
             return ''
         s = str(val)
-        return f' {s}' if for_pdf else s
+        # すでにスペースがある場合や数値セルへの考慮を入れた安全なパディング
+        if for_pdf and s and not s.startswith(' '):
+            return f' {s}'
+        return s
 
     for sheet_idx, sheet_name in enumerate(target_sheets):
         if sheet_name not in wb.sheetnames:
@@ -195,13 +197,12 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
             ws.page_margins.right = PDF_MARGIN_RIGHT_CM * CM_TO_INCH
             ws.page_margins.header = PDF_MARGIN_HEADER_CM * CM_TO_INCH
             ws.page_margins.footer = PDF_MARGIN_FOOTER_CM * CM_TO_INCH
-            # 印刷範囲を明示的に指定して変換を安定させる
             ws.print_area = 'A1:AJ80'
 
         # 共通情報の書き込み
         _write_common_info(ws, data, member, current_date, pad)
 
-        # 施設情報の書き込み
+        # 施設情報の書き込み (シート毎に4つずつ)
         start_idx = sheet_idx * 4
         sheet_facilities = facilities[start_idx : start_idx + 4]
         _write_facilities(ws, sheet_facilities, pad)
