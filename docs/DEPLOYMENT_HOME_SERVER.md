@@ -215,6 +215,21 @@ sudo systemctl reload apache2
 
 ## 7. 運用・トラブルシューティング
 
+### 起動・停止・削除
+```bash
+# 起動 (バックグラウンド)
+docker compose -f docker-compose.prod.yml up -d
+
+# 停止のみ (コンテナは残る)
+docker compose -f docker-compose.prod.yml stop
+
+# 停止と削除
+docker compose -f docker-compose.prod.yml down
+
+# 停止・削除に加え、データ(ボリューム)も完全にリセットする場合 ※注意
+docker compose -f docker-compose.prod.yml down -v
+```
+
 ### ログの確認
 ```bash
 docker compose -f docker-compose.prod.yml logs -f web
@@ -224,6 +239,11 @@ docker compose -f docker-compose.prod.yml logs -f web
 CSSやJSを変更した後は、コンテナ内で `collectstatic` を実行する必要があります.
 ```bash
 docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+```
+
+### DBマイグレーション
+```bash
+docker compose -f docker-compose.prod.yml exec web python manage.py migrate
 ```
 
 ### DBバックアップ
