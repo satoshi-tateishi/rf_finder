@@ -413,7 +413,7 @@ def restore_db(request):
             return JsonResponse({'status': 'error', 'message': 'Path is required'}, status=400)
 
         service = DropboxService()
-        result = service.restore_db_from_backup(remote_path)
+        result = service.restore_db_from_backup(remote_path, confirm=True)
         return JsonResponse({'status': 'success', 'data': result})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

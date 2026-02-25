@@ -4,6 +4,7 @@ import gzip
 import shutil
 import logging
 import tempfile
+import fcntl
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone
@@ -33,8 +34,8 @@ class DropboxService:
     def __init__(self):
         self.app_key = getattr(settings, 'DROPBOX_APP_KEY', '')
         self.app_secret = getattr(settings, 'DROPBOX_APP_SECRET', '')
-        if not self.app_key or self.app_secret == '':
-            logger.warning('Dropbox API keys are not configured properly.')
+        if not self.app_key or not self.app_secret:
+            logger.warning('Dropbox APIキーが正しく設定されていません。')
 
     class DictWrapper(object):
         def __init__(self, data):
@@ -119,7 +120,7 @@ class DropboxService:
                 raise e
 
     def upload_file(self, local_path, remote_path):
-        """ファイルをDropboxにアップロードする (大容量ファイル対応)"""
+        """ファイルをDropboxにアップロードする (チャンクアップロード統一)"""
         client = self.get_client()
         file_size = os.path.getsize(local_path)
         
@@ -127,17 +128,17 @@ class DropboxService:
         remote_dir = os.path.dirname(remote_path)
         self.ensure_folder_exists(client, remote_dir)
 
-        # 150MB (Dropboxの一括アップロード制限) を超える場合はチャンクアップロード
-        CHUNK_SIZE = 10 * 1024 * 1024  # 10MB 単位
-        UPLOAD_THRESHOLD = 140 * 1024 * 1024  # 140MB 安全策
+        # メモリ使用量を抑えるため、サイズに関わらずチャンクアップロードを使用
+        CHUNK_SIZE = 4 * 1024 * 1024  # 4MB 単位 (Dropbox推奨の最小単位に近い値)
 
         with open(local_path, 'rb') as f:
             try:
-                if file_size <= UPLOAD_THRESHOLD:
+                if file_size <= CHUNK_SIZE:
+                    # 小さいファイルは一括でアップロード
                     client.files_upload(f.read(), remote_path, mode=dropbox.files.WriteMode.overwrite)
                 else:
-                    # チャンクアップロード開始
-                    logger.info(f'大容量ファイルのアップロードを開始します: {local_path} ({file_size} バイト)')
+                    # チャンクアップロード
+                    logger.info(f'アップロードを開始します: {local_path} ({file_size} バイト)')
                     upload_session_start_result = client.files_upload_session_start(f.read(CHUNK_SIZE))
                     cursor = dropbox.files.UploadSessionCursor(
                         session_id=upload_session_start_result.session_id,
@@ -152,7 +153,7 @@ class DropboxService:
                             client.files_upload_session_append_v2(f.read(CHUNK_SIZE), cursor)
                             cursor.offset = f.tell()
                 
-                logger.info(f'Dropboxにファイルをアップロードしました: {local_path} -> {remote_path} ({file_size} バイト)')
+                logger.info(f'Dropboxにファイルをアップロードしました: {remote_path} ({file_size} バイト)')
                 return True
             except ApiError as e:
                 logger.error(f'アップロード中にDropbox APIエラーが発生しました: {e}')
@@ -165,106 +166,120 @@ class DropboxService:
         """MySQLのバックアップを作成し、Dropboxにアップロードする"""
         from apps.accounts.utils import log_action
 
-        # データベース設定の取得 (DATABASES['default'])
-        db_config = settings.DATABASES['default']
-        db_name = db_config['NAME']
-        db_user = db_config['USER']
-        db_pass = db_config['PASSWORD']
-        db_host = db_config['HOST']
-        db_port = db_config.get('PORT', '3306')
-
-        # 日本時間 (Asia/Tokyo) に変換
-        now = timezone.localtime(timezone.now())
-        timestamp = now.strftime('%Y%m%d_%H%M%S')
-
-        # 一時ディレクトリを使い、一時的な my.cnf を作成してパスワード露出を避ける
+        # 二重起動防止のロックファイル
+        lock_file_path = os.path.join(tempfile.gettempdir(), 'rf_finder_backup.lock')
+        lock_file = open(lock_file_path, 'w')
         try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                # 一時 my.cnf
-                cnf_path = os.path.join(tmpdir, 'my.cnf')
-                with open(cnf_path, 'w') as cnf:
-                    cnf.write('[client]\n')
-                    if db_user:
-                        cnf.write(f'user={db_user}\n')
-                    if db_pass:
-                        cnf.write(f'password={db_pass}\n')
-                    if db_host:
-                        cnf.write(f'host={db_host}\n')
-                    if db_port:
-                        cnf.write(f'port={db_port}\n')
-                
-                # パーミッションを 600 (所有者のみ読み書き可能) に設定
-                os.chmod(cnf_path, 0o600)
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            logger.warning('バックアップ処理が既に実行中のため、スキップします。')
+            return {'success': False, 'message': 'Already running'}
 
-                # 一時 SQL ファイル
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.sql') as sqlf:
-                    sql_file = sqlf.name
-                gz_file = f'{sql_file}.gz'
+        try:
+            # データベース設定の取得 (DATABASES['default'])
+            db_config = settings.DATABASES['default']
+            db_name = db_config['NAME']
+            db_user = db_config['USER']
+            db_pass = db_config['PASSWORD']
+            db_host = db_config['HOST']
+            db_port = db_config.get('PORT', '3306')
 
-                # mysqldump 実行（--defaults-file を使用して認証情報を渡す）
-                cmd = [
-                    'mysqldump',
-                    f'--defaults-file={cnf_path}',
-                    '--single-transaction',
-                    '--quick',
-                    '--routines',
-                    '--events',
-                    '--triggers',
-                    '--skip-ssl',
-                    db_name
-                ]
-                
-                try:
-                    with open(sql_file, 'w') as f:
-                        subprocess.run(cmd, stdout=f, check=True, stderr=subprocess.PIPE)
-                except subprocess.CalledProcessError as e:
-                    # stderr から機密情報をマスクする (my.cnf を使っているので基本は大丈夫だが念のため)
-                    err_msg = e.stderr.decode('utf-8', errors='ignore')
-                    if db_pass:
-                        err_msg = err_msg.replace(db_pass, '********')
-                    logger.error(f'mysqldump実行エラー: {err_msg}')
-                    raise DropboxBackupError(f'データベースのダンプ作成に失敗しました: {err_msg}')
+            # 日本時間 (Asia/Tokyo) に変換
+            now = timezone.localtime(timezone.now())
+            timestamp = now.strftime('%Y%m%d_%H%M%S')
 
-                # gzip 圧縮
-                with open(sql_file, 'rb') as f_in:
-                    with gzip.open(gz_file, 'wb') as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-
-                # Dropboxへアップロード
-                remote_dir = now.strftime('/backups/%Y/%m/%d')
-                remote_path = f'{remote_dir}/db_backup_{timestamp}.sql.gz'
-
-                self.upload_file(gz_file, remote_path)
-
-                # 監査ログ記録
-                log_action(action='DB_BACKUP', description=f'データベースバックアップ成功: {remote_path}')
-
-                # 古いバックアップの削除 (保持ポリシー: 最新5件, 過去3ヶ月の月次アーカイブを保持)
-                try:
-                    self.clean_old_backups()
-                except Exception as ce:
-                    logger.warning(f'古いバックアップの削除中にエラーが発生しました (バックアップ自体は成功しています): {ce}')
-
-                return {'success': True, 'path': remote_path, 'timestamp': timestamp}
-
-        except Exception as e:
-            # エラーメッセージから機密情報をマスク
-            error_str = str(e)
-            if db_pass:
-                error_str = error_str.replace(db_pass, '********')
-            
-            logger.error(f'データベースバックアップ失敗: {error_str}')
-            log_action(action='DB_BACKUP_FAILED', description=f'データベースバックアップ失敗: {error_str}')
-            raise DropboxBackupError(f'データベースバックアップ失敗: {error_str}')
-        finally:
-            # 一時ファイルの削除（存在チェックして削除）
+            # 一時ディレクトリを使い、一時的な my.cnf を作成してパスワード露出を避ける
             try:
-                if 'sql_file' in locals() and os.path.exists(sql_file):
-                    os.remove(sql_file)
-                if 'gz_file' in locals() and os.path.exists(gz_file):
-                    os.remove(gz_file)
-            except Exception:
-                pass
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    # 一時 my.cnf
+                    cnf_path = os.path.join(tmpdir, 'my.cnf')
+                    with open(cnf_path, 'w') as cnf:
+                        cnf.write('[client]\n')
+                        if db_user:
+                            cnf.write(f'user={db_user}\n')
+                        if db_pass:
+                            cnf.write(f'password={db_pass}\n')
+                        if db_host:
+                            cnf.write(f'host={db_host}\n')
+                        if db_port:
+                            cnf.write(f'port={db_port}\n')
+                    
+                    # パーミッションを 600 (所有者のみ読み書き可能) に設定
+                    os.chmod(cnf_path, 0o600)
+
+                    # 一時 SQL ファイル
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.sql') as sqlf:
+                        sql_file = sqlf.name
+                    gz_file = f'{sql_file}.gz'
+
+                    # mysqldump 実行（--defaults-file を使用して認証情報を渡す）
+                    # 注意: --skip-ssl はDockerコンテナ間通信の証明書エラー回避用
+                    cmd = [
+                        'mysqldump',
+                        f'--defaults-file={cnf_path}',
+                        '--single-transaction',
+                        '--quick',
+                        '--routines',
+                        '--events',
+                        '--triggers',
+                        '--skip-ssl',
+                        db_name
+                    ]
+                    
+                    try:
+                        with open(sql_file, 'w') as f:
+                            subprocess.run(cmd, stdout=f, check=True, stderr=subprocess.PIPE)
+                    except subprocess.CalledProcessError as e:
+                        # stderr から機密情報をマスクする
+                        err_msg = e.stderr.decode('utf-8', errors='ignore')
+                        if db_pass:
+                            err_msg = err_msg.replace(db_pass, '********')
+                        logger.error(f'mysqldump実行エラー: {err_msg}')
+                        raise DropboxBackupError(f'データベースのダンプ作成に失敗しました: {err_msg}')
+
+                    # gzip 圧縮
+                    with open(sql_file, 'rb') as f_in:
+                        with gzip.open(gz_file, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+
+                    # Dropboxへアップロード
+                    remote_dir = now.strftime('/backups/%Y/%m/%d')
+                    remote_path = f'{remote_dir}/db_backup_{timestamp}.sql.gz'
+
+                    self.upload_file(gz_file, remote_path)
+
+                    # 監査ログ記録
+                    log_action(action='DB_BACKUP', description=f'データベースバックアップ成功: {remote_path}')
+
+                    # 古いバックアップの削除 (保持ポリシー: 最新5件, 過去3ヶ月の月次アーカイブを保持)
+                    try:
+                        self.clean_old_backups()
+                    except Exception as ce:
+                        logger.warning(f'古いバックアップの削除中にエラーが発生しました (バックアップ自体は成功しています): {ce}')
+
+                    return {'success': True, 'path': remote_path, 'timestamp': timestamp}
+
+            except Exception as e:
+                # エラーメッセージから機密情報をマスク
+                error_str = str(e)
+                if db_pass:
+                    error_str = error_str.replace(db_pass, '********')
+                
+                logger.error(f'データベースバックアップ失敗: {error_str}')
+                log_action(action='DB_BACKUP_FAILED', description=f'データベースバックアップ失敗: {error_str}')
+                raise DropboxBackupError(f'データベースバックアップ失敗: {error_str}')
+            finally:
+                # 一時ファイルの削除
+                try:
+                    if 'sql_file' in locals() and os.path.exists(sql_file):
+                        os.remove(sql_file)
+                    if 'gz_file' in locals() and os.path.exists(gz_file):
+                        os.remove(gz_file)
+                except Exception:
+                    pass
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
 
     def list_backups(self, limit=30):
         """Dropbox上のバックアップファイル一覧を取得する"""
@@ -272,8 +287,7 @@ class DropboxService:
         backups = []
         
         try:
-            # 再帰的に検索するか、特定のディレクトリ構造を辿る
-            # ここでは /backups 以下の .sql.gz ファイルを探す
+            # /backups 以下の .sql.gz ファイルを探す
             result = client.files_search_v2(
                 query='.sql.gz',
                 options=dropbox.files.SearchOptions(
@@ -286,9 +300,12 @@ class DropboxService:
             for match in result.matches:
                 metadata = match.metadata.get_metadata()
                 if isinstance(metadata, dropbox.files.FileMetadata):
-                    # server_modified は UTC なので日本時間に変換
-                    dt_utc = metadata.server_modified.replace(tzinfo=timezone.utc)
-                    dt_local = timezone.localtime(dt_utc)
+                    # server_modified が naive の場合は UTC として aware に変換
+                    server_modified = metadata.server_modified
+                    if timezone.is_naive(server_modified):
+                        server_modified = timezone.make_aware(server_modified, timezone.utc)
+                    
+                    dt_local = timezone.localtime(server_modified)
                     backups.append({
                         'name': metadata.name,
                         'path': metadata.path_display,
@@ -308,15 +325,26 @@ class DropboxService:
         client = self.get_client()
         try:
             client.files_download_to_file(local_path, remote_path)
-            logger.info(f'Dropboxからファイルをダウンロードしました: {remote_path} -> {local_path}')
+            logger.info(f'Dropboxからファイルをダウンロードしました: {remote_path}')
             return True
         except ApiError as e:
             logger.error(f'ダウンロード中にDropbox APIエラーが発生しました: {e}')
             raise DropboxBackupError(f'ファイルのダウンロードに失敗しました: {str(e)}')
 
-    def restore_db_from_backup(self, remote_path):
+    def restore_db_from_backup(self, remote_path, confirm=False):
         """指定されたバックアップファイルからデータベースを復元する"""
+        if not confirm:
+            raise DropboxBackupError('復元を実行するには明示的な確認が必要です。')
+
         from apps.accounts.utils import log_action
+
+        # 二重起動防止
+        lock_file_path = os.path.join(tempfile.gettempdir(), 'rf_finder_restore.lock')
+        lock_file = open(lock_file_path, 'w')
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise DropboxBackupError('復元処理またはバックアップ処理が既に実行中です。')
 
         # データベース設定の取得
         db_config = settings.DATABASES['default']
@@ -349,8 +377,7 @@ class DropboxService:
                     if db_port: cnf.write(f'port={db_port}\n')
                 os.chmod(cnf_path, 0o600)
 
-                # 4. mysql コマンドでインポート
-                # 注意: 既存のデータは上書き（削除して作成）される
+                # 4. mysql コマンドでインポート (バイナリモードで読み込み)
                 cmd = [
                     'mysql',
                     f'--defaults-file={cnf_path}',
@@ -360,7 +387,7 @@ class DropboxService:
                 
                 logger.info(f'データベースのリストアを実行しています: {db_name}')
                 try:
-                    with open(sql_file, 'r') as f:
+                    with open(sql_file, 'rb') as f:
                         subprocess.run(cmd, stdin=f, check=True, stderr=subprocess.PIPE)
                 except subprocess.CalledProcessError as e:
                     err_msg = e.stderr.decode('utf-8', errors='ignore')
@@ -382,6 +409,9 @@ class DropboxService:
             logger.error(f'復元処理に失敗しました: {error_str}')
             log_action(action='DB_RESTORE_FAILED', description=f'データベース復元失敗: {error_str}')
             raise DropboxBackupError(f'復元処理に失敗しました: {error_str}')
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
 
     def clean_old_backups(self, keep_latest=5, keep_monthly_months=3):
         """保持ポリシーに基づき、古いバックアップを削除する"""
@@ -399,9 +429,12 @@ class DropboxService:
                 for entry in entries:
                     if isinstance(entry, dropbox.files.FileMetadata) and entry.name.endswith('.sql.gz'):
                         try:
-                            # ファイル名から日時を抽出 (db_backup_20260225_022737.sql.gz)
+                            # ファイル名から日時を抽出
                             date_str = entry.name.replace('db_backup_', '').replace('.sql.gz', '')
-                            dt = datetime.strptime(date_str, '%Y%m%d_%H%M%S')
+                            # naive datetime としてパースした後、timezone-aware (JST) に変換
+                            naive_dt = datetime.strptime(date_str, '%Y%m%d_%H%M%S')
+                            dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+                            
                             files.append({
                                 'path': entry.path_lower,
                                 'name': entry.name,
@@ -436,7 +469,6 @@ class DropboxService:
             
             for file in files:
                 m_key = file['month_key']
-                # その月のバックアップのうち、既にリストされている中で最も新しいものを採用（ソート済みなので最初に出会ったもの）
                 if m_key not in monthly_archives:
                     monthly_archives[m_key] = file
             
@@ -466,7 +498,6 @@ class DropboxService:
             return delete_count
 
         except ApiError as e:
-            # バックアップフォルダ自体が存在しない場合などは無視
             if e.error.is_path() and e.error.get_path().is_not_found():
                 logger.info('バックアップフォルダが存在しないため、削除処理をスキップします。')
                 return 0
