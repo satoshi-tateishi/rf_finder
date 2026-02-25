@@ -482,10 +482,33 @@
                     <option value="PDF_EXPORT">PDF_EXPORT</option>
                     <option value="EXCEL_EXPORT">EXCEL_EXPORT</option>
                     <option value="WSM_EXPORT">WSM_EXPORT</option>
+                    <option value="DB_BACKUP">DB_BACKUP</option>
+                    <option value="DB_RESTORE">DB_RESTORE</option>
                 </select>
                 <button onclick="refreshAuditLogs()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">
                     表示更新
                 </button>
+            </div>
+
+            <!-- Backup Management Section (Admin Only) -->
+            <div id="backup-manager-section" class="hidden p-3 bg-blue-50 border-b">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-blue-700">Dropbox バックアップ管理</span>
+                    <div class="flex gap-2">
+                        <button id="manual-backup-btn" onclick="handleManualBackup()" class="bg-white text-blue-600 border border-blue-600 px-3 py-1 rounded text-[10px] font-bold hover:bg-blue-50 transition-colors">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> 手動作成
+                        </button>
+                        <button onclick="toggleBackupList()" class="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-blue-700 transition-colors">
+                            <i class="fa-solid fa-list-ul"></i> 履歴・復元
+                        </button>
+                    </div>
+                </div>
+                <!-- Backup List Container (Hidden by default) -->
+                <div id="backup-list-container" class="hidden mt-2 bg-white rounded-lg border border-blue-100 shadow-inner max-h-48 overflow-y-auto">
+                    <div id="backup-list" class="p-1 space-y-1">
+                        <!-- Backup items dynamic -->
+                    </div>
+                </div>
             </div>
 
             <div id="audit-log-list" class="overflow-y-auto p-4 space-y-3">

@@ -16,4 +16,6 @@ urlpatterns = [
     path('dropbox/login/', views.dropbox_login, name='dropbox_login'),
     path('dropbox/callback/', views.dropbox_callback, name='dropbox_callback'),
     path('dropbox/backup/', views.run_db_backup, name='run_db_backup'),
+    path('dropbox/backups/', views.list_backups, name='list_backups'),
+    path('dropbox/restore/', views.restore_db, name='restore_db'),
 ]

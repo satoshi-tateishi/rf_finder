@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
+    default-mysql-client \
     build-essential \
     pkg-config \
     fonts-noto-cjk \

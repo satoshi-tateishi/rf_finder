@@ -2,6 +2,21 @@
  * API communication module
  */
 const Api = {
+    _getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    },
+
     async _handleResponse(res) {
         const json = await res.json();
         if (json.status === 'success') {
@@ -47,7 +62,10 @@ const Api = {
     async downloadExcel(data) {
         const res = await fetch('/api/adjustments/preview-excel/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
             body: JSON.stringify(data)
         });
         return await this._handleBlobOrError(res);
@@ -56,7 +74,10 @@ const Api = {
     async previewPDF(data) {
         const res = await fetch('/api/adjustments/preview-pdf/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
             body: JSON.stringify(data)
         });
         return await this._handleBlobOrError(res);
@@ -65,7 +86,10 @@ const Api = {
     async sendEmail(data) {
         const res = await fetch('/api/adjustments/send-email/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
             body: JSON.stringify(data)
         });
         return await this._handleResponse(res);
@@ -74,7 +98,10 @@ const Api = {
     async exportWSM(facilityId, selectedChannels) {
         const res = await fetch('/api/adjustments/export-wsm/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
             body: JSON.stringify({
                 facility_id: facilityId,
                 selected_channels: selectedChannels
@@ -87,7 +114,10 @@ const Api = {
         console.log('[Api] saveAdjustment calling POST /api/adjustments/save/');
         const res = await fetch('/api/adjustments/save/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
             body: JSON.stringify(data)
         });
         return await this._handleResponse(res);
@@ -144,5 +174,28 @@ const Api = {
             i++;
         }
         return result.join(", ");
+    },
+
+    // Dropbox Backup & Restore
+    async runBackup() {
+        const res = await fetch('/auth/dropbox/backup/');
+        return await this._handleResponse(res);
+    },
+
+    async listBackups() {
+        const res = await fetch('/auth/dropbox/backups/');
+        return await this._handleResponse(res);
+    },
+
+    async restoreBackup(path) {
+        const res = await fetch('/auth/dropbox/restore/', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this._getCookie('csrftoken')
+            },
+            body: JSON.stringify({ path })
+        });
+        return await this._handleResponse(res);
     }
 };

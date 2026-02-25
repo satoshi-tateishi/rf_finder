@@ -160,7 +160,7 @@ def log_user_login(sender, request, user, **kwargs):
 class DropboxToken(models.Model):
     """Dropbox APIのOAuth2トークン情報を保持するモデル"""
 
-    service_name = models.CharField(max_length=50, default='backup', verbose_name='サービス名')
+    service_name = models.CharField(max_length=50, default='backup', unique=True, verbose_name='サービス名')
     access_token = models.TextField(verbose_name='アクセストークン')
     refresh_token = models.TextField(null=True, blank=True, verbose_name='リフレッシュトークン')
     token_type = models.CharField(max_length=20, default='Bearer')

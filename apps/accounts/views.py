@@ -380,3 +380,40 @@ def run_db_backup(request):
         return JsonResponse({'status': 'success', 'data': result})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+def list_backups(request):
+    """Dropbox上のバックアップ一覧を取得する"""
+    if request.user.profile.role != 'admin':
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+    service = DropboxService()
+    try:
+        backups = service.list_backups()
+        return JsonResponse({'status': 'success', 'data': backups})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+def restore_db(request):
+    """指定されたバックアップからデータベースを復元する"""
+    if request.user.profile.role != 'admin':
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'POST request required'}, status=405)
+
+    import json
+    try:
+        data = json.loads(request.body)
+        remote_path = data.get('path')
+        if not remote_path:
+            return JsonResponse({'status': 'error', 'message': 'Path is required'}, status=400)
+
+        service = DropboxService()
+        result = service.restore_db_from_backup(remote_path)
+        return JsonResponse({'status': 'success', 'data': result})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

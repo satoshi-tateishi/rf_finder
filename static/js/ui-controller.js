@@ -15,12 +15,167 @@ function openAuditLogModal() {
     if (modal) {
         modal.classList.remove('hidden');
         refreshAuditLogs();
+        // 管理者ならバックアップ管理セクションを表示
+        const backupSection = document.getElementById('backup-manager-section');
+        if (backupSection) {
+            if (window.currentUser && window.currentUser.role === 'admin') {
+                backupSection.classList.remove('hidden');
+            } else {
+                backupSection.classList.add('hidden');
+            }
+        }
     }
 }
 
 function closeAuditLogModal() {
     const modal = document.getElementById('audit-log-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        // バックアップ管理が表示されていたら隠す
+        const list = document.getElementById('backup-list-container');
+        if (list) list.classList.add('hidden');
+    }
+}
+
+/**
+ * Backup Manager Functions
+ */
+async function toggleBackupList() {
+    const container = document.getElementById('backup-list-container');
+    if (!container) return;
+
+    if (!container.classList.contains('hidden')) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    const list = document.getElementById('backup-list');
+    list.innerHTML = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin text-gray-300"></i> 一覧を取得中...</div>';
+
+    try {
+        const data = await Api.listBackups();
+        renderBackupList(data);
+    } catch (err) {
+        console.error(err);
+        showToast('一覧の取得中にエラーが発生しました: ' + err.message, 'error');
+    }
+}
+
+function renderBackupList(backups) {
+    const list = document.getElementById('backup-list');
+    if (!list) return;
+
+    if (!backups || backups.length === 0) {
+        list.innerHTML = '<div class="text-center py-5 text-gray-400 text-xs">バックアップが見つかりません</div>';
+        return;
+    }
+
+    list.innerHTML = '';
+    backups.forEach(backup => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 border-b border-gray-100 last:border-0 hover:bg-gray-50';
+        
+        const sizeMb = (backup.size / (1024 * 1024)).toFixed(2);
+        const dateDisplay = backup.server_modified;
+
+        div.innerHTML = `
+            <div class="flex-1 min-w-0">
+                <div class="text-[11px] font-bold text-gray-700 truncate">${backup.name}</div>
+                <div class="text-[9px] text-gray-400">${dateDisplay} (${sizeMb} MB)</div>
+            </div>
+            <button onclick="confirmRestore('${backup.path}', '${backup.name}')" class="ml-2 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold transition-colors">
+                復元
+            </button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+async function handleManualBackup() {
+    const btn = document.getElementById('manual-backup-btn');
+    const originalContent = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 実行中...';
+    
+    try {
+        await Api.runBackup();
+        showToast('バックアップが完了しました', 'success');
+        // リストが表示中なら更新
+        const container = document.getElementById('backup-list-container');
+        if (container && !container.classList.contains('hidden')) {
+            const backupsData = await Api.listBackups();
+            renderBackupList(backupsData);
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('バックアップ実行中にエラーが発生しました: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+function confirmRestore(path, name) {
+    showDecisionModal(
+        'データベースの復元',
+        `バックアップ「${name}」からデータを復元しますか？<br><br><span class="text-red-600 font-bold">警告：現在のすべてのデータが上書きされ、元に戻せません。</span>`,
+        async () => {
+            showToast('復元処理を開始しました。ブラウザを閉じないでください...', 'info', 10000);
+            try {
+                await Api.restoreBackup(path);
+                showToast('復元が正常に完了しました。画面を再読み込みします。', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } catch (err) {
+                console.error(err);
+                showToast('復元の実行に失敗しました: ' + err.message, 'error');
+            }
+        },
+        'fa-triangle-exclamation',
+        'bg-red-50 text-red-600'
+    );
+}
+
+/**
+ * Custom Decision Modal (Confirm)
+ */
+function showDecisionModal(title, message, onOk, iconClass = 'fa-circle-question', iconBgClass = 'bg-blue-50 text-blue-600') {
+    const modal = document.getElementById('decision-modal');
+    const titleEl = document.getElementById('decision-title');
+    const messageEl = document.getElementById('decision-message');
+    const iconEl = document.getElementById('decision-fa-icon');
+    const iconContainer = document.getElementById('decision-icon');
+    const okBtn = document.getElementById('decision-ok-btn');
+    const cancelBtn = document.getElementById('decision-cancel-btn');
+
+    if (!modal) return;
+
+    titleEl.innerText = title;
+    messageEl.innerHTML = message;
+    iconEl.className = `fa-solid ${iconClass} fa-2xl`;
+    iconContainer.className = `w-16 h-16 ${iconBgClass} rounded-full flex items-center justify-center mx-auto mb-4`;
+
+    modal.classList.remove('hidden');
+
+    const handleOk = () => {
+        modal.classList.add('hidden');
+        if (onOk) onOk();
+        cleanup();
+    };
+
+    const handleCancel = () => {
+        modal.classList.add('hidden');
+        cleanup();
+    };
+
+    const cleanup = () => {
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+    };
+
+    okBtn.addEventListener('click', handleOk);
+    cancelBtn.addEventListener('click', handleCancel);
 }
 
 async function refreshAuditLogs() {
