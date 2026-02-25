@@ -149,11 +149,28 @@ LINE_WORKS_CLIENT_ID = env('LINE_WORKS_CLIENT_ID', default='')
 LINE_WORKS_CLIENT_SECRET = env('LINE_WORKS_CLIENT_SECRET', default='')
 LINE_WORKS_SERVICE_ACCOUNT = env('LINE_WORKS_SERVICE_ACCOUNT', default='')
 LINE_WORKS_PRIVATE_KEY_PATH = env('LINE_WORKS_PRIVATE_KEY_PATH', default='')
-if LINE_WORKS_PRIVATE_KEY_PATH and os.path.exists(LINE_WORKS_PRIVATE_KEY_PATH):
-    with open(LINE_WORKS_PRIVATE_KEY_PATH, 'r') as f:
-        LINE_WORKS_PRIVATE_KEY = f.read()
+
+# Resolve relative path to absolute path using BASE_DIR
+if LINE_WORKS_PRIVATE_KEY_PATH:
+    if not os.path.isabs(LINE_WORKS_PRIVATE_KEY_PATH):
+        full_key_path = os.path.join(BASE_DIR, LINE_WORKS_PRIVATE_KEY_PATH)
+    else:
+        full_key_path = LINE_WORKS_PRIVATE_KEY_PATH
+    
+    if os.path.exists(full_key_path):
+        try:
+            with open(full_key_path, 'r') as f:
+                # Use .strip() to remove trailing newlines which can cause JWT parse errors
+                LINE_WORKS_PRIVATE_KEY = f.read().strip()
+        except Exception as e:
+            print(f"Error reading private key: {e}")
+            LINE_WORKS_PRIVATE_KEY = ''
+    else:
+        print(f"Private key file not found: {full_key_path}")
+        LINE_WORKS_PRIVATE_KEY = ''
 else:
-    LINE_WORKS_PRIVATE_KEY = ''  # Fallback or error if file not found
+    LINE_WORKS_PRIVATE_KEY = ''
+
 LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')
 LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', default='')
 
