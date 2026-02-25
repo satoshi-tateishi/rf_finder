@@ -1,13 +1,20 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RF Finder - 特ラ運用調整支援</title>
+
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'img/android-chrome-192x192.png' %}">
+
     <style>
         @font-face {
             font-family: 'Noto Sans JP';
-            src: url('/static/fonts/NotoSansJP-Regular.ttf') format('truetype');
+            src: url('{% static "fonts/NotoSansJP-Regular.ttf" %}') format('truetype');
             font-weight: normal;
             font-style: normal;
         }
