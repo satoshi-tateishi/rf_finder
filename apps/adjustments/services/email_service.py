@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime
+from email.mime.application import MIMEApplication
 
 from django.conf import settings
 from django.core.mail import EmailMessage
 
 from apps.accounts.models import EmailTemplate
-
+from ..constants import APP_TYPE_MAP
 from ..utils import get_adjustment_filename
 
 logger = logging.getLogger(__name__)
@@ -28,32 +29,34 @@ def send_adjustment_email(data, member, pdf_buffer):
         try:
             # YYYY-MM-DD を解析
             dt = datetime.strptime(start_date_raw, '%Y-%m-%d')
-            # YYYY年M月D日 に変換 (月・日ともに0埋めなし)
+            # YYYY年M月D日 に変換
             start_date_formatted = f'{dt.year}年{dt.month}月{dt.day}日'
         except ValueError:
             logger.warning(f"Invalid date format: {start_date_raw}")
             pass
 
-    # テンプレートの取得 (name='adjustment' を優先取得し、なければ最初の一件)
-    try:
-        template = EmailTemplate.objects.filter(name='adjustment').first()
-        if not template:
-            template = EmailTemplate.objects.first()
-            
-        if not template:
-            raise RuntimeError('メールテンプレートが登録されていません。管理画面から "adjustment" という名前で作成してください。')
-            
-        recipient = template.to_address
-        if not recipient:
-            raise RuntimeError('送信先メールアドレス(to_address)が設定されていません。')
+    # 1. テンプレートの取得 (name='adjustment' を優先取得し、なければ最初の一件)
+    template = EmailTemplate.objects.filter(name='adjustment').first()
+    if not template:
+        template = EmailTemplate.objects.first()
+        
+    if not template:
+        msg = 'メールテンプレートが登録されていません。管理画面から "adjustment" という名前で作成してください。'
+        logger.error(msg)
+        raise RuntimeError(msg)
+        
+    recipient = template.to_address
+    if not recipient:
+        msg = '送信先メールアドレス(to_address)が設定されていません。'
+        logger.error(msg)
+        raise RuntimeError(msg)
 
-    except Exception as e:
-        logger.error(f"Failed to retrieve email template: {e}")
-        raise
-
-    # 区分（タイプ）の取得
-    from ..constants import APP_TYPE_MAP
+    # 2. 置換データの準備
     app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
+    
+    # 会員情報の取得（引数 member を活用）
+    member_name = member.name if member else ''
+    manager_name = member.manager_name if member else ''
 
     subject = template.subject
     body = template.body
@@ -66,10 +69,11 @@ def send_adjustment_email(data, member, pdf_buffer):
         '{催事名}': event_name,
         '{運用日}': start_date_formatted,
         '{タイプ}': app_type_jp,
+        '{会員名}': member_name,
+        '{運用担当者}': manager_name,
     }
     
     # 文字列の長い順にソートして置換（部分一致による誤置換防止）
-    # 今回の例では {ユーザー名} と {ユーザー} があっても {ユーザー名} から先に置換される
     for placeholder in sorted(replacements.keys(), key=len, reverse=True):
         value = replacements[placeholder] or ''
         subject = subject.replace(placeholder, value)
@@ -82,7 +86,7 @@ def send_adjustment_email(data, member, pdf_buffer):
     # 本文の最後に改行を追加（余白用）
     body = body.rstrip() + '\n\n'
 
-    # メールオブジェクトの作成
+    # 3. メールオブジェクトの作成
     email = EmailMessage(
         subject,
         body,
@@ -91,25 +95,22 @@ def send_adjustment_email(data, member, pdf_buffer):
         cc=cc_list,
     )
 
-    # PDFを添付 (Gmail文字化け対策: MIMEApplicationを直接操作)
-    from email.mime.application import MIMEApplication
-
+    # 4. PDFを添付 (Gmail文字化け対策)
     pdf_buffer.seek(0)
     filename = get_adjustment_filename(data, 'pdf')
 
     # メモリ効率のため getvalue() ではなく読み込みを使用
     attachment = MIMEApplication(pdf_buffer.read(), _subtype='pdf')
-    # add_headerで直接RFC 2231形式のパラメータを指定する
-    # Python 3.x の email モジュールは、日本語を渡すと自動的に RFC 2231 (filename*) 形式でエンコードします
     attachment.add_header('Content-Disposition', 'attachment', filename=filename)
-
-    # DjangoのEmailMessageにMIMEパートを直接追加
     email.attach(attachment)
 
-    # 送信
+    # 5. 送信
     try:
         sent_count = email.send(fail_silently=False)
-        logger.info(f"Email sent successfully: {subject} to {recipient}")
+        if sent_count != 1:
+            logger.warning(f"Unexpected sent_count: {sent_count} (expected 1) for {subject}")
+        else:
+            logger.info(f"Email sent successfully: {subject} to {recipient}")
         return sent_count
     except Exception as e:
         logger.error(f"Failed to send email: {e}")
