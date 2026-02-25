@@ -40,7 +40,6 @@ services:
       - "8084:80"
     volumes:
       - ./static:/static
-      - ./media:/media
     depends_on:
       - web
     networks:

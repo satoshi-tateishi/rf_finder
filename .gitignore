@@ -25,7 +25,7 @@ htmlcov/
 # Project Data & Docker
 mysql_data/
 # static/
-# media/
+media/
 db.sqlite3
 *.log
 

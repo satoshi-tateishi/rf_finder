@@ -2,25 +2,15 @@
 
 プロジェクトのテストおよびデバッグに関するドキュメントです。
 
-## PDF生成機能のレイアウト確認
+## PDF生成機能のレイアウト確認 (現在無効)
 
-`reportlab` を用いて生成されるPDF（運用連絡票）のレイアウトを検証・修正するための手順です。
+※現在、`media`ディレクトリおよびデバッグスクリプトは削除されています。将来的に再実装される場合は、一時ディレクトリ等を使用するように変更される予定です。
 
+<!--
 ### 1. デバッグ用PDFの生成
 サンプルの固定データを使用してPDFを生成し、`media/debug_pdf/latest.pdf` に保存するスクリプトを用意しています。
-
-```bash
-# Dockerコンテナ内で実行
-docker-compose exec web python scripts/debug_pdf.py
-```
-
-### 2. ブラウザでの確認
-生成されたPDFは、開発サーバー経由でブラウザから直接閲覧可能です。
-
-*   URL: [http://localhost:8084/media/debug_pdf/latest.pdf](http://localhost:8084/media/debug_pdf/latest.pdf)
-
-### 3. データ内容の変更
-`scripts/debug_pdf.py` 内の `test_data` 辞書を修正することで、異なるパターン（施設数、チャンネル選択、文字数の増減など）でのレイアウト崩れを確認できます。
+...
+-->
 
 ## 自動テスト (Playwright)
 
