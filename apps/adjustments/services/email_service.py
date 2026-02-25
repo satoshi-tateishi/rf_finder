@@ -79,6 +79,9 @@ def send_adjustment_email(data, member, pdf_buffer):
     # CCのリスト化
     cc_list = [addr.strip() for addr in cc_raw.split(',') if addr.strip()]
 
+    # 本文の最後に改行を追加（余白用）
+    body = body.rstrip() + '\n\n'
+
     # メールオブジェクトの作成
     email = EmailMessage(
         subject,
