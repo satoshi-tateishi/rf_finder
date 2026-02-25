@@ -239,9 +239,9 @@ class DropboxService:
                 # 監査ログ記録
                 log_action(action='DB_BACKUP', description=f'データベースバックアップ成功: {remote_path}')
 
-                # 古いバックアップの削除 (任意)
+                # 古いバックアップの削除 (保持ポリシー: 最新5件, 過去3ヶ月の月次アーカイブを保持)
                 try:
-                    self.clean_old_backups(days=30)
+                    self.clean_old_backups()
                 except Exception as ce:
                     logger.warning(f'古いバックアップの削除中にエラーが発生しました (バックアップ自体は成功しています): {ce}')
 
@@ -383,10 +383,97 @@ class DropboxService:
             log_action(action='DB_RESTORE_FAILED', description=f'データベース復元失敗: {error_str}')
             raise DropboxBackupError(f'復元処理に失敗しました: {error_str}')
 
-    def clean_old_backups(self, days=30):
-        """指定された日数より古いバックアップを削除する (未実装)"""
-        logger.info(f'{days}日以上前の古いバックアップの削除を開始します (現在は未実装)。')
-        pass
+    def clean_old_backups(self, keep_latest=5, keep_monthly_months=3):
+        """保持ポリシーに基づき、古いバックアップを削除する"""
+        client = self.get_client()
+        logger.info(f'保持ポリシーの適用を開始します (最新{keep_latest}件, 月次アーカイブ{keep_monthly_months}ヶ月)。')
+        
+        try:
+            # 1. 全てのバックアップファイルを再帰的に取得
+            files = []
+            
+            # /backups ディレクトリ以下の全ファイルをリストアップ
+            res = client.files_list_folder('/backups', recursive=True)
+            
+            def process_entries(entries):
+                for entry in entries:
+                    if isinstance(entry, dropbox.files.FileMetadata) and entry.name.endswith('.sql.gz'):
+                        try:
+                            # ファイル名から日時を抽出 (db_backup_20260225_022737.sql.gz)
+                            date_str = entry.name.replace('db_backup_', '').replace('.sql.gz', '')
+                            dt = datetime.strptime(date_str, '%Y%m%d_%H%M%S')
+                            files.append({
+                                'path': entry.path_lower,
+                                'name': entry.name,
+                                'datetime': dt,
+                                'month_key': dt.strftime('%Y-%m') # 月次判定用
+                            })
+                        except (ValueError, IndexError):
+                            continue
+
+            process_entries(res.entries)
+            while res.has_more:
+                res = client.files_list_folder_continue(res.cursor)
+                process_entries(res.entries)
+
+            if not files:
+                logger.info('削除対象のバックアップファイルは見つかりませんでした。')
+                return 0
+
+            # 2. 日時で降順ソート
+            files.sort(key=lambda x: x['datetime'], reverse=True)
+
+            # 3. 保護対象の選定
+            keep_paths = set()
+            
+            # (A) 最新の N 件を保護
+            for i in range(min(len(files), keep_latest)):
+                keep_paths.add(files[i]['path'])
+            
+            # (B) 月次アーカイブ（過去 M ヶ月の各月の最終バックアップ）を保護
+            now = timezone.localtime(timezone.now())
+            monthly_archives = {}
+            
+            for file in files:
+                m_key = file['month_key']
+                # その月のバックアップのうち、既にリストされている中で最も新しいものを採用（ソート済みなので最初に出会ったもの）
+                if m_key not in monthly_archives:
+                    monthly_archives[m_key] = file
+            
+            # 現在の月を除外した月次アーカイブから、過去 N ヶ月分を特定
+            current_month = now.strftime('%Y-%m')
+            sorted_months = sorted([m for m in monthly_archives.keys() if m != current_month], reverse=True)
+            
+            added_months = 0
+            for m_key in sorted_months:
+                keep_paths.add(monthly_archives[m_key]['path'])
+                added_months += 1
+                if added_months >= keep_monthly_months:
+                    break
+
+            # 4. 削除の実行
+            delete_count = 0
+            for file in files:
+                if file['path'] not in keep_paths:
+                    try:
+                        client.files_delete_v2(file['path'])
+                        logger.info(f'古いバックアップを削除しました: {file["name"]}')
+                        delete_count += 1
+                    except ApiError as e:
+                        logger.error(f'ファイルの削除に失敗しました ({file["path"]}): {e}')
+
+            logger.info(f'保持ポリシーの適用を完了しました。保護: {len(keep_paths)}件, 削除: {delete_count}件。')
+            return delete_count
+
+        except ApiError as e:
+            # バックアップフォルダ自体が存在しない場合などは無視
+            if e.error.is_path() and e.error.get_path().is_not_found():
+                logger.info('バックアップフォルダが存在しないため、削除処理をスキップします。')
+                return 0
+            raise DropboxBackupError(f'保持ポリシー適用中にDropboxエラーが発生しました: {str(e)}')
+        except Exception as e:
+            logger.error(f'保持ポリシー適用中に予期しないエラーが発生しました: {e}')
+            raise DropboxBackupError(f'保持ポリシー適用中にエラーが発生しました: {str(e)}')
 
     def get_auth_url(self, redirect_uri, session):
         """OAuth認証用のURLを生成する"""

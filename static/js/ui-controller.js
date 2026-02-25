@@ -15,43 +15,36 @@ function openAuditLogModal() {
     if (modal) {
         modal.classList.remove('hidden');
         refreshAuditLogs();
-        // 管理者ならバックアップ管理セクションを表示
-        const backupSection = document.getElementById('backup-manager-section');
-        if (backupSection) {
-            if (window.currentUser && window.currentUser.role === 'admin') {
-                backupSection.classList.remove('hidden');
-            } else {
-                backupSection.classList.add('hidden');
-            }
-        }
     }
 }
 
 function closeAuditLogModal() {
     const modal = document.getElementById('audit-log-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-        // バックアップ管理が表示されていたら隠す
-        const list = document.getElementById('backup-list-container');
-        if (list) list.classList.add('hidden');
-    }
+    if (modal) modal.classList.add('hidden');
 }
 
 /**
  * Backup Manager Functions
  */
-async function toggleBackupList() {
-    const container = document.getElementById('backup-list-container');
-    if (!container) return;
-
-    if (!container.classList.contains('hidden')) {
-        container.classList.add('hidden');
-        return;
+function openBackupModal() {
+    toggleMenu();
+    const modal = document.getElementById('backup-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        refreshBackupList();
     }
+}
 
-    container.classList.remove('hidden');
+function closeBackupModal() {
+    const modal = document.getElementById('backup-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function refreshBackupList() {
     const list = document.getElementById('backup-list');
-    list.innerHTML = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin text-gray-300"></i> 一覧を取得中...</div>';
+    if (!list) return;
+
+    list.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-gray-300 fa-2x"></i><p class="text-xs text-gray-400 mt-2">一覧を取得中...</p></div>';
 
     try {
         const data = await Api.listBackups();
@@ -59,6 +52,7 @@ async function toggleBackupList() {
     } catch (err) {
         console.error(err);
         showToast('一覧の取得中にエラーが発生しました: ' + err.message, 'error');
+        list.innerHTML = '<div class="text-center py-10 text-red-400 text-xs">データの取得に失敗しました</div>';
     }
 }
 
@@ -102,12 +96,10 @@ async function handleManualBackup() {
     try {
         await Api.runBackup();
         showToast('バックアップが完了しました', 'success');
-        // リストが表示中なら更新
-        const container = document.getElementById('backup-list-container');
-        if (container && !container.classList.contains('hidden')) {
-            const backupsData = await Api.listBackups();
-            renderBackupList(backupsData);
-        }
+        // Dropboxの検索インデックスへの反映を少し待ってからリストを更新
+        setTimeout(async () => {
+            await refreshBackupList();
+        }, 1500);
     } catch (err) {
         console.error(err);
         showToast('バックアップ実行中にエラーが発生しました: ' + err.message, 'error');
