@@ -7,12 +7,8 @@ services:
     restart: always
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
+      # 環境変数は .env から読み込むため、ここでは最小限の定義
       MYSQL_DATABASE: rf_finder
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-      MYSQL_ROOT_PASSWORD: root_password
-    ports:
-      - "3309:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -21,27 +17,16 @@ services:
   web:
     build: .
     container_name: rf_finder_web
+    # 本番では gunicorn 等の使用も検討可能だが、現状は runserver を維持
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/code
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     depends_on:
       - db
-    networks:
-      - rf_network
-
-  apache:
-    build:
-      context: .
-      dockerfile: docker/apache/Dockerfile
-    container_name: rf_finder_apache
-    ports:
-      - "8084:80"
-    volumes:
-      - ./static:/static
-    depends_on:
-      - web
     networks:
       - rf_network
 

@@ -130,17 +130,17 @@ nano .env
 
 ### 4. 初回起動と初期化
 ```bash
-# Dockerコンテナ起動
-docker compose up -d
+# Dockerコンテナ起動 (本番用設定ファイルを指定)
+docker compose -f docker-compose.prod.yml up -d
 
 # データベースマイグレーション
-docker compose exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml exec web python manage.py migrate
 
 # 静的ファイルの集約 (ホスト側の static/ に集約される)
-docker compose exec web python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
 
 # 管理者作成 (管理画面へのログイン用)
-docker compose exec web python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
 ```
 
 ---
