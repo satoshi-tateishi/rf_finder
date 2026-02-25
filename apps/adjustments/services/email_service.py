@@ -36,8 +36,9 @@ def send_adjustment_email(data, member, pdf_buffer):
         raise RuntimeError('メールテンプレートが設定されていません。管理画面から作成してください。')
 
     # 区分（タイプ）の取得
-    app_type_map = {'new': '新規', 'change': '変更', 'delete': '削除'}
-    app_type_jp = app_type_map.get(data.get('app_type'), '新規')
+    from ..constants import APP_TYPE_MAP
+
+    app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
 
     subject = template.subject
     body = template.body

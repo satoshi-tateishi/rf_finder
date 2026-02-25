@@ -72,9 +72,10 @@ def get_adjustment_filename(data, extension='pdf'):
     運用連絡票のファイル名を生成する。
     形式: 運用連絡票_{区分}_{催事名}_{運用開始日}.{extension}
     """
-    app_type_map = {'new': '新規', 'change': '変更', 'delete': '削除'}
+    from .constants import APP_TYPE_MAP
+
     app_type_raw = data.get('app_type', 'new')
-    app_type_jp = app_type_map.get(app_type_raw, '新規')
+    app_type_jp = APP_TYPE_MAP.get(app_type_raw, '新規')
 
     event_name = data.get('event', {}).get('name', '無題の催事')
 

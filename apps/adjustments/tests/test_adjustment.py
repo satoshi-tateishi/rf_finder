@@ -134,6 +134,23 @@ class AdjustmentAPITest(TestCase):
         self.assertEqual(response.json()['status'], 'success')
         self.assertEqual(len(mail.outbox), 1)
 
+    def test_save_adjustment_api(self):
+        """下書き保存APIが正常に動作し、DBに保存されること"""
+        from apps.adjustments.models import OperationAdjustment
+
+        response = self.client.post(
+            reverse('adjustments:save_adjustment'), data=json.dumps(self.valid_data), content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+        adj_id = response.json()['data']['id']
+
+        # DB確認
+        adj = OperationAdjustment.objects.get(pk=adj_id)
+        self.assertEqual(adj.event_name, '催事')
+        self.assertEqual(adj.status, 'draft')
+        self.assertEqual(adj.user_name, '使用者')
+
     def test_api_invalid_json(self):
         """不正なJSONを送った場合に400エラーになること"""
         response = self.client.post(

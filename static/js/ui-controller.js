@@ -110,64 +110,26 @@ async function handleManualBackup() {
 }
 
 function confirmRestore(path, name) {
-    showDecisionModal(
-        'データベースの復元',
-        `バックアップ「${name}」からデータを復元しますか？<br><br><span class="text-red-600 font-bold">警告：現在のすべてのデータが上書きされ、元に戻せません。</span>`,
-        async () => {
-            showToast('復元処理を開始しました。ブラウザを閉じないでください...', 'info', 10000);
-            try {
-                await Api.restoreBackup(path);
-                showToast('復元が正常に完了しました。画面を再読み込みします。', 'success');
-                setTimeout(() => location.reload(), 2000);
-            } catch (err) {
-                console.error(err);
-                showToast('復元の実行に失敗しました: ' + err.message, 'error');
-            }
-        },
-        'fa-triangle-exclamation',
-        'bg-red-50 text-red-600'
-    );
-}
-
-/**
- * Custom Decision Modal (Confirm)
- */
-function showDecisionModal(title, message, onOk, iconClass = 'fa-circle-question', iconBgClass = 'bg-blue-50 text-blue-600') {
-    const modal = document.getElementById('decision-modal');
-    const titleEl = document.getElementById('decision-title');
-    const messageEl = document.getElementById('decision-message');
-    const iconEl = document.getElementById('decision-fa-icon');
-    const iconContainer = document.getElementById('decision-icon');
-    const okBtn = document.getElementById('decision-ok-btn');
-    const cancelBtn = document.getElementById('decision-cancel-btn');
-
-    if (!modal) return;
-
-    titleEl.innerText = title;
-    messageEl.innerHTML = message;
-    iconEl.className = `fa-solid ${iconClass} fa-2xl`;
-    iconContainer.className = `w-16 h-16 ${iconBgClass} rounded-full flex items-center justify-center mx-auto mb-4`;
-
-    modal.classList.remove('hidden');
-
-    const handleOk = () => {
-        modal.classList.add('hidden');
-        if (onOk) onOk();
-        cleanup();
-    };
-
-    const handleCancel = () => {
-        modal.classList.add('hidden');
-        cleanup();
-    };
-
-    const cleanup = () => {
-        okBtn.removeEventListener('click', handleOk);
-        cancelBtn.removeEventListener('click', handleCancel);
-    };
-
-    okBtn.addEventListener('click', handleOk);
-    cancelBtn.addEventListener('click', handleCancel);
+    showDecisionModal({
+        title: 'データベースの復元',
+        message: `バックアップ「${name}」からデータを復元しますか？<br><br><span class="text-red-600 font-bold">警告：現在のすべてのデータが上書きされ、元に戻せません。</span>`,
+        okText: '復元する',
+        cancelText: 'キャンセル',
+        iconClass: 'fa-triangle-exclamation',
+        cancelColor: 'red'
+    }).then(async (confirmed) => {
+        if (!confirmed) return;
+        
+        showToast('復元処理を開始しました。ブラウザを閉じないでください...', 'info', 10000);
+        try {
+            await Api.restoreBackup(path);
+            showToast('復元が正常に完了しました。画面を再読み込みします。', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } catch (err) {
+            console.error(err);
+            showToast('復元の実行に失敗しました: ' + err.message, 'error');
+        }
+    });
 }
 
 async function refreshAuditLogs() {

@@ -259,7 +259,18 @@ function collectFormData() {
  */
 function handleValidationErrors(err) {
     console.error('[Validation] Full error:', err);
-    const errorText = err.message || "Unknown error";
+    
+    let errorText = "不明なエラーが発生しました";
+    if (err instanceof Error) {
+        errorText = err.message;
+    } else if (typeof err === 'string') {
+        errorText = err;
+    } else if (err && typeof err === 'object') {
+        errorText = JSON.stringify(err);
+    }
+
+    // トーストでエラーを表示
+    showToast(errorText, 'error', 5000);
     
     const fieldMap = {
         'user_name': 'user_name',

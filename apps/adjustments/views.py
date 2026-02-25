@@ -47,54 +47,12 @@ def validate_adjustment_data(data):
     return True, None
 
 
-def _save_adjustment_internal(request, data, status='draft'):
-    """内部用：データをモデルに保存する"""
-    adjustment_id = data.get('id')
-    if adjustment_id:
-        try:
-            adjustment = OperationAdjustment.objects.get(pk=adjustment_id)
-        except OperationAdjustment.DoesNotExist:
-            adjustment = OperationAdjustment()
-    else:
-        adjustment = OperationAdjustment()
-
-    if request.user.is_authenticated:
-        adjustment.user = request.user
-
-    adjustment.app_type = data.get('app_type', 'new')
-
-    user_data = data.get('user', {})
-    adjustment.user_name = user_data.get('name', '')
-    adjustment.user_kana = user_data.get('kana', '')
-    adjustment.user_tel = user_data.get('tel', '')
-    adjustment.user_email = user_data.get('email', '')
-
-    event_data = data.get('event', {})
-    adjustment.event_name = event_data.get('name', '')
-    adjustment.event_comment = event_data.get('comment', '')
-
-    adjustment.facilities_json = data.get('facilities', [])
-    adjustment.mic_counts_json = data.get('mic_counts', {})
-    adjustment.selected_channels_json = data.get('selected_channels', [])
-    adjustment.extra_53ch = data.get('extra_53ch') == '○'
-
-    adjustment.status = status
-    adjustment.save()
-
-    # M2M 施設の紐付け
-    facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
-    if facility_ids:
-        adjustment.facilities.set(Facility.objects.filter(id__in=facility_ids))
-
-    return adjustment
-
-
 @csrf_exempt
 @json_api_view(validate=False)
 def save_adjustment(request, data):
     """手動保存（下書き）"""
     try:
-        adjustment = _save_adjustment_internal(request, data, status='draft')
+        adjustment = OperationAdjustment.save_from_json(data, user=request.user, status='draft')
         return api_success({'id': adjustment.id, 'message': 'Saved as draft'})
     except Exception as e:
         traceback.print_exc()
@@ -199,8 +157,7 @@ def send_email(request, data):
     member = Member.objects.first()
     try:
         # 0. データを保存 (status='submitted')
-        adjustment = _save_adjustment_internal(request, data, status='submitted')
-        # IDを返却データに含めるためにdataを更新（必要なら）
+        adjustment = OperationAdjustment.save_from_json(data, user=request.user, status='submitted')
         data['id'] = adjustment.id
 
         # 1. PDFを生成
@@ -237,31 +194,8 @@ def send_email(request, data):
         notify_channel_id = getattr(settings, 'LINE_WORKS_NOTIFICATION_CHANNEL_ID', None)
         if notify_channel_id:
             try:
-                # メッセージの作成
-                app_type_map = {'new': '新規', 'change': '変更', 'delete': '削除'}
-                app_type_jp = app_type_map.get(data.get('app_type'), '新規')
-                event_name = data.get('event', {}).get('name', '無題の催事')
-                user_name = data.get('user', {}).get('name', '不明')
-
-                # 施設情報の整形
-                facilities = data.get('facilities', [])
-                facility_lines = []
-                for i, f in enumerate(facilities):
-                    name = f.get('name', '不明')
-                    start = f.get('start_date', '').replace('-', '/')
-                    end = f.get('end_date', '').replace('-', '/')
-                    facility_lines.append(f'{i + 1}.{name}\n{start} - {end}')
-
-                facility_text = '\n\n'.join(facility_lines)
-
-                msg = (
-                    f'【運用調整届 送信通知】\n'
-                    f'区分: {app_type_jp}\n'
-                    f'催事名: {event_name}\n'
-                    f'申請者: {user_name}\n\n'
-                    f'施設:\n{facility_text}\n\n'
-                    f'上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。'
-                )
+                # サービス層で構築されたメッセージを使用
+                msg = bot_service.build_submission_notification_message(data)
 
                 # テキストメッセージとPDFを送信
                 bot_service.send_text_message(notify_channel_id, msg)

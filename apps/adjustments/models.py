@@ -54,3 +54,47 @@ class OperationAdjustment(models.Model):
 
     def __str__(self):
         return f'{self.event_name} ({self.user_name})'
+
+    @classmethod
+    def save_from_json(cls, data, user=None, status='draft'):
+        """
+        JSONデータ（辞書形式）を受け取り、モデルインスタンスを保存・更新する。
+        """
+        adjustment_id = data.get('id')
+        if adjustment_id:
+            try:
+                instance = cls.objects.get(pk=adjustment_id)
+            except cls.DoesNotExist:
+                instance = cls()
+        else:
+            instance = cls()
+
+        if user and user.is_authenticated:
+            instance.user = user
+
+        instance.app_type = data.get('app_type', 'new')
+
+        user_data = data.get('user', {})
+        instance.user_name = user_data.get('name', '')
+        instance.user_kana = user_data.get('kana', '')
+        instance.user_tel = user_data.get('tel', '')
+        instance.user_email = user_data.get('email', '')
+
+        event_data = data.get('event', {})
+        instance.event_name = event_data.get('name', '')
+        instance.event_comment = event_data.get('comment', '')
+
+        instance.facilities_json = data.get('facilities', [])
+        instance.mic_counts_json = data.get('mic_counts', {})
+        instance.selected_channels_json = data.get('selected_channels', [])
+        instance.extra_53ch = data.get('extra_53ch') == '○'
+
+        instance.status = status
+        instance.save()
+
+        # M2M 施設の紐付け
+        facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
+        if facility_ids:
+            instance.facilities.set(Facility.objects.filter(id__in=facility_ids))
+
+        return instance
