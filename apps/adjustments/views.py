@@ -80,8 +80,10 @@ def list_adjustments(request):
             {
                 'id': adj.id,
                 'event_name': adj.event_name,
-                'user_name': adj.user_name, # 現地使用者
-                'sender_name': adj.user.profile.full_name if (adj.user and hasattr(adj.user, 'profile')) else (adj.user.get_full_name() if adj.user else 'システム'), # 実際に操作した申請者
+                'user_name': adj.user_name,  # 現地使用者
+                'sender_name': adj.user.profile.full_name
+                if (adj.user and hasattr(adj.user, 'profile'))
+                else (adj.user.get_full_name() if adj.user else 'システム'),  # 実際に操作した申請者
                 'app_type': adj.get_app_type_display(),
                 'status': adj.get_status_display(),
                 'created_at': timezone.localtime(adj.created_at).strftime('%Y/%m/%d %H:%M'),
@@ -101,6 +103,7 @@ def get_adjustment(request, pk):
         # 認可チェック: 作成者本人または管理者のみ許可
         if adj.user and adj.user != request.user and getattr(request.user.profile, 'role', 'viewer') != 'admin':
             from apps.adjustments.utils import api_error
+
             return api_error('Permission denied', status=403)
 
         data = {
@@ -136,6 +139,7 @@ def preview_excel(request, data):
     log_action(user=request.user, action='EXCEL_EXPORT', description=f'Excel出力: {filename}', request=request)
 
     from django.utils.encoding import escape_uri_path
+
     content = buffer.getvalue()
     response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Length'] = len(content)
@@ -155,6 +159,7 @@ def preview_pdf(request, data):
         log_action(user=request.user, action='PDF_EXPORT', description=f'PDF出力: {filename}', request=request)
 
         from django.utils.encoding import escape_uri_path
+
         content = buffer.getvalue()
         response = HttpResponse(content, content_type='application/pdf')
         response['Content-Length'] = len(content)
@@ -227,10 +232,7 @@ def send_email(request, data):
             except Exception as notify_err:
                 print(f'Error sending notification to LW group: {notify_err}')
 
-        return api_success({
-            'message': 'Email sent successfully',
-            'id': adjustment.id
-        })
+        return api_success({'message': 'Email sent successfully', 'id': adjustment.id})
     except Exception as e:
         print(f'Error sending email: {e}')
         traceback.print_exc()

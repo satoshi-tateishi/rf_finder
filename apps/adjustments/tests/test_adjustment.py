@@ -1,5 +1,6 @@
 import io
 import json
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase
@@ -22,8 +23,10 @@ class AdjustmentLogicTest(TestCase):
         self.assertEqual(format_channels([13, 15, 17]), '13, 15, 17')
         self.assertEqual(format_channels([]), '')
 
-    def test_generate_excel_and_pdf_smoke(self):
+    @patch('apps.adjustments.services.pdf_service.convert_excel_to_pdf')
+    def test_generate_excel_and_pdf_smoke(self, mock_convert):
         """ExcelとPDFの生成がエラーなく完了し、BytesIOを返すこと"""
+        mock_convert.return_value = io.BytesIO(b'dummy pdf content')
         member = Member.objects.create(
             member_id_1='123',
             member_id_2='4567',
@@ -51,7 +54,7 @@ class AdjustmentLogicTest(TestCase):
         try:
             pdf_buffer = generate_adjustment_pdf(data, member)
             self.assertIsInstance(pdf_buffer, io.BytesIO)
-            self.assertTrue(len(pdf_buffer.getvalue()) > 0)
+            self.assertEqual(pdf_buffer.getvalue(), b'dummy pdf content')
         except Exception as e:
             self.fail(f'PDF generation failed: {e}')
 
@@ -91,6 +94,11 @@ class AdjustmentLogicTest(TestCase):
 
 class AdjustmentAPITest(TestCase):
     def setUp(self):
+        # PDF変換のモック化
+        self.pdf_patcher = patch('apps.adjustments.services.pdf_service.convert_excel_to_pdf')
+        self.mock_convert = self.pdf_patcher.start()
+        self.mock_convert.return_value = io.BytesIO(b'dummy pdf')
+
         from django.contrib.auth.models import User
 
         from apps.accounts.models import UserProfile
@@ -121,6 +129,9 @@ class AdjustmentAPITest(TestCase):
             ],
             'mic_counts': {'analog_rm': {'10mw': 1}},
         }
+
+    def tearDown(self):
+        self.pdf_patcher.stop()
 
     def test_preview_pdf_api(self):
         """PDFプレビューAPIが正常にPDFを返すこと"""

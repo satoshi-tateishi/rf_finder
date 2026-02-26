@@ -21,7 +21,7 @@ def _apply_replacements(text: str, replacements: dict) -> str:
     長いプレースホルダーから順に置換することで誤置換を防ぐ。
     """
     if not text:
-        return ""
+        return ''
     # 文字列の長い順にソートして置換（部分一致による誤置換防止）
     for placeholder in sorted(replacements.keys(), key=len, reverse=True):
         value = replacements[placeholder] or ''
@@ -55,7 +55,7 @@ def send_adjustment_email(data, member, pdf_buffer):
             # YYYY年M月D日 に変換
             start_date_formatted = f'{dt.year}年{dt.month}月{dt.day}日'
         except ValueError:
-            logger.warning(f"Invalid date format: {start_date_raw}")
+            logger.warning(f'Invalid date format: {start_date_raw}')
             pass
 
     # 1. テンプレートの取得 (name='adjustment' を優先取得し、なければ最初の一件)
@@ -78,7 +78,7 @@ def send_adjustment_email(data, member, pdf_buffer):
     try:
         validate_email(recipient)
     except ValidationError as e:
-        msg = f"不正なメールアドレス形式です: {recipient}"
+        msg = f'不正なメールアドレス形式です: {recipient}'
         logger.error(msg)
         raise RuntimeError(msg) from e
 
@@ -137,11 +137,11 @@ def send_adjustment_email(data, member, pdf_buffer):
     try:
         sent_count = email.send(fail_silently=False)
         if sent_count != 1:
-            logger.warning(f"Unexpected sent_count: {sent_count} (expected 1) for {subject}")
+            logger.warning(f'Unexpected sent_count: {sent_count} (expected 1) for {subject}')
         else:
-            logger.info(f"Email sent successfully: {subject} to {recipient}")
+            logger.info(f'Email sent successfully: {subject} to {recipient}')
         return sent_count
     except Exception:
         # exc_info=True でスタックトレースをログに出力
-        logger.error("Failed to send email", exc_info=True)
+        logger.error('Failed to send email', exc_info=True)
         raise

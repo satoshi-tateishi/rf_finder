@@ -26,6 +26,7 @@ CM_TO_INCH = 0.393701
 
 class Cells:
     """Excel セル座標定数"""
+
     SUBMISSION_DATE = 'AD1'
     APP_TYPE = 'D4'
     MEMBER_ID_1 = 'M4'

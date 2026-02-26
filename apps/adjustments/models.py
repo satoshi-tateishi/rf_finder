@@ -45,12 +45,7 @@ class OperationAdjustment(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='ステータス')
 
     parent = models.ForeignKey(
-        'self',
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='children',
-        verbose_name='元申請'
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children', verbose_name='元申請'
     )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
@@ -133,7 +128,7 @@ class OperationAdjustment(models.Model):
             if facility_ids:
                 valid_facilities = Facility.objects.filter(id__in=facility_ids)
                 if valid_facilities.count() != len(set(facility_ids)):
-                    raise ValueError("不正または存在しない施設IDが含まれています。")
+                    raise ValueError('不正または存在しない施設IDが含まれています。')
                 instance.facilities.set(valid_facilities)
 
             return instance

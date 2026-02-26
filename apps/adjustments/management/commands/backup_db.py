@@ -6,6 +6,7 @@ from apps.adjustments.services.dropbox_service import DropboxError, DropboxServi
 
 logger = logging.getLogger(__name__)
 
+
 class Command(BaseCommand):
     help = 'データベースのバックアップを作成し、Dropboxへアップロードします（保持ポリシーを自動適用）。'
 
@@ -23,9 +24,9 @@ class Command(BaseCommand):
             result = service.create_db_backup()
 
             if result.get('success'):
-                self.stdout.write(self.style.SUCCESS(
-                    f'バックアップ成功: {result["path"]} (日時: {result["timestamp"]})'
-                ))
+                self.stdout.write(
+                    self.style.SUCCESS(f'バックアップ成功: {result["path"]} (日時: {result["timestamp"]})')
+                )
             else:
                 self.stdout.write(self.style.ERROR('バックアップ処理に失敗しました。'))
 

@@ -39,11 +39,11 @@ class LineBotService:
             total=3,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"]  # POSTもリトライ対象に含める
+            allowed_methods=['GET', 'POST'],  # POSTもリトライ対象に含める
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
 
     def _generate_jwt(self) -> str:
         """
@@ -72,7 +72,7 @@ class LineBotService:
             return token
 
         # レースコンディション対策（識別子付きロック）
-        lock_key = f"{self.CACHE_KEY}_lock"
+        lock_key = f'{self.CACHE_KEY}_lock'
         lock_id = str(uuid.uuid4())
         if not cache.add(lock_key, lock_id, 10):
             # 他のプロセスが取得中の場合は少し待ってからキャッシュを確認
@@ -322,7 +322,7 @@ class LineBotService:
         app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
         event_name = data.get('event', {}).get('name', '無題の催事')
         on_site_user = data.get('user', {}).get('name', '不明')
-        sender_name = data.get('sender_name', 'システム') # 実際に操作したユーザー
+        sender_name = data.get('sender_name', 'システム')  # 実際に操作したユーザー
 
         facilities = data.get('facilities', [])
         facility_lines = []
@@ -332,7 +332,7 @@ class LineBotService:
             end = f.get('end_date', '').replace('-', '/')
             facility_lines.append(f'{i + 1}.{name}\n{start} - {end}')
 
-        facility_text = '\n\n'.join(facility_lines) or "（施設情報なし）"
+        facility_text = '\n\n'.join(facility_lines) or '（施設情報なし）'
 
         return (
             f'【運用調整届 送信通知】\n'

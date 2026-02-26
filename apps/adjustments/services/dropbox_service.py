@@ -19,16 +19,19 @@ logger = logging.getLogger(__name__)
 
 class DropboxError(Exception):
     """Dropboxサービスに関連する基底例外"""
+
     pass
 
 
 class DropboxAuthError(DropboxError):
     """認証に関連する例外"""
+
     pass
 
 
 class DropboxBackupError(DropboxError):
     """バックアップ実行に関連する例外"""
+
     pass
 
 
@@ -117,7 +120,9 @@ class DropboxService:
                     logger.info(f'Dropboxにフォルダを作成しました: {folder_path}')
                 except ApiError as create_e:
                     # 同時実行などで既に作成されている場合は無視
-                    logger.warning(f'フォルダ {folder_path} の作成に失敗しました (既に存在している可能性があります): {create_e}')
+                    logger.warning(
+                        f'フォルダ {folder_path} の作成に失敗しました (既に存在している可能性があります): {create_e}'
+                    )
             else:
                 raise e
 
@@ -143,8 +148,7 @@ class DropboxService:
                     logger.info(f'アップロードを開始します: {local_path} ({file_size} バイト)')
                     upload_session_start_result = client.files_upload_session_start(f.read(CHUNK_SIZE))
                     cursor = dropbox.files.UploadSessionCursor(
-                        session_id=upload_session_start_result.session_id,
-                        offset=f.tell()
+                        session_id=upload_session_start_result.session_id, offset=f.tell()
                     )
                     commit = dropbox.files.CommitInfo(path=remote_path, mode=dropbox.files.WriteMode.overwrite)
 
@@ -225,7 +229,7 @@ class DropboxService:
                         '--events',
                         '--triggers',
                         '--skip-ssl',
-                        db_name
+                        db_name,
                     ]
 
                     try:
@@ -257,7 +261,9 @@ class DropboxService:
                     try:
                         self.clean_old_backups()
                     except Exception as ce:
-                        logger.warning(f'古いバックアップの削除中にエラーが発生しました (バックアップ自体は成功しています): {ce}')
+                        logger.warning(
+                            f'古いバックアップの削除中にエラーが発生しました (バックアップ自体は成功しています): {ce}'
+                        )
 
                     return {'success': True, 'path': remote_path, 'timestamp': timestamp}
 
@@ -292,11 +298,7 @@ class DropboxService:
             # /backups 以下の .sql.gz ファイルを探す
             result = client.files_search_v2(
                 query='.sql.gz',
-                options=dropbox.files.SearchOptions(
-                    path='/backups',
-                    max_results=limit,
-                    file_extensions=['gz']
-                )
+                options=dropbox.files.SearchOptions(path='/backups', max_results=limit, file_extensions=['gz']),
             )
 
             for match in result.matches:
@@ -308,12 +310,14 @@ class DropboxService:
                         server_modified = timezone.make_aware(server_modified, timezone.utc)
 
                     dt_local = timezone.localtime(server_modified)
-                    backups.append({
-                        'name': metadata.name,
-                        'path': metadata.path_display,
-                        'size': metadata.size,
-                        'server_modified': dt_local.strftime('%Y-%m-%d %H:%M:%S')
-                    })
+                    backups.append(
+                        {
+                            'name': metadata.name,
+                            'path': metadata.path_display,
+                            'size': metadata.size,
+                            'server_modified': dt_local.strftime('%Y-%m-%d %H:%M:%S'),
+                        }
+                    )
 
             # 日付の新しい順にソート
             backups.sort(key=lambda x: x['server_modified'], reverse=True)
@@ -384,12 +388,7 @@ class DropboxService:
                 os.chmod(cnf_path, 0o600)
 
                 # 4. mysql コマンドでインポート (バイナリモードで読み込み)
-                cmd = [
-                    'mysql',
-                    f'--defaults-file={cnf_path}',
-                    '--skip-ssl',
-                    db_name
-                ]
+                cmd = ['mysql', f'--defaults-file={cnf_path}', '--skip-ssl', db_name]
 
                 logger.info(f'データベースのリストアを実行しています: {db_name}')
                 try:
@@ -429,6 +428,7 @@ class DropboxService:
         finally:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
+
     def clean_old_backups(self, keep_latest=5, keep_monthly_months=3):
         """保持ポリシーに基づき、古いバックアップを削除する"""
         client = self.get_client()
@@ -451,12 +451,14 @@ class DropboxService:
                             naive_dt = datetime.strptime(date_str, '%Y%m%d_%H%M%S')
                             dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
 
-                            files.append({
-                                'path': entry.path_lower,
-                                'name': entry.name,
-                                'datetime': dt,
-                                'month_key': dt.strftime('%Y-%m') # 月次判定用
-                            })
+                            files.append(
+                                {
+                                    'path': entry.path_lower,
+                                    'name': entry.name,
+                                    'datetime': dt,
+                                    'month_key': dt.strftime('%Y-%m'),  # 月次判定用
+                                }
+                            )
                         except (ValueError, IndexError):
                             continue
 
@@ -565,6 +567,7 @@ class DropboxService:
             token_model.save()
 
             from apps.accounts.utils import log_action
+
             log_action(action='DROPBOX_AUTH', description=f'Dropbox連携成功: {token_model.account_name}')
 
             logger.info(f'Dropboxの認証が完了しました: {token_model.account_name}')

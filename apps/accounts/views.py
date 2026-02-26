@@ -404,6 +404,7 @@ def restore_db(request):
         return JsonResponse({'status': 'error', 'message': 'POST request required'}, status=405)
 
     import json
+
     try:
         data = json.loads(request.body)
         remote_path = data.get('path')

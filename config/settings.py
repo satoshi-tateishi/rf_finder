@@ -167,10 +167,10 @@ if not TESTING and LINE_WORKS_PRIVATE_KEY_PATH:
                 # Use .strip() to remove trailing newlines which can cause JWT parse errors
                 LINE_WORKS_PRIVATE_KEY = f.read().strip()
         except Exception as e:
-            print(f"Error reading private key: {e}")
+            print(f'Error reading private key: {e}')
             LINE_WORKS_PRIVATE_KEY = ''
     else:
-        print(f"Private key file not found: {full_key_path}")
+        print(f'Private key file not found: {full_key_path}')
         LINE_WORKS_PRIVATE_KEY = ''
 else:
     # テスト時やパス未設定時はダミーまたは空

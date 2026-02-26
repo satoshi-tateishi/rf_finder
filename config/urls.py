@@ -4,7 +4,7 @@ from django.urls import include, path
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.facilities.urls')),
-    path('api/facilities/', include('apps.facilities.urls')),
+    path('api/facilities/', include(('apps.facilities.urls', 'facilities'), namespace='api-facilities')),
     path('api/adjustments/', include('apps.adjustments.urls')),
     # path('api/accounts/', include('apps.accounts.urls')), # Removed to avoid duplicate namespace
     path('auth/', include('apps.accounts.urls')),  # Web画面用

@@ -12,9 +12,9 @@ def main():
         from django.core.management import execute_from_command_line
     except ImportError as exc:
         raise ImportError(
-            "Djangoをインポートできませんでした。インストールされているか、"
-            "PYTHONPATH環境変数で利用可能であることを確認してください。"
-            "仮想環境を有効にし忘れていませんか？"
+            'Djangoをインポートできませんでした。インストールされているか、'
+            'PYTHONPATH環境変数で利用可能であることを確認してください。'
+            '仮想環境を有効にし忘れていませんか？'
         ) from exc
     execute_from_command_line(sys.argv)
 
