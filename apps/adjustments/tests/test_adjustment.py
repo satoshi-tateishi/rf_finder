@@ -92,6 +92,7 @@ class AdjustmentLogicTest(TestCase):
 class AdjustmentAPITest(TestCase):
     def setUp(self):
         from django.contrib.auth.models import User
+
         from apps.accounts.models import UserProfile
 
         # テスト用ユーザーの作成とログイン
