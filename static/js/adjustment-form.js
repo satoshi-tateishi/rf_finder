@@ -3,6 +3,7 @@
  */
 
 window.currentAdjustmentId = null;
+window.currentStatus = 'draft';
 
 function updateRequiredHighlight(el) {
     if (!el.hasAttribute('required')) return;
@@ -69,8 +70,13 @@ function goToAdjustment() {
         return;
     }
 
+    // 保存されている状態を取得 (復元用)
+    const savedState = typeof FormStorage !== 'undefined' ? FormStorage.load() : null;
+    const savedFacilities = savedState ? savedState.facilities : [];
+
     // 新規作成時のみユーザー情報を初期入力
     if (!window.currentAdjustmentId) {
+        window.currentStatus = 'draft';
         prefillUserInfo();
     }
 
@@ -79,6 +85,9 @@ function goToAdjustment() {
     container.innerHTML = '';
     
     window.keepList.forEach((f, index) => {
+        // 保存データからこの施設の情報を探す
+        const sf = savedFacilities.find(item => item.id === f.id) || {};
+        
         const div = document.createElement('div');
         div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
         const formattedChannels = Api.formatChannels(f.selectedChannels);
@@ -93,21 +102,25 @@ function goToAdjustment() {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                        value="${sf.start_date || ''}" required>
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                        value="${sf.end_date || ''}" required>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="09:00" required>
+                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                        value="${sf.start_time || '09:00'}" required>
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" value="22:00" required>
+                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                        value="${sf.end_time || '22:00'}" required>
                 </div>
             </div>
         `;
@@ -146,6 +159,7 @@ function prefillUserInfo() {
 function applyRoleConstraints() {
     const role = window.currentUser?.role || 'guest';
     const isViewer = (role === 'viewer');
+    const isSubmitted = (window.currentStatus === 'submitted');
     
     // 閲覧者(viewer)の場合、アクションボタンを無効化
     const actionButtons = [
@@ -158,9 +172,21 @@ function applyRoleConstraints() {
     actionButtons.forEach(selector => {
         const btn = document.querySelector(selector);
         if (btn) {
-            btn.disabled = isViewer;
-            if (isViewer) btn.classList.add('opacity-50', 'cursor-not-allowed');
+            // viewer であるか、既に送信済みの場合は無効化
+            const shouldDisable = isViewer || (selector === '#send-email-btn' && isSubmitted);
+            btn.disabled = shouldDisable;
+            
+            if (shouldDisable) btn.classList.add('opacity-50', 'cursor-not-allowed');
             else btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            // 送信ボタンのテキスト表示
+            if (selector === '#send-email-btn') {
+                if (isSubmitted) {
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> 送信済み';
+                } else {
+                    btn.innerHTML = '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
+                }
+            }
         }
     });
 
@@ -459,10 +485,14 @@ async function sendEmail() {
     try {
         await Api.sendEmail(data);
         showToast('特ラ機構への送信が完了しました', 'success');
-        FormStorage.clear(); // 送信成功時は保存内容をクリア
+        
+        // 送信成功時はボタンをロック
+        window.currentStatus = 'submitted';
+        applyRoleConstraints();
+        
+        FormStorage.clear(); // 送信成功時は一時保存内容をクリア
     } catch (err) {
         handleValidationErrors(err);
-    } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
@@ -484,7 +514,8 @@ async function applyStateToForm(state) {
     try {
         console.log('[Form] Applying state...', state);
         window.currentAdjustmentId = state.id || null;
-
+        window.currentStatus = state.status || 'draft';
+        
         const radio = document.querySelector(`input[name="app_type"][value="${state.app_type}"]`);
         if (radio) radio.checked = true;
 
@@ -622,8 +653,14 @@ async function refreshHistory() {
         
         items.forEach(item => {
             const div = document.createElement('div');
-            div.className = 'p-3 bg-white border rounded-xl hover:border-blue-500 cursor-pointer transition-all shadow-sm';
-            div.onclick = () => loadAdjustment(item.id);
+            const isDeleteType = (item.app_type === '削除');
+            
+            div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isDeleteType ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
+            
+            // 削除タイプ以外の場合のみクリックで読み込み
+            if (!isDeleteType) {
+                div.onclick = () => loadAdjustment(item.id);
+            }
             
             const statusColor = item.status === '下書き' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700';
             
@@ -633,17 +670,26 @@ async function refreshHistory() {
             if (item.app_type === '変更') typeColor = 'bg-yellow-100 text-yellow-700';
             if (item.app_type === '削除') typeColor = 'bg-red-100 text-red-700';
 
+            const contentOpacity = isDeleteType ? 'opacity-50' : '';
+
             div.innerHTML = `
-                <div class="flex justify-between items-start mb-1">
-                    <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
-                    <span class="text-[10px] text-gray-400">${item.created_at}</span>
+                <div class="${contentOpacity}">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
+                        <span class="text-[10px] text-gray-400">${item.updated_at}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="font-bold text-gray-800 flex-1">${item.event_name || '（催事名なし）'}</div>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColor} shrink-0">${item.app_type}</span>
+                    </div>
+                    <div class="text-xs text-gray-500 truncate mb-2">${item.facility_names.join(', ')}</div>
                 </div>
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="font-bold text-gray-800 flex-1">${item.event_name || '（催事名なし）'}</div>
-                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColor} shrink-0">${item.app_type}</span>
+                <div class="flex justify-between items-center">
+                    <div class="text-[10px] text-gray-400 ${contentOpacity}">${item.user_name}</div>
+                    <button onclick="event.stopPropagation(); previewHistoryItem(${item.id})" class="text-[10px] font-bold text-blue-600 border border-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors bg-white">
+                        <i class="fa-solid fa-eye"></i> プレビュー
+                    </button>
                 </div>
-                <div class="text-xs text-gray-500 truncate">${item.facility_names.join(', ')}</div>
-                <div class="text-[10px] text-gray-400 mt-1">${item.user_name}</div>
             `;
             container.appendChild(div);
         });
@@ -666,15 +712,19 @@ async function loadAdjustment(id) {
         
         // 送信済みのデータを再利用する場合の処理
         if (data.status === 'submitted') {
-            const isChange = await showDecisionModal({
+            const result = await showDecisionModal({
                 title: '送信済みデータの再利用',
-                message: '既に送信済みの申請データです。次に行操作を選択してください。',
+                message: '既に送信済みの申請データです。次に行う操作を選択してください。',
                 okText: '変更申請を作成',
                 cancelText: '削除申請を作成',
                 cancelColor: 'red',
                 iconClass: 'fa-rotate-right'
             });
             
+            // xボタンや背景クリックで閉じられた場合は何もしない
+            if (result === null) return;
+
+            const isChange = result;
             data.app_type = isChange ? 'change' : 'delete';
             data.id = null; // 元のレコードを上書きしないようIDをクリア
             window.currentAdjustmentId = null; 
@@ -688,6 +738,18 @@ async function loadAdjustment(id) {
         FormStorage.save(data); // 復元用ストレージも同期
     } catch (err) {
         showToast(`読み込みに失敗しました: ${err.message}`, 'error');
+    }
+}
+
+async function previewHistoryItem(id) {
+    showToast('プレビューを生成中...', 'info');
+    try {
+        const data = await Api.getAdjustment(id);
+        const blob = await Api.previewPDF(data);
+        PdfPreview.open(blob);
+        showToast('プレビューを表示しました', 'success');
+    } catch (err) {
+        showToast(`プレビューの生成に失敗しました: ${err.message}`, 'error');
     }
 }
 

@@ -51,6 +51,7 @@
         const msgEl = document.getElementById('decision-message');
         const okBtn = document.getElementById('decision-ok-btn');
         const cancelBtn = document.getElementById('decision-cancel-btn');
+        const closeBtn = document.getElementById('decision-close-btn');
         const iconEl = document.getElementById('decision-fa-icon');
 
         if (!modal) {
@@ -91,16 +92,28 @@
                 cleanup();
                 resolve(false);
             };
+            const handleClose = () => {
+                cleanup();
+                resolve(null);
+            };
+            const handleBackgroundClick = (e) => {
+                if (e.target === modal) handleClose();
+            };
+            
             const cleanup = () => {
                 console.log('[Modal] cleanup called');
                 okBtn.removeEventListener('click', handleOk);
                 cancelBtn.removeEventListener('click', handleCancel);
+                if (closeBtn) closeBtn.removeEventListener('click', handleClose);
+                modal.removeEventListener('click', handleBackgroundClick);
                 modal.classList.add('hidden');
                 modal.style.display = ''; // Clear inline style to allow 'hidden' class to work
             };
 
             okBtn.addEventListener('click', handleOk);
             cancelBtn.addEventListener('click', handleCancel);
+            if (closeBtn) closeBtn.addEventListener('click', handleClose);
+            modal.addEventListener('click', handleBackgroundClick);
         });
     };
 })();

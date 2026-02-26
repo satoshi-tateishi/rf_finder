@@ -1,6 +1,7 @@
 import traceback
 
 from django.http import HttpResponse, FileResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
@@ -65,7 +66,8 @@ def list_adjustments(request):
     facility_name = request.GET.get('facility_name')
     user_name = request.GET.get('user_name')
 
-    queryset = OperationAdjustment.objects.all()
+    # 最終更新日時（updated_at）の降順で取得
+    queryset = OperationAdjustment.objects.all().order_by('-updated_at')
 
     if event_name:
         queryset = queryset.filter(event_name__icontains=event_name)
@@ -83,7 +85,8 @@ def list_adjustments(request):
                 'user_name': adj.user_name,
                 'app_type': adj.get_app_type_display(),
                 'status': adj.get_status_display(),
-                'created_at': adj.created_at.strftime('%Y/%m/%d %H:%M'),
+                'created_at': timezone.localtime(adj.created_at).strftime('%Y/%m/%d %H:%M'),
+                'updated_at': timezone.localtime(adj.updated_at).strftime('%Y/%m/%d %H:%M'),
                 'facility_names': [f.name for f in adj.facilities.all()],
             }
         )
