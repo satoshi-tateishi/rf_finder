@@ -1,5 +1,6 @@
 import traceback
 
+from django.db import transaction
 from django.http import HttpResponse, FileResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -171,26 +172,27 @@ def preview_pdf(request, data):
 def send_email(request, data):
     member = Member.objects.first()
     try:
-        # 0. データを保存 (status='submitted')
-        adjustment = OperationAdjustment.save_from_json(data, user=request.user, status='submitted')
-        data['id'] = adjustment.id
+        with transaction.atomic():
+            # 0. データを保存 (status='submitted')
+            adjustment = OperationAdjustment.save_from_json(data, user=request.user, status='submitted')
+            data['id'] = adjustment.id
 
-        # 1. PDFを生成
-        pdf_buffer = generate_adjustment_pdf(data, member)
+            # 1. PDFを生成
+            pdf_buffer = generate_adjustment_pdf(data, member)
 
-        # 2. メール送信
-        send_adjustment_email(data, member, pdf_buffer)
+            # 2. メール送信
+            send_adjustment_email(data, member, pdf_buffer)
 
-        # 監査ログの記録
-        log_action(
-            user=request.user,
-            action='EMAIL_SEND',
-            description=f'メール送信: {adjustment.event_name} (ID: {adjustment.id})',
-            request=request,
-            obj=adjustment,
-        )
+            # 監査ログの記録
+            log_action(
+                user=request.user,
+                action='EMAIL_SEND',
+                description=f'メール送信: {adjustment.event_name} (ID: {adjustment.id})',
+                request=request,
+                obj=adjustment,
+            )
 
-        # 3. LINE Bot連携
+        # 3. LINE Bot連携 (外部サービス呼び出しはトランザクション外が望ましい)
         bot_service = LineBotService()
         filename = get_adjustment_filename(data, 'pdf')
         pdf_content = pdf_buffer.getvalue()

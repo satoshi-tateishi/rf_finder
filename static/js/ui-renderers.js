@@ -96,6 +96,7 @@ const UIRenderer = (function() {
     function createFacilityFormItem(facility, index, savedData = {}) {
         const div = document.createElement('div');
         div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
+        div.setAttribute('data-facility-id', facility.id);
         
         const formattedChannels = (typeof Api !== 'undefined' && Api.formatChannels) 
             ? Api.formatChannels(facility.selectedChannels) 

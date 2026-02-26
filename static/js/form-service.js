@@ -80,8 +80,8 @@ const FormService = (function() {
         const facilitiesList = cache['form-facilities-list'];
         if (!facilitiesList) return AppState.KeepList.get();
 
-        return AppState.KeepList.get().map((f, index) => {
-            const container = facilitiesList.children[index];
+        return AppState.KeepList.get().map((f) => {
+            const container = facilitiesList.querySelector(`[data-facility-id="${f.id}"]`);
             if (!container) return { ...f };
             
             const getVal = (field) => container.querySelector(`[data-field="${field}"]`)?.value ?? '';

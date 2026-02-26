@@ -149,51 +149,60 @@ function applyRoleConstraints() {
     actionButtons.forEach(selector => {
         const btn = document.querySelector(selector);
         if (btn) {
-            // 閲覧者モード、または既に送信済みの場合はボタンを無効化
             const shouldDisable = isViewer || (selector === '#send-email-btn' && isSubmitted);
             btn.disabled = shouldDisable;
-            
             if (shouldDisable) btn.classList.add('opacity-50', 'cursor-not-allowed');
             else btn.classList.remove('opacity-50', 'cursor-not-allowed');
 
-            // 送信ボタンのテキスト表示
             if (selector === '#send-email-btn') {
-                if (isSubmitted) {
-                    btn.innerHTML = '<i class="fa-solid fa-check"></i> 送信済み';
-                } else {
-                    btn.innerHTML = '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
-                }
+                btn.innerHTML = isSubmitted ? '<i class="fa-solid fa-check"></i> 送信済み' : '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
             }
         }
     });
 
-    // 入力フィールドの制限 (viewer または submitted の場合)
+    // 入力フィールドの全般的な制限
     const inputs = document.querySelectorAll('#adjustment-form-section input, #adjustment-form-section textarea, #adjustment-form-section select');
     inputs.forEach(el => {
         if (isReadOnly) {
             el.setAttribute('disabled', 'true');
             el.classList.add('bg-gray-100');
         } else {
-            // 基本は有効化するが、特定の条件下で個別に制御
-            el.removeAttribute('disabled');
-            el.classList.remove('bg-gray-100');
+            // 基本は有効化。ただし、app_type ラジオボタンと event_name は別途個別制御
+            if (el.name !== 'app_type' && el.id !== 'event_name') {
+                el.removeAttribute('disabled');
+                el.classList.remove('bg-gray-100');
+            }
         }
     });
 
-    // 特定のフィールドに対する追加制限
+    // 特定のフィールドに対する追加制限 (催事名)
     const eventNameInput = document.getElementById('event_name');
     if (eventNameInput) {
-        // 変更・削除申請の場合は催事名をロック
-        if (appType !== 'new') {
+        if (isReadOnly || appType !== 'new') {
             eventNameInput.setAttribute('disabled', 'true');
             eventNameInput.classList.add('bg-gray-100');
+        } else {
+            eventNameInput.removeAttribute('disabled');
+            eventNameInput.classList.remove('bg-gray-100');
         }
     }
 
-    // 申請区分のラジオボタンは、フォーム表示中は常にロック
-    // (履歴からの読み込みや派生作成によって決定されるため、ユーザーによる変更を禁止)
-    const typeRadios = document.querySelectorAll('input[name="app_type"]');
-    typeRadios.forEach(r => r.setAttribute('disabled', 'true'));
+    // 申請区分のラジオボタンの厳格な制御
+    document.querySelectorAll('input[name="app_type"]').forEach(radio => {
+        radio.setAttribute('disabled', 'true'); // 常に変更不可
+        const label = radio.closest('label');
+        if (label) {
+            if (radio.value === appType) {
+                label.classList.remove('cursor-not-allowed', 'opacity-50', 'bg-gray-100', 'text-gray-400');
+                label.classList.add('cursor-default');
+            } else {
+                label.classList.add('cursor-not-allowed', 'opacity-50', 'bg-gray-100', 'text-gray-400');
+                label.classList.remove('has-[:checked]:bg-blue-50', 'has-[:checked]:border-blue-500', 'has-[:checked]:text-blue-700',
+                                     'has-[:checked]:bg-yellow-50', 'has-[:checked]:border-yellow-500', 'has-[:checked]:text-yellow-700',
+                                     'has-[:checked]:bg-red-50', 'has-[:checked]:border-red-500', 'has-[:checked]:text-red-700');
+            }
+        }
+    });
 
     if (isViewer) {
         showToast('閲覧専用モードです（編集・送信はできません）', 'info');
@@ -473,16 +482,20 @@ async function sendEmail() {
 async function restoreFormState() {
     const state = FormStorage.load();
     if (!state) return;
-    await applyStateToForm(state);
+    // 第2引数に 'storage' を渡し、status の復元をスキップさせる
+    await applyStateToForm(state, 'storage');
     showToast('前回の入力内容を復元しました', 'info');
 }
 
-async function applyStateToForm(state) {
+async function applyStateToForm(state, source = 'api') {
     if (!state) return;
 
     try {
         console.log('[Form] Applying state...', state);
-        AppState.setAdjustment(state.id || null, state.status || 'draft');
+        
+        // ステータスは API 由来のみを信用し、localStorage (FormStorage) 由来は無視する
+        const status = (source === 'api') ? (state.status || 'draft') : AppState.currentStatus;
+        AppState.setAdjustment(state.id || null, status, state.parent_id || null);
         
         const radio = document.querySelector(`input[name="app_type"][value="${state.app_type}"]`);
         if (radio) radio.checked = true;
@@ -705,7 +718,10 @@ async function previewHistoryItem(id) {
     }
 }
 
+let isWatcherInitialized = false;
 function initChangeWatchers() {
+    if (isWatcherInitialized) return;
+    
     const container = document.getElementById('adjustment-form-section');
     if (!container) return;
 
@@ -728,6 +744,8 @@ function initChangeWatchers() {
         const observer = new MutationObserver(handleChange);
         observer.observe(toggle53, { childList: true, characterData: true, subtree: true });
     }
+    
+    isWatcherInitialized = true;
 }
 
 // 初期化時に実行

@@ -64,6 +64,9 @@ class OperationAdjustment(models.Model):
         if adjustment_id:
             try:
                 instance = cls.objects.get(pk=adjustment_id)
+                # 既に送信済みの場合は、一切の変更を拒否する
+                if instance.status == 'submitted':
+                    raise ValueError('既に送信済みのデータは変更できません。')
             except cls.DoesNotExist:
                 instance = cls()
         else:
@@ -92,9 +95,12 @@ class OperationAdjustment(models.Model):
         instance.status = status
         instance.save()
 
-        # M2M 施設の紐付け
+        # M2M 施設の紐付け (IDの妥当性チェックを追加)
         facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
         if facility_ids:
-            instance.facilities.set(Facility.objects.filter(id__in=facility_ids))
+            valid_facilities = Facility.objects.filter(id__in=facility_ids)
+            if valid_facilities.count() != len(set(facility_ids)):
+                raise ValueError("不正な施設IDが含まれています。")
+            instance.facilities.set(valid_facilities)
 
         return instance

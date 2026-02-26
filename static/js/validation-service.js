@@ -70,12 +70,13 @@ const ValidationService = (function() {
         for (const category in mc) {
             const val = mc[category];
             if (typeof val === 'string') {
-                const n = Number(val);
-                if (val.trim() !== '' && !Number.isNaN(n) && n > 0) return true;
+                const n = parseInt(val, 10);
+                if (/^\d+$/.test(val.trim()) && n > 0) return true;
             } else if (typeof val === 'object') {
                 for (const sub in val) {
-                    const n = Number(val[sub]);
-                    if (val[sub].trim() !== '' && !Number.isNaN(n) && n > 0) return true;
+                    const subVal = val[sub];
+                    const n = parseInt(subVal, 10);
+                    if (/^\d+$/.test(subVal.trim()) && n > 0) return true;
                 }
             }
         }
