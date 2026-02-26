@@ -1,7 +1,6 @@
 /**
  * Keep List Management module
  */
-window.keepList = [];
 let sortable = null;
 
 function initSortable() {
@@ -12,8 +11,11 @@ function initSortable() {
         handle: '.drag-handle',
         animation: 150,
         onEnd: (evt) => {
-            const movedItem = window.keepList.splice(evt.oldIndex, 1)[0];
-            window.keepList.splice(evt.newIndex, 0, movedItem);
+            const list = AppState.KeepList.get();
+            const movedItem = list.splice(evt.oldIndex, 1)[0];
+            list.splice(evt.newIndex, 0, movedItem);
+            AppState.KeepList.set(list);
+            
             renderKeepList(); // Update numbers
             
             // TVチャンネル選択UIが表示されている場合は、その順番も更新する
@@ -32,11 +34,11 @@ async function addToKeepList(f) {
     searchInput.value = '';
     
     // 重複チェック
-    if (!window.keepList.find(item => item.id === f.id)) {
+    if (!AppState.KeepList.find(f.id)) {
         try {
             const data = await Api.getFacilityDetail(f.id);
             
-            window.keepList.push({ 
+            AppState.KeepList.add({ 
                 ...f, 
                 selectedChannels: [], 
                 availableChannels: data.available_channels 
@@ -54,10 +56,10 @@ async function addToKeepList(f) {
 }
 
 function removeFromKeepList(id) {
-    window.keepList = window.keepList.filter(f => f.id !== id);
+    AppState.KeepList.remove(id);
     renderKeepList();
     
-    if (window.keepList.length === 0) {
+    if (AppState.KeepList.isEmpty()) {
         document.getElementById('keep-list-section').classList.add('hidden');
         document.getElementById('welcome-msg').classList.remove('hidden');
         document.getElementById('ch-selection-section').classList.add('hidden');
@@ -70,7 +72,7 @@ function renderKeepList() {
     const container = document.getElementById('keep-list');
     container.innerHTML = '';
     
-    window.keepList.forEach((f, index) => {
+    AppState.KeepList.get().forEach((f, index) => {
         const item = UIRenderer.createKeepItem(f, index, removeFromKeepList);
         container.appendChild(item);
     });

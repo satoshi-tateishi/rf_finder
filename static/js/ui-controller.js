@@ -198,7 +198,7 @@ function updateAdjustmentButtonState() {
     if (!btn) return;
 
     // 少なくとも1つの施設で、1つ以上のチャンネルが選択されているか確認
-    const hasSelection = window.keepList && window.keepList.some(f => f.selectedChannels && f.selectedChannels.length > 0);
+    const hasSelection = !AppState.KeepList.isEmpty() && AppState.KeepList.get().some(f => f.selectedChannels && f.selectedChannels.length > 0);
     
     if (hasSelection) {
         btn.disabled = false;
@@ -215,7 +215,7 @@ function updateWsmButtonState(facilityId) {
     const btn = document.getElementById(`wsm-btn-${facilityId}`);
     if (!btn) return;
 
-    const facility = window.keepList.find(f => f.id === facilityId);
+    const facility = AppState.KeepList.find(facilityId);
     const hasSelection = facility && facility.selectedChannels && facility.selectedChannels.length > 0;
 
     if (hasSelection) {
@@ -234,7 +234,7 @@ function renderChannelSelection() {
     if (!container) return;
     container.innerHTML = '';
     
-    window.keepList.forEach(f => {
+    AppState.KeepList.get().forEach(f => {
         const section = UIRenderer.createFacilitySection(f, handleExportWSM);
         container.appendChild(section);
         
@@ -274,8 +274,8 @@ function renderRFGrid(facility, gridElement) {
 window.addEventListener('DOMContentLoaded', () => {
     // Legend initialization
     const legend = document.getElementById('device-legend');
-    if (legend && typeof window.devices !== 'undefined') {
-        window.devices.forEach((d) => {
+    if (legend && AppState.devices) {
+        AppState.devices.forEach((d) => {
             const div = document.createElement('div');
             div.className = 'flex items-center gap-1';
             div.innerHTML = `<span class="w-2 h-2 rounded-full" style="background-color: ${getDeviceColor(d.name)}"></span> ${d.name}`;
@@ -332,7 +332,7 @@ window.addEventListener('DOMContentLoaded', () => {
  * Handle WSM CSV export for a specific facility
  */
 async function handleExportWSM(facilityId) {
-    const facility = window.keepList.find(f => f.id === facilityId);
+    const facility = AppState.KeepList.find(facilityId);
     if (!facility) return;
 
     if (!facility.selectedChannels || facility.selectedChannels.length === 0) {

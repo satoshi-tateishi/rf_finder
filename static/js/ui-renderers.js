@@ -177,8 +177,8 @@ const UIRenderer = (function() {
             const base_start = 470000 + (ch - 13) * 6000;
             const base_end = base_start + chWidth;
 
-            if (window.devices) {
-                window.devices.forEach((d) => {
+            if (AppState.devices) {
+                AppState.devices.forEach((d) => {
                     const overlap_min = Math.max(d.min, base_start);
                     const overlap_max = Math.min(d.max, base_end);
                     

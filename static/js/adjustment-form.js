@@ -2,9 +2,6 @@
  * Adjustment Form Management module
  */
 
-window.currentAdjustmentId = null;
-window.currentStatus = 'draft';
-
 function updateRequiredHighlight(el) {
     if (!el.hasAttribute('required')) return;
     const val = el.value;
@@ -65,18 +62,14 @@ document.addEventListener('change', (e) => {
 });
 
 function goToAdjustment() {
-    if (window.keepList.length === 0) {
+    if (AppState.KeepList.isEmpty()) {
         showToast('施設を選択してください', 'info');
         return;
     }
 
-    // 保存されている状態を取得 (復元用)
-    const savedState = typeof FormStorage !== 'undefined' ? FormStorage.load() : null;
-    const savedFacilities = savedState ? savedState.facilities : [];
-
     // 新規作成時のみユーザー情報を初期入力
-    if (!window.currentAdjustmentId) {
-        window.currentStatus = 'draft';
+    if (!AppState.currentAdjustmentId) {
+        AppState.setAdjustment(null, 'draft');
         prefillUserInfo();
     }
 
@@ -84,12 +77,18 @@ function goToAdjustment() {
     const container = document.getElementById('form-facilities-list');
     container.innerHTML = '';
     
-    window.keepList.forEach((f, index) => {
-        // 保存データからこの施設の情報を探す
-        const sf = savedFacilities.find(item => item.id === f.id) || {};
+    AppState.KeepList.get().forEach((f, index) => {
+        // AppState に既にデータがある場合はそれを使用し、なければ空（デフォルト）を使用
+        // renderer に渡すオブジェクトを構築
+        const currentData = {
+            start_date: f.start_date || '',
+            end_date: f.end_date || '',
+            start_time: f.start_time || '09:00',
+            end_time: f.end_time || '22:00'
+        };
         
         // Renderer を使用して DOM 要素を生成し、追加
-        const facilityItem = UIRenderer.createFacilityFormItem(f, index, sf);
+        const facilityItem = UIRenderer.createFacilityFormItem(f, index, currentData);
         container.appendChild(facilityItem);
     });
 
@@ -97,7 +96,13 @@ function goToAdjustment() {
     document.getElementById('keep-list-section').classList.add('hidden');
     document.getElementById('adjustment-form-section').classList.remove('hidden');
     
-    // ロールに応じた権限制限の適用
+    // ストレージから最新の状態（送信済みステータス等）を最終同期して AppState を更新
+    const finalState = FormStorage.load();
+    if (finalState && finalState.id === AppState.currentAdjustmentId) {
+        AppState.setAdjustment(finalState.id, finalState.status || 'draft');
+    }
+
+    // ロールに応じた権限制限の適用 (送信済みロックも含む)
     applyRoleConstraints();
 
     // バリデーション用ハイライト初期化
@@ -107,7 +112,7 @@ function goToAdjustment() {
 }
 
 function prefillUserInfo() {
-    const user = window.currentUser;
+    const user = AppState.currentUser;
     if (!user || !user.isAuthenticated) return;
 
     const nameEl = document.getElementById('user_name');
@@ -123,9 +128,9 @@ function prefillUserInfo() {
 }
 
 function applyRoleConstraints() {
-    const role = window.currentUser?.role || 'guest';
+    const role = AppState.currentUser?.role || 'guest';
     const isViewer = (role === 'viewer');
-    const isSubmitted = (window.currentStatus === 'submitted');
+    const isSubmitted = (AppState.currentStatus === 'submitted');
     
     // 閲覧者(viewer)の場合、アクションボタンを無効化
     const actionButtons = [
@@ -195,7 +200,7 @@ function collectFormData() {
         comment: document.getElementById('comment').value
     };
     
-    const facilitiesData = window.keepList.map((f, index) => {
+    const facilitiesData = AppState.KeepList.get().map((f, index) => {
         const container = document.getElementById('form-facilities-list').children[index];
         if (!container) return f;
         const inputs = container.querySelectorAll('input');
@@ -236,7 +241,8 @@ function collectFormData() {
     };
 
     return {
-        id: window.currentAdjustmentId,
+        id: AppState.currentAdjustmentId,
+        status: AppState.currentStatus,
         app_type: appType,
         user: user,
         event: event,
@@ -453,10 +459,11 @@ async function sendEmail() {
         showToast('特ラ機構への送信が完了しました', 'success');
         
         // 送信成功時はボタンをロック
-        window.currentStatus = 'submitted';
+        AppState.setAdjustment(AppState.currentAdjustmentId, 'submitted');
         applyRoleConstraints();
         
-        FormStorage.clear(); // 送信成功時は一時保存内容をクリア
+        // クリアせずに現在の状態（submitted）を保存して同期を維持
+        FormStorage.save(collectFormData());
     } catch (err) {
         handleValidationErrors(err);
         btn.disabled = false;
@@ -479,8 +486,7 @@ async function applyStateToForm(state) {
 
     try {
         console.log('[Form] Applying state...', state);
-        window.currentAdjustmentId = state.id || null;
-        window.currentStatus = state.status || 'draft';
+        AppState.setAdjustment(state.id || null, state.status || 'draft');
         
         const radio = document.querySelector(`input[name="app_type"][value="${state.app_type}"]`);
         if (radio) radio.checked = true;
@@ -530,19 +536,24 @@ async function applyStateToForm(state) {
         }
 
         if (state.facilities && state.facilities.length > 0) {
-            window.keepList = [];
+            AppState.KeepList.clear();
             for (const sf of state.facilities) {
                 try {
                     const data = await Api.getFacilityDetail(sf.id);
-                    window.keepList.push({
+                    AppState.KeepList.add({
                         ...data.facility, // 施設基本情報を展開 (name, address等)
                         selectedChannels: sf.selectedChannels || [],
-                        availableChannels: data.available_channels
+                        availableChannels: data.available_channels,
+                        // スケジュール情報も同期
+                        start_date: sf.start_date || '',
+                        end_date: sf.end_date || '',
+                        start_time: sf.start_time || '09:00',
+                        end_time: sf.end_time || '22:00'
                     });
                 } catch (e) { console.error(`Failed to restore facility ${sf.id}:`, e); }
             }
             
-            if (window.keepList.length > 0) {
+            if (!AppState.KeepList.isEmpty()) {
                 renderKeepList();
                 renderChannelSelection();
                 document.getElementById('welcome-msg').classList.add('hidden');
@@ -550,17 +561,6 @@ async function applyStateToForm(state) {
                 document.getElementById('ch-selection-section').classList.remove('hidden');
                 
                 goToAdjustment();
-                
-                state.facilities.forEach((sf, index) => {
-                    const container = document.getElementById('form-facilities-list').children[index];
-                    if (container) {
-                        const inputs = container.querySelectorAll('input');
-                        inputs[0].value = sf.start_date || '';
-                        inputs[1].value = sf.end_date || '';
-                        inputs[2].value = sf.start_time || '09:00';
-                        inputs[3].value = sf.end_time || '22:00';
-                    }
-                });
             }
         }
         
@@ -583,7 +583,7 @@ async function saveAdjustmentDraft() {
         console.log('[Draft] Collected data:', data);
         const result = await Api.saveAdjustment(data);
         console.log('[Draft] Server response:', result);
-        window.currentAdjustmentId = result.id;
+        AppState.setAdjustment(result.id, 'draft');
         showToast('下書きを保存しました', 'success');
     } catch (err) {
         console.error('[Draft] Save failed:', err);
@@ -660,7 +660,8 @@ async function loadAdjustment(id) {
             const isChange = result;
             data.app_type = isChange ? 'change' : 'delete';
             data.id = null; // 元のレコードを上書きしないようIDをクリア
-            window.currentAdjustmentId = null; 
+            data.status = 'draft'; // 新しい申請として扱うためステータスをリセット
+            AppState.setAdjustment(null, 'draft'); 
             showToast(`送信済みデータから「${isChange ? '変更' : '削除'}」申請を作成します`, 'info');
         }
 
@@ -690,7 +691,17 @@ function initChangeWatchers() {
     const container = document.getElementById('adjustment-form-section');
     if (!container) return;
 
-    const handleChange = () => FormStorage.save(collectFormData());
+    const handleChange = () => {
+        const data = collectFormData();
+        FormStorage.save(data);
+        
+        // AppState にもスケジュール情報を同期
+        if (data.facilities) {
+            data.facilities.forEach(f => {
+                AppState.KeepList.updateFacilityData(f.id, f);
+            });
+        }
+    };
     container.addEventListener('input', handleChange);
     container.addEventListener('change', handleChange);
     

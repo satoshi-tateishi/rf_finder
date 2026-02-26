@@ -578,49 +578,9 @@
             </div>
         </div>
     </div>
-        <!-- Device Data -->
-    <script>
-        // Djangoテンプレートからデータを取得し、グローバル変数として保持
-        window.devices = [
-            {% for device in devices %}
-            {
-                "id": {{ device.id }},
-                "name": "{{ device.model_name }}",
-                "min": {{ device.min_frequency }},
-                "max": {{ device.max_frequency }}
-            }{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
-
-        // ユーザー情報をグローバル変数として保持
-        window.currentUser = {
-            isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }},
-            {% if user.is_authenticated %}
-            role: "{{ user.profile.role }}",
-            fullName: "{{ user.profile.full_name|escapejs }}",
-            fullKana: "{{ user.profile.full_kana|escapejs }}",
-            phone: "{{ user.profile.phone_number|escapejs }}",
-            email: "{{ user.profile.email|escapejs }}"
-            {% else %}
-            role: "guest",
-            fullName: "",
-            fullKana: "",
-            phone: "",
-            email: ""
-            {% endif %}
-        };
-
-        // Fallback for toggleMenu
-        function toggleMenu() {
-            const menu = document.getElementById('side-menu');
-            if (menu) {
-                menu.classList.toggle('hidden');
-            }
-        }
-    </script>
-
     <!-- Modular JS Files -->
     <script src="/static/js/api.js?v=1.2"></script>
+    <script src="/static/js/app-state.js?v=1.2"></script>
     <script src="/static/js/ui-renderers.js?v=1.2"></script>
     <script src="/static/js/notifications.js?v=1.2"></script>
     <script src="/static/js/form-storage.js?v=1.2"></script>
@@ -631,7 +591,45 @@
 
     <!-- Initialization -->
     <script>
+        // Fallback for toggleMenu
+        function toggleMenu() {
+            const menu = document.getElementById('side-menu');
+            if (menu) {
+                menu.classList.toggle('hidden');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
+            // AppState の初期化
+            AppState.init({
+                devices: [
+                    {% for device in devices %}
+                    {
+                        "id": {{ device.id }},
+                        "name": "{{ device.model_name }}",
+                        "min": {{ device.min_frequency }},
+                        "max": {{ device.max_frequency }}
+                    }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                currentUser: {
+                    isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }},
+                    {% if user.is_authenticated %}
+                    role: "{{ user.profile.role }}",
+                    fullName: "{{ user.profile.full_name|escapejs }}",
+                    fullKana: "{{ user.profile.full_kana|escapejs }}",
+                    phone: "{{ user.profile.phone_number|escapejs }}",
+                    email: "{{ user.profile.email|escapejs }}"
+                    {% else %}
+                    role: "guest",
+                    fullName: "",
+                    fullKana: "",
+                    phone: "",
+                    email: ""
+                    {% endif %}
+                }
+            });
+
             // UI Controller の初期化
             if (typeof UIController !== 'undefined' && UIController.init) {
                 UIController.init();

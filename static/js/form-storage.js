@@ -8,6 +8,7 @@ const FormStorage = (function() {
         // 施設の基本情報は重いので除外、選択内容のみ保存
         const state = {
             id: data.id,
+            status: data.status,
             app_type: data.app_type,
             user: data.user,
             event: data.event,
