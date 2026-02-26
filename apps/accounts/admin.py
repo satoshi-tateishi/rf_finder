@@ -156,9 +156,9 @@ class MemberAdmin(ImportExportModelAdmin):
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(ImportExportModelAdmin):
     resource_class = EmailTemplateResource
-    list_display = ('subject', 'to_address', 'cc_address')
+    list_display = ('name', 'subject', 'to_address', 'cc_address')
     fieldsets = (
-        (None, {'fields': ('to_address', 'cc_address', 'subject', 'body')}),
+        (None, {'fields': ('name', 'to_address', 'cc_address', 'subject', 'body')}),
         (
             '利用可能な変数 (プレースホルダー)',
             {

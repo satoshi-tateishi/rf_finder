@@ -396,9 +396,20 @@ class DropboxService:
                     logger.error(f'mysql実行エラー: {err_msg}')
                     raise DropboxBackupError(f'データベースのリストアに失敗しました: {err_msg}')
 
+                # 5. マイグレーションの実行 (スキーマ不整合の解消)
+                logger.info('スキーマを最新の状態に更新するためにマイグレーションを実行しています...')
+                try:
+                    subprocess.run(['python', 'manage.py', 'migrate', '--noinput'], check=True, stderr=subprocess.PIPE)
+                except subprocess.CalledProcessError as e:
+                    err_msg = e.stderr.decode('utf-8', errors='ignore')
+                    logger.error(f'リストア後のマイグレーションに失敗しました: {err_msg}')
+                    # マイグレーション失敗は重大だが、データ自体は入っている可能性があるため警告に留めるか検討
+                    # ここではエラーとして扱い、ログに記録する
+                    raise DropboxBackupError(f'リストア後のマイグレーションに失敗しました: {err_msg}')
+
                 # 監査ログ記録
                 log_action(action='DB_RESTORE', description=f'データベース復元成功: {remote_path}')
-                logger.info(f'データベースの復元が完了しました: {remote_path}')
+                logger.info(f'データベースの復元とマイグレーションが完了しました: {remote_path}')
 
                 return {'success': True, 'path': remote_path}
 
