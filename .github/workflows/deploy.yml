@@ -66,7 +66,8 @@ jobs:
           LINE_WORKS_PRIVATE_KEY_PATH: ./keys/line_works_private_key.key
         run: |
           mkdir -p keys
-          touch ./keys/line_works_private_key.key
+          # 有効な形式のダミーRSA秘密鍵を生成（jwt.encode のクラッシュ防止）
+          openssl genrsa -out ./keys/line_works_private_key.key 2048
           python manage.py test
 
   # ===== デプロイジョブ =====
