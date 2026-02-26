@@ -131,19 +131,25 @@ function applyRoleConstraints() {
     const role = AppState.currentUser?.role || 'guest';
     const isViewer = (role === 'viewer');
     const isSubmitted = (AppState.currentStatus === 'submitted');
+    const isReadOnly = isViewer || isSubmitted;
     
-    // 閲覧者(viewer)の場合、アクションボタンを無効化
+    // 現在の申請区分を取得
+    const appTypeEl = document.querySelector('input[name="app_type"]:checked');
+    const appType = appTypeEl ? appTypeEl.value : 'new';
+
+    // アクションボタンの制御
     const actionButtons = [
         '#send-email-btn',
-        'button[onclick="saveAdjustmentDraft()"]',
-        'button[onclick="downloadPDF()"]',
-        'button[onclick="downloadExcel()"]'
+        '#save-draft-btn',
+        '#preview-pdf-btn',
+        '#download-pdf-btn',
+        '#download-excel-btn'
     ];
 
     actionButtons.forEach(selector => {
         const btn = document.querySelector(selector);
         if (btn) {
-            // viewer であるか、既に送信済みの場合は無効化
+            // 閲覧者モード、または既に送信済みの場合はボタンを無効化
             const shouldDisable = isViewer || (selector === '#send-email-btn' && isSubmitted);
             btn.disabled = shouldDisable;
             
@@ -161,17 +167,33 @@ function applyRoleConstraints() {
         }
     });
 
-    // 入力フィールドの制限 (viewerの場合)
+    // 入力フィールドの制限 (viewer または submitted の場合)
     const inputs = document.querySelectorAll('#adjustment-form-section input, #adjustment-form-section textarea, #adjustment-form-section select');
     inputs.forEach(el => {
-        if (isViewer) {
+        if (isReadOnly) {
             el.setAttribute('disabled', 'true');
             el.classList.add('bg-gray-100');
         } else {
+            // 基本は有効化するが、特定の条件下で個別に制御
             el.removeAttribute('disabled');
             el.classList.remove('bg-gray-100');
         }
     });
+
+    // 特定のフィールドに対する追加制限
+    const eventNameInput = document.getElementById('event_name');
+    if (eventNameInput) {
+        // 変更・削除申請の場合は催事名をロック
+        if (appType !== 'new') {
+            eventNameInput.setAttribute('disabled', 'true');
+            eventNameInput.classList.add('bg-gray-100');
+        }
+    }
+
+    // 申請区分のラジオボタンは、フォーム表示中は常にロック
+    // (履歴からの読み込みや派生作成によって決定されるため、ユーザーによる変更を禁止)
+    const typeRadios = document.querySelectorAll('input[name="app_type"]');
+    typeRadios.forEach(r => r.setAttribute('disabled', 'true'));
 
     if (isViewer) {
         showToast('閲覧専用モードです（編集・送信はできません）', 'info');
@@ -185,134 +207,87 @@ function backToSelection() {
     window.scrollTo(0, 0);
 }
 
-function collectFormData() {
-    const appTypeEl = document.querySelector('input[name="app_type"]:checked');
-    const appType = appTypeEl ? appTypeEl.value : 'new';
-    
-    const user = {
-        name: document.getElementById('user_name').value,
-        kana: document.getElementById('user_kana').value,
-        tel: document.getElementById('user_tel').value,
-        email: document.getElementById('user_email').value
-    };
-    const event = {
-        name: document.getElementById('event_name').value,
-        comment: document.getElementById('comment').value
-    };
-    
-    const facilitiesData = AppState.KeepList.get().map((f, index) => {
-        const container = document.getElementById('form-facilities-list').children[index];
-        if (!container) return f;
-        const inputs = container.querySelectorAll('input');
-        return {
-            ...f,
-            start_date: inputs[0].value,
-            end_date: inputs[1].value,
-            start_time: inputs[2].value,
-            end_time: inputs[3].value
-        };
-    });
-
-    const extra_53ch = document.getElementById('toggle-53ch').innerText;
-
-    const mic_counts = {
-        analog_rm: { '10mw': document.getElementById('mic-analog-rm-10mw').value },
-        analog_em: { '10mw': document.getElementById('mic-analog-em-10mw').value },
-        digital_rm: {
-            '10mw': document.getElementById('mic-digital-rm-10mw').value,
-            '20mw': document.getElementById('mic-digital-rm-20mw').value,
-            '50mw': document.getElementById('mic-digital-rm-50mw').value
-        },
-        analog_53ch: {
-            rm_10mw: document.getElementById('mic-analog-rm-53ch-10mw').value,
-            em_10mw: document.getElementById('mic-analog-em-53ch-10mw').value
-        },
-        digital_53ch: {
-            '10mw': document.getElementById('mic-digital-rm-53ch-10mw').value,
-            '20mw': document.getElementById('mic-digital-rm-53ch-20mw').value,
-            '50mw': document.getElementById('mic-digital-rm-53ch-50mw').value
-        },
-        digital_12g: {
-            '10mw': document.getElementById('mic-digital-rm-12g-10mw').value,
-            '20mw': document.getElementById('mic-digital-rm-12g-20mw').value,
-            '50mw': document.getElementById('mic-digital-rm-12g-50mw').value
-        },
-        '12g_lmh': document.getElementById('mic-12g-lmh').value
-    };
-
-    return {
-        id: AppState.currentAdjustmentId,
-        status: AppState.currentStatus,
-        app_type: appType,
-        user: user,
-        event: event,
-        facilities: facilitiesData,
-        extra_53ch: extra_53ch,
-        mic_counts: mic_counts
-    };
-}
-
 /**
  * Validation and UI Feedback
  */
-function handleValidationErrors(err) {
-    console.error('[Validation] Full error:', err);
+function handleValidationErrors(errOrList) {
+    console.log('[Validation] Handling errors:', errOrList);
     
-    let errorText = "不明なエラーが発生しました";
-    if (err instanceof Error) {
-        errorText = err.message;
-    } else if (typeof err === 'string') {
-        errorText = err;
-    } else if (err && typeof err === 'object') {
-        errorText = JSON.stringify(err);
+    // 以前のエラースタイルをクリア
+    const container = document.getElementById('adjustment-form-section');
+    if (container) {
+        container.querySelectorAll('.bg-red-50').forEach(el => clearError(el));
     }
 
-    // トーストでエラーを表示
-    showToast(errorText, 'error', 5000);
+    let errorList = [];
+    if (Array.isArray(errOrList)) {
+        errorList = errOrList;
+    } else {
+        // API からの単一エラーまたは例外
+        const msg = errOrList.message || errOrList;
+        showToast(msg, 'error', 5000);
+        return;
+    }
+
+    if (errorList.length === 0) return;
+
+    // 最初のエラーメッセージを表示
+    showToast(errorList[0].message, 'error', 5000);
     
     const fieldMap = {
         'user_name': 'user_name',
         'user_kana': 'user_kana',
         'user_tel': 'user_tel',
         'user_email': 'user_email',
-        'event_name': 'event_name'
+        'event_name': 'event_name',
+        'mic_counts': 'mic-counts-table-container',
+        'facilities': 'form-facilities-list'
     };
 
-    let foundField = false;
-    Object.keys(fieldMap).forEach(key => {
-        if (errorText.includes(key)) {
-            const el = document.getElementById(fieldMap[key]);
-            if (el) { applyErrorStyle(el); foundField = true; }
+    let firstErrEl = null;
+
+    errorList.forEach(err => {
+        let id = fieldMap[err.field];
+        
+        // 施設ごとのエラー対応 (facility_0, facility_1 ...)
+        if (!id && err.field.startsWith('facility_')) {
+            const index = parseInt(err.field.split('_')[1]);
+            const facilitiesList = document.getElementById('form-facilities-list');
+            if (facilitiesList && facilitiesList.children[index]) {
+                const el = facilitiesList.children[index];
+                applyErrorStyle(el);
+                
+                const inputs = el.querySelectorAll('input');
+                inputs.forEach(input => {
+                    input.addEventListener('input', () => clearError(el), { once: true });
+                });
+                
+                if (!firstErrEl) firstErrEl = el;
+            }
+            return;
+        }
+
+        const el = document.getElementById(id);
+        if (el) {
+            applyErrorStyle(el);
+            
+            // 特別な処理: マイク数テーブル内の全入力にイベントリスナーを貼る
+            if (err.field === 'mic_counts') {
+                const inputs = el.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    const eventName = (input.tagName === 'SELECT') ? 'change' : 'input';
+                    input.addEventListener(eventName, () => clearError(el), { once: true });
+                });
+            }
+            
+            if (!firstErrEl) firstErrEl = el;
         }
     });
 
-    if (errorText.includes('mic_counts')) {
-        const container = document.getElementById('mic-counts-table-container');
-        if (container) {
-            applyErrorStyle(container);
-            foundField = true;
-            const inputs = container.querySelectorAll('input, select');
-            inputs.forEach(input => {
-                const eventName = (input.tagName === 'SELECT') ? 'change' : 'input';
-                input.addEventListener(eventName, () => clearError(container), { once: true });
-            });
-        }
+    // 最初のエラー箇所へスクロール
+    if (firstErrEl) {
+        firstErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    if (errorText.includes('facilities')) {
-        const container = document.getElementById('form-facilities-list');
-        if (container) {
-            foundField = true;
-            const inputs = container.querySelectorAll('input');
-            inputs.forEach(input => { if (!input.value) applyErrorStyle(input); });
-        }
-    }
-
-    const displayMsg = foundField 
-        ? '入力内容に不備があります。赤色の項目を確認してください。'
-        : `エラーが発生しました: ${errorText}`;
-
-    showToast(displayMsg, 'error', 5000);
 }
 
 function applyErrorStyle(el) {
@@ -329,10 +304,17 @@ function clearError(el) {
  * Main Actions
  */
 async function previewPDF() {
-    const data = collectFormData();
-    const btn = document.querySelector('button[onclick="previewPDF()"]');
+    const data = FormService.collect();
+    const btn = document.getElementById('preview-pdf-btn');
     const originalText = btn.innerHTML;
     
+    // クライアント側バリデーション
+    const errors = ValidationService.validate(data);
+    if (errors.length > 0) {
+        handleValidationErrors(errors);
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
@@ -341,6 +323,7 @@ async function previewPDF() {
         PdfPreview.open(blob);
         showToast('PDFプレビューを表示しました', 'success');
     } catch (err) {
+        // API から返ってくる構造化されたエラーまたは一般的なエラー
         handleValidationErrors(err);
     } finally {
         btn.disabled = false;
@@ -349,17 +332,21 @@ async function previewPDF() {
 }
 
 async function downloadPDF() {
-    const data = collectFormData();
-    const btn = document.querySelector('button[onclick="downloadPDF()"]');
+    const data = FormService.collect();
+    const btn = document.getElementById('download-pdf-btn');
     const originalText = btn.innerHTML;
     
+    const errors = ValidationService.validate(data);
+    if (errors.length > 0) {
+        handleValidationErrors(errors);
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
-        console.log('[Download] Requesting PDF...');
         const blob = await Api.previewPDF(data, 'attachment');
-        console.log(`[Download] Received blob: type=${blob.type}, size=${blob.size}`);
         
         if (blob.size < 1000) throw new Error('PDFの生成に失敗しました。');
 
@@ -375,10 +362,8 @@ async function downloadPDF() {
         a.download = filename;
         a.style.display = 'none';
         document.body.appendChild(a);
-        
         a.click();
         
-        // 1秒待ってから後片付け
         setTimeout(() => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
@@ -394,17 +379,21 @@ async function downloadPDF() {
 }
 
 async function downloadExcel() {
-    const data = collectFormData();
-    const btn = document.querySelector('button[onclick="downloadExcel()"]');
+    const data = FormService.collect();
+    const btn = document.getElementById('download-excel-btn');
     const originalText = btn.innerHTML;
     
+    const errors = ValidationService.validate(data);
+    if (errors.length > 0) {
+        handleValidationErrors(errors);
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
-        console.log('[Download] Requesting Excel...');
         const blob = await Api.downloadExcel(data);
-        console.log(`[Download] Received blob: type=${blob.type}, size=${blob.size}`);
 
         if (blob.size < 100) throw new Error('Excelの生成に失敗しました。');
 
@@ -420,7 +409,6 @@ async function downloadExcel() {
         a.download = filename;
         a.style.display = 'none';
         document.body.appendChild(a);
-        
         a.click();
 
         setTimeout(() => {
@@ -438,6 +426,15 @@ async function downloadExcel() {
 }
 
 async function sendEmail() {
+    const data = FormService.collect();
+    
+    // バリデーション
+    const errors = ValidationService.validate(data);
+    if (errors.length > 0) {
+        handleValidationErrors(errors);
+        return;
+    }
+
     const confirmed = await showDecisionModal({
         title: '特ラ機構へ送信',
         message: '運用調整届を特ラ機構へ送信してもよろしいですか？',
@@ -447,7 +444,6 @@ async function sendEmail() {
     });
     if (!confirmed) return;
 
-    const data = collectFormData();
     const btn = document.getElementById('send-email-btn');
     const originalText = btn.innerHTML;
     
@@ -463,7 +459,7 @@ async function sendEmail() {
         applyRoleConstraints();
         
         // クリアせずに現在の状態（submitted）を保存して同期を維持
-        FormStorage.save(collectFormData());
+        FormStorage.save(FormService.collect());
     } catch (err) {
         handleValidationErrors(err);
         btn.disabled = false;
@@ -501,56 +497,71 @@ async function applyStateToForm(state) {
         if (state.event) {
             document.getElementById('event_name').value = state.event.name || '';
             document.getElementById('comment').value = state.event.comment || '';
-            document.getElementById('event-name-counter').innerText = `${(state.event.name || '').length} / 50`;
-            document.getElementById('comment-counter').innerText = `${(state.event.comment || '').length} / 165`;
+            const eventNameCounter = document.getElementById('event-name-counter');
+            const commentCounter = document.getElementById('comment-counter');
+            if (eventNameCounter) eventNameCounter.innerText = `${(state.event.name || '').length} / 50`;
+            if (commentCounter) commentCounter.innerText = `${(state.event.comment || '').length} / 165`;
         }
 
         if (state.mic_counts) {
             const mc = state.mic_counts;
-            if (mc.analog_rm) document.getElementById('mic-analog-rm-10mw').value = mc.analog_rm['10mw'] || '';
-            if (mc.analog_em) document.getElementById('mic-analog-em-10mw').value = mc.analog_em['10mw'] || '';
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.value = val || '';
+            };
+
+            if (mc.analog_rm) setVal('mic-analog-rm-10mw', mc.analog_rm['10mw']);
+            if (mc.analog_em) setVal('mic-analog-em-10mw', mc.analog_em['10mw']);
             if (mc.digital_rm) {
-                document.getElementById('mic-digital-rm-10mw').value = mc.digital_rm['10mw'] || '';
-                document.getElementById('mic-digital-rm-20mw').value = mc.digital_rm['20mw'] || '';
-                document.getElementById('mic-digital-rm-50mw').value = mc.digital_rm['50mw'] || '';
+                setVal('mic-digital-rm-10mw', mc.digital_rm['10mw']);
+                setVal('mic-digital-rm-20mw', mc.digital_rm['20mw']);
+                setVal('mic-digital-rm-50mw', mc.digital_rm['50mw']);
             }
             if (mc.analog_53ch) {
-                document.getElementById('mic-analog-rm-53ch-10mw').value = mc.analog_53ch.rm_10mw || '';
-                document.getElementById('mic-analog-em-53ch-10mw').value = mc.analog_53ch.em_10mw || '';
+                setVal('mic-analog-rm-53ch-10mw', mc.analog_53ch.rm_10mw);
+                setVal('mic-analog-em-53ch-10mw', mc.analog_53ch.em_10mw);
             }
             if (mc.digital_53ch) {
-                document.getElementById('mic-digital-rm-53ch-10mw').value = mc.digital_53ch['10mw'] || '';
-                document.getElementById('mic-digital-rm-53ch-20mw').value = mc.digital_53ch['20mw'] || '';
-                document.getElementById('mic-digital-rm-53ch-50mw').value = mc.digital_53ch['50mw'] || '';
+                setVal('mic-digital-rm-53ch-10mw', mc.digital_53ch['10mw']);
+                setVal('mic-digital-rm-53ch-20mw', mc.digital_53ch['20mw']);
+                setVal('mic-digital-rm-53ch-50mw', mc.digital_53ch['50mw']);
             }
             if (mc.digital_12g) {
-                document.getElementById('mic-digital-rm-12g-10mw').value = mc.digital_12g['10mw'] || '';
-                document.getElementById('mic-digital-rm-12g-20mw').value = mc.digital_12g['20mw'] || '';
-                document.getElementById('mic-digital-rm-12g-50mw').value = mc.digital_12g['50mw'] || '';
+                setVal('mic-digital-rm-12g-10mw', mc.digital_12g['10mw']);
+                setVal('mic-digital-rm-12g-20mw', mc.digital_12g['20mw']);
+                setVal('mic-digital-rm-12g-50mw', mc.digital_12g['50mw']);
             }
-            document.getElementById('mic-12g-lmh').value = mc['12g_lmh'] || '';
+            setVal('mic-12g-lmh', mc['12g_lmh']);
         }
 
         if (state.extra_53ch) {
-            document.getElementById('toggle-53ch').innerText = state.extra_53ch;
+            const toggle = document.getElementById('toggle-53ch');
+            if (toggle) toggle.innerText = state.extra_53ch;
         }
 
         if (state.facilities && state.facilities.length > 0) {
             AppState.KeepList.clear();
-            for (const sf of state.facilities) {
-                try {
-                    const data = await Api.getFacilityDetail(sf.id);
+            
+            // 施設詳細を並列で取得して高速化
+            try {
+                const facilityPromises = state.facilities.map(sf => Api.getFacilityDetail(sf.id));
+                const detailResults = await Promise.all(facilityPromises);
+                
+                detailResults.forEach((detail, index) => {
+                    const sf = state.facilities[index];
                     AppState.KeepList.add({
-                        ...data.facility, // 施設基本情報を展開 (name, address等)
+                        ...detail.facility,
                         selectedChannels: sf.selectedChannels || [],
-                        availableChannels: data.available_channels,
+                        availableChannels: detail.available_channels,
                         // スケジュール情報も同期
                         start_date: sf.start_date || '',
                         end_date: sf.end_date || '',
                         start_time: sf.start_time || '09:00',
                         end_time: sf.end_time || '22:00'
                     });
-                } catch (e) { console.error(`Failed to restore facility ${sf.id}:`, e); }
+                });
+            } catch (e) {
+                console.error('Failed to restore some facilities:', e);
             }
             
             if (!AppState.KeepList.isEmpty()) {
@@ -563,10 +574,7 @@ async function applyStateToForm(state) {
                 goToAdjustment();
             }
         }
-        
-        // ハイライトの更新
         checkAllRequiredFields();
-        
     } catch (e) {
         console.error('Failed to apply state to form:', e);
         throw e;
@@ -577,16 +585,12 @@ async function applyStateToForm(state) {
  * History / Persistence Actions
  */
 async function saveAdjustmentDraft() {
-    console.log('[Draft] Starting save process...');
     try {
-        const data = collectFormData();
-        console.log('[Draft] Collected data:', data);
+        const data = FormService.collect();
         const result = await Api.saveAdjustment(data);
-        console.log('[Draft] Server response:', result);
         AppState.setAdjustment(result.id, 'draft');
         showToast('下書きを保存しました', 'success');
     } catch (err) {
-        console.error('[Draft] Save failed:', err);
         showToast(`保存に失敗しました: ${err.message}`, 'error');
     }
 }
@@ -619,11 +623,12 @@ async function refreshHistory() {
         
         items.forEach(item => {
             // Renderer を使用して DOM 要素を生成し、追加
-            const card = UIRenderer.createHistoryCard(
-                item, 
-                loadAdjustment, // 読み込み時のコールバック
-                previewHistoryItem // プレビュー時のコールバック
-            );
+            const card = UIRenderer.createHistoryCard(item, {
+                onLoad: loadAdjustment,
+                onPreview: previewHistoryItem,
+                onCreateChange: (id) => createDerivedAdjustment(id, 'change'),
+                onCreateDelete: (id) => createDerivedAdjustment(id, 'delete')
+            });
             container.appendChild(card);
         });
     } catch (err) {
@@ -642,29 +647,6 @@ async function loadAdjustment(id) {
     
     try {
         const data = await Api.getAdjustment(id);
-        
-        // 送信済みのデータを再利用する場合の処理
-        if (data.status === 'submitted') {
-            const result = await showDecisionModal({
-                title: '送信済みデータの再利用',
-                message: '既に送信済みの申請データです。次に行う操作を選択してください。',
-                okText: '変更申請を作成',
-                cancelText: '削除申請を作成',
-                cancelColor: 'red',
-                iconClass: 'fa-rotate-right'
-            });
-            
-            // xボタンや背景クリックで閉じられた場合は何もしない
-            if (result === null) return;
-
-            const isChange = result;
-            data.app_type = isChange ? 'change' : 'delete';
-            data.id = null; // 元のレコードを上書きしないようIDをクリア
-            data.status = 'draft'; // 新しい申請として扱うためステータスをリセット
-            AppState.setAdjustment(null, 'draft'); 
-            showToast(`送信済みデータから「${isChange ? '変更' : '削除'}」申請を作成します`, 'info');
-        }
-
         await applyStateToForm(data);
         closeHistoryModal();
         applyRoleConstraints(); // ロール制限を再適用
@@ -672,6 +654,42 @@ async function loadAdjustment(id) {
         FormStorage.save(data); // 復元用ストレージも同期
     } catch (err) {
         showToast(`読み込みに失敗しました: ${err.message}`, 'error');
+    }
+}
+
+/**
+ * 既存の「新規」または「変更」申請から、さらに「変更」または「削除」申請を作成する
+ */
+async function createDerivedAdjustment(parentId, type) {
+    try {
+        // 先に元データを取得して、正しいメッセージを表示できるようにする
+        const data = await Api.getAdjustment(parentId);
+        const originalTypeMap = { 'new': '新規', 'change': '変更' };
+        const originalTypeName = originalTypeMap[data.app_type] || '新規';
+        
+        const typeName = type === 'change' ? '変更' : '削除';
+        const confirmed = await showDecisionModal({
+            title: `${typeName}申請の作成`,
+            message: `【${data.event.name}】<br>の「${originalTypeName}」申請を元に、${typeName}申請を作成しますか？<br><br>※催事名は変更できません。`,
+            okText: '作成する',
+            cancelText: 'キャンセル',
+            iconClass: type === 'change' ? 'fa-pen-to-square' : 'fa-trash-can'
+        });
+        if (!confirmed) return;
+
+        // 派生申請として初期化
+        data.id = null;
+        data.status = 'draft';
+        data.app_type = type;
+        data.parent_id = parentId; // 親IDを保持
+
+        await applyStateToForm(data);
+        closeHistoryModal();
+        applyRoleConstraints();
+        showToast(`${typeName}申請を作成しました`, 'success');
+        FormStorage.save(data);
+    } catch (err) {
+        showToast(`作成に失敗しました: ${err.message}`, 'error');
     }
 }
 
@@ -692,7 +710,7 @@ function initChangeWatchers() {
     if (!container) return;
 
     const handleChange = () => {
-        const data = collectFormData();
+        const data = FormService.collect();
         FormStorage.save(data);
         
         // AppState にもスケジュール情報を同期

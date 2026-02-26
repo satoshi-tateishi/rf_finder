@@ -197,10 +197,10 @@ function updateAdjustmentButtonState() {
     const btn = document.getElementById('go-to-adjustment-btn');
     if (!btn) return;
 
-    // 少なくとも1つの施設で、1つ以上のチャンネルが選択されているか確認
-    const hasSelection = !AppState.KeepList.isEmpty() && AppState.KeepList.get().some(f => f.selectedChannels && f.selectedChannels.length > 0);
+    // ValidationService を使用して、全施設でチャンネルが選択されているか確認
+    const canProceed = ValidationService.canProceedToAdjustment(AppState.KeepList.get());
     
-    if (hasSelection) {
+    if (canProceed) {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
         btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
@@ -254,7 +254,7 @@ function renderRFGrid(facility, gridElement) {
         const chData = facility.availableChannels.find(c => c.channel === ch);
         const isSelected = facility.selectedChannels.includes(ch);
         
-        const btn = UIRenderer.createChannelButton(ch, chData, isSelected, () => {
+        const btn = UIRenderer.createChannelButton(ch, chData, isSelected, AppState.devices, () => {
             if (facility.selectedChannels.includes(ch)) {
                 facility.selectedChannels = facility.selectedChannels.filter(c => c !== ch);
                 btn.classList.remove('selected');

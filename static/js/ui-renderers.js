@@ -8,9 +8,12 @@ const UIRenderer = (function() {
     /**
      * 履歴カードの DOM 要素を生成する
      */
-    function createHistoryCard(item, onLoad, onPreview) {
+    function createHistoryCard(item, handlers = {}) {
+        const { onLoad, onPreview, onCreateChange, onCreateDelete } = handlers;
         const div = document.createElement('div');
         const isDeleteType = (item.app_type === '削除');
+        const isDerivableType = (item.app_type === '新規' || item.app_type === '変更');
+        const isSubmitted = (item.status === '送信済み');
         
         div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isDeleteType ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
         
@@ -26,6 +29,18 @@ const UIRenderer = (function() {
         if (item.app_type === '削除') typeColor = 'bg-red-100 text-red-700';
 
         const contentOpacity = isDeleteType ? 'opacity-50' : '';
+
+        // 新規または変更、かつ送信済みの場合のみ、派生申請ボタンを表示
+        const actionButtonsHtml = (isDerivableType && isSubmitted) ? `
+            <div class="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                <button class="create-change-btn flex-1 text-[9px] font-bold text-yellow-600 border border-yellow-600 py-1 rounded hover:bg-yellow-50 transition-colors">
+                    <i class="fa-solid fa-pen-to-square"></i> 変更を作成
+                </button>
+                <button class="create-delete-btn flex-1 text-[9px] font-bold text-red-600 border border-red-600 py-1 rounded hover:bg-red-50 transition-colors">
+                    <i class="fa-solid fa-trash-can"></i> 削除を作成
+                </button>
+            </div>
+        ` : '';
 
         div.innerHTML = `
             <div class="${contentOpacity}">
@@ -45,6 +60,7 @@ const UIRenderer = (function() {
                     <i class="fa-solid fa-eye"></i> プレビュー
                 </button>
             </div>
+            ${actionButtonsHtml}
         `;
 
         const previewBtn = div.querySelector('.preview-btn');
@@ -52,6 +68,22 @@ const UIRenderer = (function() {
             previewBtn.onclick = (e) => {
                 e.stopPropagation();
                 onPreview(item.id);
+            };
+        }
+
+        const changeBtn = div.querySelector('.create-change-btn');
+        if (changeBtn && onCreateChange) {
+            changeBtn.onclick = (e) => {
+                e.stopPropagation();
+                onCreateChange(item.id);
+            };
+        }
+
+        const deleteBtn = div.querySelector('.create-delete-btn');
+        if (deleteBtn && onCreateDelete) {
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                onCreateDelete(item.id);
             };
         }
 
@@ -80,24 +112,24 @@ const UIRenderer = (function() {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="start-date w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                    <input type="date" data-field="start_date" class="start-date w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
                         value="${savedData.start_date || ''}" required>
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="end-date w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                    <input type="date" data-field="end_date" class="end-date w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
                         value="${savedData.end_date || ''}" required>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-3">
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用開始時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="start-time w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                    <input type="time" data-field="start_time" class="start-time w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
                         value="${savedData.start_time || '09:00'}" required>
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 block mb-1">使用終了時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="end-time w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
+                    <input type="time" data-field="end_time" class="end-time w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
                         value="${savedData.end_time || '22:00'}" required>
                 </div>
             </div>
@@ -144,7 +176,7 @@ const UIRenderer = (function() {
     /**
      * チャンネルボタンを生成する
      */
-    function createChannelButton(ch, chData, isSelected, onClick) {
+    function createChannelButton(ch, chData, isSelected, devices, onClick) {
         const btn = document.createElement('div');
         btn.className = `ch-btn ${chData ? 'available' : 'disabled'} ${isSelected ? 'selected' : ''}`;
         btn.innerHTML = `<span>${ch}</span>`;
@@ -152,7 +184,7 @@ const UIRenderer = (function() {
         if (chData && onClick) {
             btn.onclick = onClick;
             
-            const chWidth = (ch === 53) ? 4000 : 6000;
+            const chWidth = RADIO_SPEC.SPECIAL_WIDTHS[ch] ?? RADIO_SPEC.DEFAULT_WIDTH;
 
             // ガードバンド表示
             if (chData.gb_lower > 0) {
@@ -174,11 +206,11 @@ const UIRenderer = (function() {
             const indicators = document.createElement('div');
             indicators.className = 'device-indicators';
             
-            const base_start = 470000 + (ch - 13) * 6000;
+            const base_start = RADIO_SPEC.calculateChannelBase(ch);
             const base_end = base_start + chWidth;
 
-            if (AppState.devices) {
-                AppState.devices.forEach((d) => {
+            if (devices) {
+                devices.forEach((d) => {
                     const overlap_min = Math.max(d.min, base_start);
                     const overlap_max = Math.min(d.max, base_end);
                     

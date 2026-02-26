@@ -7,6 +7,7 @@ const AppState = (function() {
     // 内部的な状態保持
     const _state = {
         currentAdjustmentId: null,
+        parentAdjustmentId: null,
         currentStatus: 'draft',
         keepList: [],
         devices: [],
@@ -28,10 +29,11 @@ const AppState = (function() {
     /**
      * 申請データの情報をセット
      */
-    function setAdjustment(id, status = 'draft') {
+    function setAdjustment(id, status = 'draft', parentId = null) {
         _state.currentAdjustmentId = id;
         _state.currentStatus = status;
-        console.log(`[State] Adjustment updated: id=${id}, status=${status}`);
+        _state.parentAdjustmentId = parentId;
+        console.log(`[State] Adjustment updated: id=${id}, status=${status}, parentId=${parentId}`);
     }
 
     /**
@@ -61,6 +63,7 @@ const AppState = (function() {
         setAdjustment,
         KeepList,
         get currentAdjustmentId() { return _state.currentAdjustmentId; },
+        get parentAdjustmentId() { return _state.parentAdjustmentId; },
         get currentStatus() { return _state.currentStatus; },
         get devices() { return _state.devices; },
         get currentUser() { return _state.currentUser; }

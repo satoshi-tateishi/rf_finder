@@ -406,17 +406,17 @@
 
             <!-- Form Actions -->
             <div class="flex flex-col gap-3">
-                <button onclick="saveAdjustmentDraft()" class="w-full bg-blue-50 text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center justify-center gap-2">
+                <button id="save-draft-btn" onclick="saveAdjustmentDraft()" class="w-full bg-blue-50 text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center justify-center gap-2">
                     <i class="fa-solid fa-floppy-disk"></i> 下書き保存
                 </button>
-                <button onclick="previewPDF()" class="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                <button id="preview-pdf-btn" onclick="previewPDF()" class="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
                     <i class="fa-solid fa-eye"></i> 内容をプレビュー
                 </button>
                 <div class="grid grid-cols-2 gap-3">
-                    <button onclick="downloadPDF()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                    <button id="download-pdf-btn" onclick="downloadPDF()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg">
                         <i class="fa-solid fa-file-pdf"></i> PDF
                     </button>
-                    <button onclick="downloadExcel()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                    <button id="download-excel-btn" onclick="downloadExcel()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 text-lg">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
                 </div>
@@ -579,8 +579,11 @@
         </div>
     </div>
     <!-- Modular JS Files -->
+    <script src="/static/js/constants.js?v=1.2"></script>
     <script src="/static/js/api.js?v=1.2"></script>
     <script src="/static/js/app-state.js?v=1.2"></script>
+    <script src="/static/js/form-service.js?v=1.2"></script>
+    <script src="/static/js/validation-service.js?v=1.2"></script>
     <script src="/static/js/ui-renderers.js?v=1.2"></script>
     <script src="/static/js/notifications.js?v=1.2"></script>
     <script src="/static/js/form-storage.js?v=1.2"></script>
