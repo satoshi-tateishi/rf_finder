@@ -88,43 +88,9 @@ function goToAdjustment() {
         // 保存データからこの施設の情報を探す
         const sf = savedFacilities.find(item => item.id === f.id) || {};
         
-        const div = document.createElement('div');
-        div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
-        const formattedChannels = Api.formatChannels(f.selectedChannels);
-        div.innerHTML = `
-            <div class="flex items-center gap-2 mb-1">
-                <span class="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">${index + 1}</span>
-                <span class="font-bold text-sm text-gray-800">${f.name}</span>
-            </div>
-            <div class="ml-7 mb-3 text-[10px] text-blue-600 font-medium">
-                使用チャンネル : ${formattedChannels}
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用開始日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
-                        value="${sf.start_date || ''}" required>
-                </div>
-                <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用終了日 <span class="text-red-500">*</span></label>
-                    <input type="date" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
-                        value="${sf.end_date || ''}" required>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3 mt-3">
-                <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用開始時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
-                        value="${sf.start_time || '09:00'}" required>
-                </div>
-                <div>
-                    <label class="text-[10px] text-gray-500 block mb-1">使用終了時間 <span class="text-red-500">*</span></label>
-                    <input type="time" class="w-full border border-gray-300 p-2 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" 
-                        value="${sf.end_time || '22:00'}" required>
-                </div>
-            </div>
-        `;
-        container.appendChild(div);
+        // Renderer を使用して DOM 要素を生成し、追加
+        const facilityItem = UIRenderer.createFacilityFormItem(f, index, sf);
+        container.appendChild(facilityItem);
     });
 
     document.getElementById('ch-selection-section').classList.add('hidden');
@@ -652,46 +618,13 @@ async function refreshHistory() {
         }
         
         items.forEach(item => {
-            const div = document.createElement('div');
-            const isDeleteType = (item.app_type === '削除');
-            
-            div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isDeleteType ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
-            
-            // 削除タイプ以外の場合のみクリックで読み込み
-            if (!isDeleteType) {
-                div.onclick = () => loadAdjustment(item.id);
-            }
-            
-            const statusColor = item.status === '下書き' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700';
-            
-            // 申請区分の色分け
-            let typeColor = 'bg-gray-100 text-gray-600';
-            if (item.app_type === '新規') typeColor = 'bg-blue-100 text-blue-700';
-            if (item.app_type === '変更') typeColor = 'bg-yellow-100 text-yellow-700';
-            if (item.app_type === '削除') typeColor = 'bg-red-100 text-red-700';
-
-            const contentOpacity = isDeleteType ? 'opacity-50' : '';
-
-            div.innerHTML = `
-                <div class="${contentOpacity}">
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
-                        <span class="text-[10px] text-gray-400">${item.updated_at}</span>
-                    </div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <div class="font-bold text-gray-800 flex-1">${item.event_name || '（催事名なし）'}</div>
-                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColor} shrink-0">${item.app_type}</span>
-                    </div>
-                    <div class="text-xs text-gray-500 truncate mb-2">${item.facility_names.join(', ')}</div>
-                </div>
-                <div class="flex justify-between items-center">
-                    <div class="text-[10px] text-gray-400 ${contentOpacity}">${item.user_name}</div>
-                    <button onclick="event.stopPropagation(); previewHistoryItem(${item.id})" class="text-[10px] font-bold text-blue-600 border border-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors bg-white">
-                        <i class="fa-solid fa-eye"></i> プレビュー
-                    </button>
-                </div>
-            `;
-            container.appendChild(div);
+            // Renderer を使用して DOM 要素を生成し、追加
+            const card = UIRenderer.createHistoryCard(
+                item, 
+                loadAdjustment, // 読み込み時のコールバック
+                previewHistoryItem // プレビュー時のコールバック
+            );
+            container.appendChild(card);
         });
     } catch (err) {
         container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm">エラー: ${err.message}</div>`;
