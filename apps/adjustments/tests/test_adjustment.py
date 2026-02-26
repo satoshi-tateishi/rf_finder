@@ -91,6 +91,18 @@ class AdjustmentLogicTest(TestCase):
 
 class AdjustmentAPITest(TestCase):
     def setUp(self):
+        from django.contrib.auth.models import User
+        from apps.accounts.models import UserProfile
+
+        # テスト用ユーザーの作成とログイン
+        self.user = User.objects.create_user(username='testuser', password='password')
+        # UserProfile はシグナルで自動生成されるが、role などを明示的に設定
+        self.user.profile.role = UserProfile.Role.EDITOR
+        self.user.profile.family_name = 'テスト'
+        self.user.profile.given_name = 'ユーザー'
+        self.user.profile.save()
+        self.client.force_login(self.user)
+
         Member.objects.create(name='テスト会員')
         EmailTemplate.objects.create(subject='テスト件名', body='テスト本文', to_address='test@example.com')
         self.valid_data = {
