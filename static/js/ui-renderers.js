@@ -12,12 +12,17 @@ const UIRenderer = (function() {
         const { onLoad, onPreview, onCreateChange, onCreateDelete } = handlers;
         const div = document.createElement('div');
         const isDeleteType = (item.app_type === '削除');
+        const isNewType = (item.app_type === '新規');
         const isDerivableType = (item.app_type === '新規' || item.app_type === '変更');
         const isSubmitted = (item.status === '送信済み');
         
-        div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isDeleteType ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
+        // 「新規」かつ送信済みの場合は、再編集を禁止するためクリック不可にする
+        const isReadLayer = isDeleteType || (isNewType && isSubmitted);
         
-        if (!isDeleteType && onLoad) {
+        div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isReadLayer ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
+        
+        // 読み取り専用レイヤー（削除済み、または送信済み新規）以外の場合のみクリックで読み込み
+        if (!isReadLayer && onLoad) {
             div.onclick = () => onLoad(item.id);
         }
         
@@ -54,9 +59,12 @@ const UIRenderer = (function() {
                 </div>
                 <div class="text-xs text-gray-500 truncate mb-2">${item.facility_names.join(', ')}</div>
             </div>
-            <div class="flex justify-between items-center">
-                <div class="text-[10px] text-gray-400 ${contentOpacity}">${item.user_name}</div>
-                <button class="preview-btn text-[10px] font-bold text-blue-600 border border-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors bg-white">
+            <div class="flex justify-between items-end">
+                <div class="text-[10px] text-gray-400 ${contentOpacity}">
+                    <div>現地使用者: ${item.user_name}</div>
+                    <div class="mt-0.5">申請者&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${item.sender_name}</div>
+                </div>
+                <button class="preview-btn text-[10px] font-bold text-blue-600 border border-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors bg-white shrink-0">
                     <i class="fa-solid fa-eye"></i> プレビュー
                 </button>
             </div>

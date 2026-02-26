@@ -50,7 +50,6 @@ def validate_adjustment_data(data):
     return True, None
 
 
-@csrf_exempt
 @json_api_view(validate=False)
 def save_adjustment(request, data):
     """手動保存（下書き）"""
@@ -84,7 +83,8 @@ def list_adjustments(request):
             {
                 'id': adj.id,
                 'event_name': adj.event_name,
-                'user_name': adj.user_name,
+                'user_name': adj.user_name, # 現地使用者
+                'sender_name': adj.user.profile.full_name if (adj.user and hasattr(adj.user, 'profile')) else (adj.user.get_full_name() if adj.user else 'システム'), # 実際に操作した申請者
                 'app_type': adj.get_app_type_display(),
                 'status': adj.get_status_display(),
                 'created_at': timezone.localtime(adj.created_at).strftime('%Y/%m/%d %H:%M'),
@@ -100,6 +100,12 @@ def get_adjustment(request, pk):
     """単一データの取得"""
     try:
         adj = OperationAdjustment.objects.get(pk=pk)
+        
+        # 認可チェック: 作成者本人または管理者のみ許可
+        if adj.user and adj.user != request.user and getattr(request.user.profile, 'role', 'viewer') != 'admin':
+            from apps.adjustments.utils import api_error
+            return api_error('Permission denied', status=403)
+
         data = {
             'id': adj.id,
             'app_type': adj.app_type,
@@ -124,7 +130,6 @@ def get_adjustment(request, pk):
         return api_error('Not found', status=404)
 
 
-@csrf_exempt
 @json_api_view(validate=True)
 def preview_excel(request, data):
     member = Member.objects.first()
@@ -142,7 +147,6 @@ def preview_excel(request, data):
     return response
 
 
-@csrf_exempt
 @json_api_view(validate=True)
 def preview_pdf(request, data):
     print('>>> preview_pdf called')
@@ -168,7 +172,6 @@ def preview_pdf(request, data):
         return api_error(str(e), status=500)
 
 
-@csrf_exempt
 @json_api_view(validate=True)
 def send_email(request, data):
     member = Member.objects.first()
@@ -221,21 +224,22 @@ def send_email(request, data):
             try:
                 # サービス層で構築されたメッセージを使用
                 msg = bot_service.build_submission_notification_message(data)
-
                 # テキストメッセージとPDFを送信
                 bot_service.send_text_message(notify_channel_id, msg)
                 bot_service.send_pdf(notify_channel_id, pdf_content, file_name=filename)
             except Exception as notify_err:
                 print(f'Error sending notification to LW group: {notify_err}')
 
-        return api_success({'message': 'Email sent successfully'})
+        return api_success({
+            'message': 'Email sent successfully',
+            'id': adjustment.id
+        })
     except Exception as e:
         print(f'Error sending email: {e}')
         traceback.print_exc()
         return api_error(str(e), status=500)
 
 
-@csrf_exempt
 @json_api_view(validate=False)
 def export_wsm(request, data):
     """

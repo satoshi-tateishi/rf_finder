@@ -69,8 +69,11 @@ function createNewAdjustment() {
         showToast('施設を選択してください', 'info');
         return;
     }
-    // 新規作成なので状態をリセット
+    // 新規作成なので状態を完全にリセット
+    // 以前の案件の ID やステータス (submitted等) が残留しないようストレージもクリアする
     AppState.setAdjustment(null, 'draft');
+    FormStorage.clear();
+    
     resetFormForNew(); 
     
     // 画面遷移実行
@@ -183,7 +186,8 @@ function applyRoleConstraints() {
     const role = AppState.currentUser?.role || 'guest';
     const isViewer = (role === 'viewer');
     const isSubmitted = (AppState.currentStatus === 'submitted');
-    const isReadOnly = isViewer || isSubmitted;
+    const isSubmitting = (AppState.currentStatus === 'submitting');
+    const isReadOnly = isViewer || isSubmitted || isSubmitting;
     
     // 現在の申請区分を取得
     const appTypeEl = document.querySelector('input[name="app_type"]:checked');
@@ -201,13 +205,18 @@ function applyRoleConstraints() {
     actionButtons.forEach(selector => {
         const btn = document.querySelector(selector);
         if (btn) {
-            const shouldDisable = isViewer || (selector === '#send-email-btn' && isSubmitted);
+            // 閲覧者、送信済み、または送信中の場合はボタンを無効化
+            const shouldDisable = isViewer || (selector === '#send-email-btn' && (isSubmitted || isSubmitting));
             btn.disabled = shouldDisable;
             if (shouldDisable) btn.classList.add('opacity-50', 'cursor-not-allowed');
             else btn.classList.remove('opacity-50', 'cursor-not-allowed');
 
             if (selector === '#send-email-btn') {
-                btn.innerHTML = isSubmitted ? '<i class="fa-solid fa-check"></i> 送信済み' : '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
+                if (isSubmitting) {
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
+                } else {
+                    btn.innerHTML = isSubmitted ? '<i class="fa-solid fa-check"></i> 送信済み' : '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
+                }
             }
         }
     });
@@ -518,19 +527,24 @@ async function sendEmail() {
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
+    
+    // 送信中ステータスをセット (二重送信防止の強化)
+    AppState.setAdjustment(AppState.currentAdjustmentId, 'submitting');
 
     try {
-        await Api.sendEmail(data);
+        const result = await Api.sendEmail(data);
         showToast('特ラ機構への送信が完了しました', 'success');
         
-        // 送信成功時はボタンをロック
-        AppState.setAdjustment(AppState.currentAdjustmentId, 'submitted');
+        // 送信成功時はボタンをロック。サーバーから発行されたIDを同期
+        AppState.setAdjustment(result.id, 'submitted');
         applyRoleConstraints();
         
         // クリアせずに現在の状態（submitted）を保存して同期を維持
         FormStorage.save(FormService.collect());
     } catch (err) {
         handleValidationErrors(err);
+        // 失敗時は draft に戻して再試行を許可
+        AppState.setAdjustment(AppState.currentAdjustmentId, 'draft');
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
@@ -542,9 +556,23 @@ async function sendEmail() {
 async function restoreFormState() {
     const state = FormStorage.load();
     if (!state) return;
-    // 第2引数に 'storage' を渡し、status の復元をスキップさせる
-    await applyStateToForm(state, 'storage');
-    showToast('前回の入力内容を復元しました', 'info');
+
+    try {
+        if (state.id) {
+            // ID がある場合は、サーバーから最新の状態（ステータス含む）を再取得して整合性を保証
+            console.log(`[Storage] Found ID ${state.id}, fetching fresh state from server...`);
+            const fresh = await Api.getAdjustment(state.id);
+            await applyStateToForm(fresh, 'api');
+        } else {
+            // ID がない（未保存の下書き）の場合は、ストレージの内容をそのまま復元
+            await applyStateToForm(state, 'storage');
+        }
+        showToast('前回の入力内容を復元しました', 'info');
+    } catch (err) {
+        console.error('[Storage] Failed to restore from server, falling back to local storage:', err);
+        // サーバーからの取得に失敗した場合は、ローカルの内容で可能な限り復元
+        await applyStateToForm(state, 'storage');
+    }
 }
 
 async function applyStateToForm(state, source = 'api') {
@@ -647,6 +675,8 @@ async function applyStateToForm(state, source = 'api') {
                 goToAdjustment();
             }
         }
+        // ロール制限とハイライトの更新
+        applyRoleConstraints();
         checkAllRequiredFields();
     } catch (e) {
         console.error('Failed to apply state to form:', e);
@@ -787,6 +817,8 @@ function initChangeWatchers() {
 
     const handleChange = () => {
         const data = FormService.collect();
+        // 明示的に現在のステータスを保存に含める
+        data.status = AppState.currentStatus;
         FormStorage.save(data);
         
         // AppState にもスケジュール情報を同期
@@ -810,6 +842,11 @@ function initChangeWatchers() {
 
 // 初期化時に実行
 window.addEventListener('DOMContentLoaded', async () => {
-    // 他の初期化（KeepList等）が完了するのを待つ必要があるため、
-    // ここではなく index.html の末尾で明示的に呼び出す形を維持
+    // 変更監視を開始
+    initChangeWatchers();
+
+    // ID がセットされていない場合は、確実に draft ステータスにする
+    if (!AppState.currentAdjustmentId) {
+        AppState.setAdjustment(null, 'draft');
+    }
 });

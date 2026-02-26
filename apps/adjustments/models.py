@@ -43,6 +43,15 @@ class OperationAdjustment(models.Model):
 
     extra_53ch = models.BooleanField(default=False, verbose_name='53ch併用')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='ステータス')
+    
+    parent = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='children',
+        verbose_name='元申請'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
@@ -60,59 +69,73 @@ class OperationAdjustment(models.Model):
         """
         JSONデータ（辞書形式）を受け取り、モデルインスタンスを保存・更新する。
         """
-        adjustment_id = data.get('id')
-        if adjustment_id:
-            try:
-                # 更新時は、IDだけでなくユーザーの一致も確認する (セキュリティ強化)
-                if user and user.is_authenticated:
-                    # 既に送信済みの場合は、一切の変更を拒否する (既存のIDを指定しての再送信も不可)
-                    instance = cls.objects.get(pk=adjustment_id)
-                    if instance.status == 'submitted':
-                        raise ValueError('既に送信済みのデータは変更できません。')
-                    
-                    # 作成者本人でない場合の下書き上書きを制限
-                    if instance.user and instance.user != user:
-                        raise PermissionError('他のユーザーの下書きを編集する権限がありません。')
-                else:
-                    raise PermissionError('ログインが必要です。')
-            except cls.DoesNotExist:
-                raise ValueError('対象のデータが見つかりません。')
-        else:
-            instance = cls()
+        from django.db import transaction
+        
+        with transaction.atomic():
+            adjustment_id = data.get('id')
+            parent_id = data.get('parent_id')
+            
+            if adjustment_id:
+                try:
+                    # 更新時は、IDだけでなくユーザーの一致も確認する (セキュリティ強化)
+                    if user and user.is_authenticated:
+                        # 既に送信済みの場合は、一切の変更を拒否する (既存のIDを指定しての再送信も不可)
+                        instance = cls.objects.select_for_update().get(pk=adjustment_id)
+                        if instance.status == 'submitted':
+                            raise ValueError('既に送信済みのデータは変更できません。')
+                        
+                        # 作成者本人でない場合の下書き上書きを制限
+                        if instance.user and instance.user != user:
+                            raise PermissionError('他のユーザーの下書きを編集する権限がありません。')
+                    else:
+                        raise PermissionError('ログインが必要です。')
+                except cls.DoesNotExist:
+                    raise ValueError('対象のデータが見つかりません。')
+            else:
+                instance = cls()
 
-        if user and user.is_authenticated:
-            instance.user = user
+            if user and user.is_authenticated:
+                instance.user = user
 
-        # ステータス遷移の制限: draft または submitted のみを許可
-        if status not in ['draft', 'submitted']:
-            raise ValueError('不正なステータス指定です。')
-        instance.status = status
+            # 親申請の紐付け (永続化)
+            if parent_id:
+                try:
+                    instance.parent = cls.objects.get(pk=parent_id)
+                except cls.DoesNotExist:
+                    pass
 
-        instance.app_type = data.get('app_type', 'new')
+            # ステータス遷移の制限: draft または submitted のみを許可
+            if status not in ['draft', 'submitted']:
+                raise ValueError('不正なステータス指定です。')
+            instance.status = status
 
-        user_data = data.get('user', {})
-        instance.user_name = user_data.get('name', '')
-        instance.user_kana = user_data.get('kana', '')
-        instance.user_tel = user_data.get('tel', '')
-        instance.user_email = user_data.get('email', '')
+            instance.app_type = data.get('app_type', 'new')
 
-        event_data = data.get('event', {})
-        instance.event_name = event_data.get('name', '')
-        instance.event_comment = event_data.get('comment', '')
+            user_data = data.get('user', {})
+            instance.user_name = user_data.get('name', '')
+            instance.user_kana = user_data.get('kana', '')
+            instance.user_tel = user_data.get('tel', '')
+            instance.user_email = user_data.get('email', '')
 
-        instance.facilities_json = data.get('facilities', [])
-        instance.mic_counts_json = data.get('mic_counts', {})
-        instance.selected_channels_json = data.get('selected_channels', [])
-        instance.extra_53ch = data.get('extra_53ch') == '○'
+            event_data = data.get('event', {})
+            instance.event_name = event_data.get('name', '')
+            instance.event_comment = event_data.get('comment', '')
 
-        instance.save()
+            instance.facilities_json = data.get('facilities', [])
+            instance.mic_counts_json = data.get('mic_counts', {})
+            instance.selected_channels_json = data.get('selected_channels', [])
+            instance.extra_53ch = data.get('extra_53ch') == '○'
 
-        # M2M 施設の紐付け (IDの妥当性チェック)
-        facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
-        if facility_ids:
-            valid_facilities = Facility.objects.filter(id__in=facility_ids)
-            if valid_facilities.count() != len(set(facility_ids)):
-                raise ValueError("不正または存在しない施設IDが含まれています。")
-            instance.facilities.set(valid_facilities)
+            instance.save()
+
+            # M2M 施設の紐付け (IDの妥当性チェック)
+            facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
+            if facility_ids:
+                valid_facilities = Facility.objects.filter(id__in=facility_ids)
+                if valid_facilities.count() != len(set(facility_ids)):
+                    raise ValueError("不正または存在しない施設IDが含まれています。")
+                instance.facilities.set(valid_facilities)
+
+            return instance
 
         return instance
