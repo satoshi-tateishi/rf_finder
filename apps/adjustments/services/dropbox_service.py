@@ -72,38 +72,43 @@ class DropboxService:
         return token is not None and (token.access_token or token.refresh_token)
 
     def get_client(self):
-        token = self.get_token_model()
-        if not token:
+        token_model = self.get_token_model()
+        if not token_model:
             raise DropboxAuthError('Dropboxのトークンが見つかりません。先に認証を行ってください。')
 
-        # トークンの期限切れチェックとリフレッシュ
-        if token.is_access_token_expired():
-            if token.has_valid_refresh_token():
-                self.refresh_access_token(token)
+        # SDKの自動リフレッシュ機能を利用する設定
+        # oauth2_access_token を渡しておくと、有効な間はそれを使います。
+        # 期限が切れると refresh_token を使って自動更新します。
+        dbx = dropbox.Dropbox(
+            oauth2_access_token=token_model.access_token,
+            oauth2_refresh_token=token_model.refresh_token,
+            app_key=self.app_key,
+            app_secret=self.app_secret,
+        )
+
+        # 明示的に期限切れをチェックして更新・保存する
+        # (SDK任せでも動きますが、DB内のアクセストークンを最新に保つために手動リフレッシュを併用)
+        if token_model.is_access_token_expired():
+            if token_model.has_valid_refresh_token():
+                try:
+                    logger.info('アクセストークンの期限が近いため、リフレッシュを実行します。')
+                    res = dbx.refresh_access_token()
+
+                    token_model.access_token = res.access_token
+                    expires_in = getattr(res, 'expires_in', 14400)
+                    token_model.expires_at = timezone.now() + timedelta(seconds=expires_in)
+                    token_model.save()
+                    logger.info('Dropboxのアクセストークンを正常に更新して保存しました。')
+                except ApiError as e:
+                    logger.error(f'Dropboxトークンのリフレッシュに失敗しました (ApiError): {e}')
+                    raise DropboxAuthError('Dropboxの再連携が必要です。') from e
+                except Exception as e:
+                    logger.error(f'Dropboxトークンの更新中に予期しないエラーが発生しました: {e}')
+                    raise DropboxAuthError(f'Dropboxトークンの更新に失敗しました: {str(e)}') from e
             else:
-                raise DropboxAuthError('アクセストークンが期限切れで、リフレッシュトークンも利用できません。')
+                raise DropboxAuthError('Dropboxの再連携が必要です（リフレッシュトークンなし）。')
 
-        return dropbox.Dropbox(token.access_token)
-
-    def refresh_access_token(self, token_model):
-        """リフレッシュトークンを使用してアクセストークンを更新する"""
-        try:
-            dbx = dropbox.Dropbox(
-                oauth2_refresh_token=token_model.refresh_token, app_key=self.app_key, app_secret=self.app_secret
-            )
-            res = dbx.refresh_access_token()
-
-            token_model.access_token = res.access_token
-            # 有効期限を更新 (秒を時間に変換)
-            expires_in = getattr(res, 'expires_in', 14400)
-            token_model.expires_at = timezone.now() + timedelta(seconds=expires_in)
-            token_model.save()
-
-            logger.info('Dropboxのアクセストークンを正常に更新しました。')
-            return True
-        except Exception as e:
-            logger.error(f'Dropboxトークンの更新に失敗しました: {e}')
-            raise DropboxAuthError(f'Dropboxトークンの更新に失敗しました: {str(e)}') from e
+        return dbx
 
     def ensure_folder_exists(self, client, folder_path):
         """フォルダが存在することを確認し、なければ作成する"""
