@@ -10,6 +10,19 @@ from apps.facilities.models import Facility, TVChannelStatus
 
 class LWNotificationTest(TestCase):
     def setUp(self):
+        from django.contrib.auth.models import User
+
+        from apps.accounts.models import UserProfile
+
+        # テスト用ユーザーの作成とログイン
+        self.user = User.objects.create_user(username='testnotif', password='password')
+        if not hasattr(self.user, 'profile'):
+            UserProfile.objects.create(user=self.user)
+        self.user.profile.family_name = '通知'
+        self.user.profile.given_name = 'テスト'
+        self.user.profile.save()
+        self.client.force_login(self.user)
+
         self.member = Member.objects.create(name='テスト会員', member_id_1='123', member_id_2='456')
         EmailTemplate.objects.create(to_address='dest@example.com', subject='{タイプ}:{催事名}', body='{ユーザー名} 様')
         self.facility = Facility.objects.create(name='テスト施設', prefecture='東京都', address='渋谷区')

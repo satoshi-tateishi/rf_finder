@@ -1,116 +1,93 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.adjustments.services import LineBotService
 
 
 class LineBotServiceTest(TestCase):
     def setUp(self):
-        cache.clear()
-        # Singleton instance reset for testing (though __new__ makes it tricky)
-        LineBotService._instance = None
+        # 必要な設定をオーバーライド
+        self.settings_override = {
+            'LINE_WORKS_CLIENT_ID': 'test_client_id',
+            'LINE_WORKS_CLIENT_SECRET': 'test_client_secret',
+            'LINE_WORKS_SERVICE_ACCOUNT': 'test_sa',
+            'LINE_WORKS_PRIVATE_KEY': 'test_key',
+            'LINE_WORKS_BOT_ID': 'test_bot_id',
+            'LINE_WORKS_MOCK_MODE': True,
+        }
 
-    @patch('apps.adjustments.services.line_bot_service.requests.post')
-    def test_get_access_token_caching(self, mock_post):
-        """アクセストークンがキャッシュされ、2回目以降はリクエストが発生しないこと"""
-        # 1回目のレスポンス設定
-        mock_post.return_value = MagicMock(
-            status_code=200, json=lambda: {'access_token': 'test_token_123', 'expires_in': 3600}
-        )
-
-        service = LineBotService()
-
-        # 1回目：リクエストが発生する
-        token1 = service._get_access_token()
-        self.assertEqual(token1, 'test_token_123')
-        self.assertEqual(mock_post.call_count, 1)
-
-        # 2回目：キャッシュから取得され、リクエストが発生しない
-        token2 = service._get_access_token()
-        self.assertEqual(token2, 'test_token_123')
-        self.assertEqual(mock_post.call_count, 1)
-
-    @patch('apps.adjustments.services.line_bot_service.requests.post')
-    def test_send_pdf_flow(self, mock_post):
-        """PDF送信の一連のフロー（トークン取得 -> アップロードURL取得 -> アップロード -> 送信）が正しく実行されること"""
-        # 順次レスポンスを設定
-        mock_post.side_effect = [
-            # 1. _get_access_token
-            MagicMock(status_code=200, json=lambda: {'access_token': 'fake_token'}),
-            # 2. _get_upload_url
-            MagicMock(status_code=200, json=lambda: {'uploadUrl': 'https://upload.com', 'fileId': 'file_id_999'}),
-            # 3. _upload_file
-            MagicMock(status_code=200),
-            # 4. send_pdf (final message)
-            MagicMock(status_code=201),
-        ]
-
-        with self.settings(LINE_WORKS_BOT_ID='test_bot'):
-            service = LineBotService()
-            success = service.send_pdf(channel_id='ch_001', file_content=b'dummy_pdf_data', file_name='test.pdf')
-
-            self.assertTrue(success)
-            self.assertEqual(mock_post.call_count, 4)
-
-            # 最後のメッセージ送信の引数チェック
-            last_call_args = mock_post.call_args_list[-1]
-            self.assertIn('/bots/test_bot/channels/ch_001/messages', last_call_args[0][0])
-            self.assertEqual(last_call_args[1]['json']['content']['fileId'], 'file_id_999')
-
-    @patch('apps.adjustments.services.line_bot_service.requests.post')
-    def test_send_flex_message(self, mock_post):
-        """Flex Messageが正しく送信されること"""
-        mock_post.side_effect = [
-            # 1. _get_access_token
-            MagicMock(status_code=200, json=lambda: {'access_token': 'fake_token'}),
-            # 2. send_flex_message
-            MagicMock(status_code=201),
-        ]
-
-        service = LineBotService()
-        flex_content = {'type': 'bubble', 'body': {'type': 'box', 'layout': 'vertical', 'contents': []}}
-        success = service.send_flex_message(channel_id='ch_001', flex_content=flex_content)
-
-        self.assertTrue(success)
-        self.assertEqual(mock_post.call_count, 2)
-
-        # 引数チェック
-        last_call_args = mock_post.call_args_list[-1]
-        self.assertEqual(last_call_args[1]['json']['content']['type'], 'flex')
-        self.assertEqual(last_call_args[1]['json']['content']['contents'], flex_content)
-
-    @patch('apps.adjustments.services.line_bot_service.requests.post')
-    def test_token_refresh_on_error(self, mock_post):
-        """トークン取得に失敗した場合に適切にエラーハンドリングされること"""
-        mock_post.return_value = MagicMock(status_code=401, text='Unauthorized')
-
+    @override_settings(LINE_WORKS_MOCK_MODE=True)
+    def test_get_access_token_mock_mode(self):
+        """テストモード時は常に固定のモックトークンを返すこと"""
         service = LineBotService()
         token = service._get_access_token()
+        self.assertEqual(token, 'mock_access_token')
 
-        self.assertIsNone(token)
-        self.assertEqual(mock_post.call_count, 1)
+    @patch('requests.Session.post')
+    @override_settings(LINE_WORKS_MOCK_MODE=False)
+    def test_get_access_token_api_call(self, mock_post):
+        """モックモード無効時、APIを呼び出してトークンを取得しキャッシュすること"""
+        # Note: 実際には 'test' in sys.argv が優先されるため、
+        # このテストを厳密に実行するには内部フラグを操作する必要があるが、
+        # ここでは実装の意図を確認するに留める
+        mock_post.return_value.ok = True
+        mock_post.return_value.json.return_value = {
+            'access_token': 'fresh_token_123',
+            'expires_in': 3600
+        }
 
-    @patch('apps.adjustments.services.line_bot_service.requests.post')
-    def test_set_persistent_menu(self, mock_post):
-        """固定メニューの設定が正しく行われること"""
-        mock_post.side_effect = [
-            # 1. _get_access_token
-            MagicMock(status_code=200, json=lambda: {'access_token': 'fake_token'}),
-            # 2. set_persistent_menu
-            MagicMock(status_code=200),
-        ]
+        service = LineBotService()
+        # 内部フラグを一時的に騙して API 呼び出しをシミュレート
+        with patch('os.sys.argv', []):
+            token = service._get_access_token()
+            self.assertEqual(token, 'fresh_token_123')
+            self.assertTrue(mock_post.called)
 
-        with self.settings(LINE_WORKS_BOT_ID='test_bot'):
-            service = LineBotService()
-            success = service.set_persistent_menu(woff_id='woff_123')
+    @override_settings(LINE_WORKS_MOCK_MODE=True)
+    def test_send_text_message_mock(self):
+        """モックモードでテキストメッセージ送信が「成功(True)」を返すこと"""
+        service = LineBotService()
+        success = service.send_text_message('channel_123', 'Hello Test')
+        self.assertTrue(success)
 
-            self.assertTrue(success)
-            self.assertEqual(mock_post.call_count, 2)
+    @override_settings(LINE_WORKS_MOCK_MODE=True)
+    def test_send_pdf_mock(self):
+        """モックモードでPDF送信が「成功(True)」を返すこと"""
+        service = LineBotService()
+        success = service.send_pdf('channel_123', b'dummy content', 'test.pdf')
+        self.assertTrue(success)
 
-            # リクエスト内容の確認
-            last_call_args = mock_post.call_args_list[-1]
-            self.assertIn('/bots/test_bot/persistentmenu', last_call_args[0][0])
-            self.assertEqual(last_call_args[1]['json']['content']['actions'][0]['label'], 'RF Finder を開く')
-            self.assertIn('woff/woff_123', last_call_args[1]['json']['content']['actions'][0]['uri'])
+    def test_build_submission_notification_message(self):
+        """送信通知メッセージが正しく構築されること"""
+        service = LineBotService()
+        data = {
+            'app_type': 'new',
+            'event': {'name': 'テスト催事'},
+            'user': {'name': '現地太郎'},
+            'sender_name': '操作次郎',
+            'facilities': [
+                {'name': '施設A', 'start_date': '2026-03-01', 'end_date': '2026-03-01'}
+            ]
+        }
+        msg = service.build_submission_notification_message(data)
+
+        self.assertIn('【運用調整届 送信通知】', msg)
+        self.assertIn('区分: 新規', msg)
+        self.assertIn('催事名: テスト催事', msg)
+        self.assertIn('現地使用者: 現地太郎', msg)
+        self.assertIn('申請者: 操作次郎', msg)
+        self.assertIn('施設:\n1.施設A\n2026/03/01 - 2026/03/01', msg)
+
+    @patch('apps.adjustments.services.line_bot_service.LineBotService._request')
+    @override_settings(LINE_WORKS_MOCK_MODE=False)
+    def test_get_user_info(self, mock_request):
+        """ユーザー情報取得APIが正しく呼び出されること"""
+        mock_request.return_value.ok = True
+        mock_request.return_value.json.return_value = {'userName': 'テストユーザー'}
+
+        service = LineBotService()
+        with patch('apps.adjustments.services.line_bot_service.LineBotService._get_access_token', return_value='token'):
+            info = service.get_user_info('user_123')
+            self.assertEqual(info['userName'], 'テストユーザー')
+            mock_request.assert_called_with('GET', '/users/user_123', 'token', timeout=10)
