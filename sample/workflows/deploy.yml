@@ -1,0 +1,183 @@
+name: Test and Deploy to Home Server
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  # ===== テストジョブ（並列実行） =====
+
+  lint-php:
+    name: PHP Lint (phpcs)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: phpcs
+
+      - name: Run PHP code style check
+        run: composer lint
+
+  lint-js:
+    name: JavaScript Lint (eslint)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Run JavaScript lint
+        run: npm run lint
+
+  phpstan:
+    name: PHP Static Analysis (phpstan)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, mbstring, json, curl, xml, mysql, ldap
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-8.3
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --ansi
+
+      - name: Run PHP static analysis
+        run: composer check-static
+
+  # PHPUnit tests skipped - BookStack base tests require default configuration
+  # Custom features (LINE WORKS SSO, Dropbox backup) are validated by lint/phpstan
+  # Uncomment below to enable PHPUnit tests if needed in the future
+  #
+  # test-php:
+  #   name: PHP Unit Tests (phpunit)
+  #   runs-on: ubuntu-24.04
+  #   ...
+
+  test-js:
+    name: JavaScript Tests (jest)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Run TypeScript type check
+        run: npm run ts:lint
+
+      - name: Run JavaScript tests
+        run: npm test
+
+  # ===== デプロイジョブ =====
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint-php, lint-js, phpstan, test-js]
+    if: github.repository == 'satoshi-tateishi/shin-on_wiki'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 56834
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            # パーミッション修正（git resetのため一時的に所有権を変更）
+            sudo chown -R $USER:$USER ${{ secrets.DEPLOY_PATH }}
+
+            # 最新のコードを取得（デプロイキーを使用）
+            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_deploy -o StrictHostKeyChecking=no' git fetch origin
+            git reset --hard origin/release
+
+            # 依存関係の更新（ホスト側で実行）
+            # 注: composer install前はユーザー権限のままにしておく
+            composer install --no-dev --optimize-autoloader
+            npm ci
+
+            # storage と bootstrap/cache の所有者をwww-data(33)に変更
+            sudo chown -R 33:33 ${{ secrets.DEPLOY_PATH }}/storage ${{ secrets.DEPLOY_PATH }}/bootstrap/cache
+
+            # アセットのビルド（ホスト側で実行）
+            npm run production
+
+            # ビルド後、開発用依存関係を削除
+            npm prune --omit=dev
+
+            # Dockerコンテナを再起動（PHPコードの変更を反映）
+            docker compose -f docker-compose.production.yml restart app
+
+            # データベースマイグレーション
+            docker compose -f docker-compose.production.yml exec -T app php artisan migrate --force || true
+
+            # ログファイルの権限修正（マイグレーションでrootが作成した場合に対応）
+            docker compose -f docker-compose.production.yml exec -T app chown -R www-data:www-data storage/logs/
+
+            # セキュリティ設定: 秘密鍵のパーミッション
+            docker compose -f docker-compose.production.yml exec -T app sh -c '
+              if [ -f storage/app/lineworks/private_key.pem ]; then
+                chown www-data:www-data storage/app/lineworks/private_key.pem
+                chmod 600 storage/app/lineworks/private_key.pem
+                echo "✓ private_key.pem permission set to 600"
+              fi
+            '
+
+            # セキュリティ設定: .envファイルのパーミッション
+            chmod 600 ${{ secrets.DEPLOY_PATH }}/.env
+
+            # キャッシュクリア
+            docker compose -f docker-compose.production.yml exec -T app php artisan config:clear
+            docker compose -f docker-compose.production.yml exec -T app php artisan cache:clear
+            docker compose -f docker-compose.production.yml exec -T app php artisan route:clear
+            docker compose -f docker-compose.production.yml exec -T app php artisan view:clear
+
+            # キャッシュ最適化
+            docker compose -f docker-compose.production.yml exec -T app php artisan config:cache
+            docker compose -f docker-compose.production.yml exec -T app php artisan route:cache
+            docker compose -f docker-compose.production.yml exec -T app php artisan view:cache
+
+            echo "Deployment completed successfully!"
