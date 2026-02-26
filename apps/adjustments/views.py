@@ -3,6 +3,7 @@ import traceback
 from django.db import transaction
 from django.http import HttpResponse, FileResponse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
@@ -194,6 +195,13 @@ def send_email(request, data):
 
         # 3. LINE Bot連携 (外部サービス呼び出しはトランザクション外が望ましい)
         bot_service = LineBotService()
+        
+        # 通知用データに実際に送信したユーザー名を追加
+        if hasattr(request.user, 'profile'):
+            data['sender_name'] = request.user.profile.full_name
+        else:
+            data['sender_name'] = request.user.get_full_name() or request.user.username
+
         filename = get_adjustment_filename(data, 'pdf')
         pdf_content = pdf_buffer.getvalue()
 

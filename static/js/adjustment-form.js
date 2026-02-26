@@ -61,16 +61,29 @@ document.addEventListener('change', (e) => {
     }
 });
 
-function goToAdjustment() {
+/**
+ * 施設検索画面から「運用調整連絡へ」進む際の入り口 (純粋な新規作成)
+ */
+function createNewAdjustment() {
     if (AppState.KeepList.isEmpty()) {
         showToast('施設を選択してください', 'info');
         return;
     }
+    // 新規作成なので状態をリセット
+    AppState.setAdjustment(null, 'draft');
+    resetFormForNew(); 
+    
+    // 画面遷移実行
+    goToAdjustment();
+}
 
-    // 新規作成時のみユーザー情報を初期入力
-    if (!AppState.currentAdjustmentId) {
-        AppState.setAdjustment(null, 'draft');
-        prefillUserInfo();
+/**
+ * フォーム入力画面への表示切り替え (共通の描画ロジック)
+ */
+function goToAdjustment() {
+    if (AppState.KeepList.isEmpty()) {
+        showToast('施設を選択してください', 'info');
+        return;
     }
 
     // 使用場所・日程リストの生成
@@ -120,11 +133,50 @@ function prefillUserInfo() {
     const telEl = document.getElementById('user_tel');
     const emailEl = document.getElementById('user_email');
 
-    // 既に値がある場合は上書きしない
-    if (!nameEl.value) nameEl.value = user.fullName || '';
-    if (!kanaEl.value) kanaEl.value = user.fullKana || '';
-    if (!telEl.value) telEl.value = user.phone || '';
-    if (!emailEl.value) emailEl.value = user.email || '';
+    if (nameEl) nameEl.value = user.fullName || '';
+    if (kanaEl) kanaEl.value = user.fullKana || '';
+    if (telEl) telEl.value = user.phone || '';
+    if (emailEl) emailEl.value = user.email || '';
+}
+
+/**
+ * 新規作成用にフォームを完全に初期化する
+ */
+function resetFormForNew() {
+    // 1. 現地使用者情報をセット
+    prefillUserInfo();
+
+    // 2. 催事情報をクリア
+    const eventNameEl = document.getElementById('event_name');
+    const commentEl = document.getElementById('comment');
+    if (eventNameEl) eventNameEl.value = '';
+    if (commentEl) commentEl.value = '';
+
+    // 3. マイク数テーブルをクリア
+    const micTable = document.getElementById('mic-counts-table-container');
+    if (micTable) {
+        micTable.querySelectorAll('input, select').forEach(el => {
+            el.value = '';
+        });
+    }
+
+    // 4. 53chオプションをクリア
+    const toggle53 = document.getElementById('toggle-53ch');
+    if (toggle53) toggle53.innerText = '';
+
+    // 5. 文字数カウンターをリセット
+    const eventNameCounter = document.getElementById('event-name-counter');
+    const commentCounter = document.getElementById('comment-counter');
+    if (eventNameCounter) eventNameCounter.innerText = '0 / 50';
+    if (commentCounter) commentCounter.innerText = '0 / 165';
+
+    // 6. AppState 内の各施設のスケジュール情報をクリア
+    AppState.KeepList.get().forEach(f => {
+        delete f.start_date;
+        delete f.end_date;
+        delete f.start_time;
+        delete f.end_time;
+    });
 }
 
 function applyRoleConstraints() {
@@ -214,6 +266,14 @@ function backToSelection() {
     document.getElementById('keep-list-section').classList.remove('hidden');
     document.getElementById('ch-selection-section').classList.remove('hidden');
     window.scrollTo(0, 0);
+
+    // 送信済み状態で戻った場合は、現在の案件との紐付けをリセットする
+    // (次に「運用調整連絡へ」を押した時に新規案件として扱われるようにする)
+    if (AppState.currentStatus === 'submitted') {
+        console.log('[Workflow] Resetting state after successful submission.');
+        AppState.setAdjustment(null, 'draft');
+        FormStorage.clear();
+    }
 }
 
 /**

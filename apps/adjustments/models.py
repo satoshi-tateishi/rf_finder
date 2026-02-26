@@ -63,17 +63,30 @@ class OperationAdjustment(models.Model):
         adjustment_id = data.get('id')
         if adjustment_id:
             try:
-                instance = cls.objects.get(pk=adjustment_id)
-                # 既に送信済みの場合は、一切の変更を拒否する
-                if instance.status == 'submitted':
-                    raise ValueError('既に送信済みのデータは変更できません。')
+                # 更新時は、IDだけでなくユーザーの一致も確認する (セキュリティ強化)
+                if user and user.is_authenticated:
+                    # 既に送信済みの場合は、一切の変更を拒否する (既存のIDを指定しての再送信も不可)
+                    instance = cls.objects.get(pk=adjustment_id)
+                    if instance.status == 'submitted':
+                        raise ValueError('既に送信済みのデータは変更できません。')
+                    
+                    # 作成者本人でない場合の下書き上書きを制限
+                    if instance.user and instance.user != user:
+                        raise PermissionError('他のユーザーの下書きを編集する権限がありません。')
+                else:
+                    raise PermissionError('ログインが必要です。')
             except cls.DoesNotExist:
-                instance = cls()
+                raise ValueError('対象のデータが見つかりません。')
         else:
             instance = cls()
 
         if user and user.is_authenticated:
             instance.user = user
+
+        # ステータス遷移の制限: draft または submitted のみを許可
+        if status not in ['draft', 'submitted']:
+            raise ValueError('不正なステータス指定です。')
+        instance.status = status
 
         instance.app_type = data.get('app_type', 'new')
 
@@ -92,15 +105,14 @@ class OperationAdjustment(models.Model):
         instance.selected_channels_json = data.get('selected_channels', [])
         instance.extra_53ch = data.get('extra_53ch') == '○'
 
-        instance.status = status
         instance.save()
 
-        # M2M 施設の紐付け (IDの妥当性チェックを追加)
+        # M2M 施設の紐付け (IDの妥当性チェック)
         facility_ids = [f.get('id') for f in data.get('facilities', []) if f.get('id')]
         if facility_ids:
             valid_facilities = Facility.objects.filter(id__in=facility_ids)
             if valid_facilities.count() != len(set(facility_ids)):
-                raise ValueError("不正な施設IDが含まれています。")
+                raise ValueError("不正または存在しない施設IDが含まれています。")
             instance.facilities.set(valid_facilities)
 
         return instance

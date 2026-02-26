@@ -322,7 +322,8 @@ class LineBotService:
 
         app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
         event_name = data.get('event', {}).get('name', '無題の催事')
-        user_name = data.get('user', {}).get('name', '不明')
+        on_site_user = data.get('user', {}).get('name', '不明')
+        sender_name = data.get('sender_name', 'システム') # 実際に操作したユーザー
 
         facilities = data.get('facilities', [])
         facility_lines = []
@@ -338,7 +339,8 @@ class LineBotService:
             f'【運用調整届 送信通知】\n'
             f'区分: {app_type_jp}\n'
             f'催事名: {event_name}\n'
-            f'申請者: {user_name}\n\n'
+            f'現地使用者: {on_site_user}\n'
+            f'申請者: {sender_name}\n\n'
             f'施設:\n{facility_text}\n\n'
             f'上記内容で特ラ機構へメール送信しました。添付のPDFをご確認ください。'
         )

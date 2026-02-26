@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db.models import Case, Q, When
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.cache import never_cache
 
 from apps.adjustments.utils import api_error, api_success
 
@@ -10,6 +11,7 @@ from .services import calculate_available_frequencies
 
 
 @login_required(login_url='accounts:login')
+@never_cache
 def index(request):
     """メイン画面（検索・視覚化）を表示"""
     # ユーザー指定の順序: SR2050 (上) -> EM 3732 N (中) -> EM 3732 L (下)

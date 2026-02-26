@@ -231,7 +231,7 @@
 
             <!-- Action Buttons -->
             <div class="mt-6">
-                <button id="go-to-adjustment-btn" onclick="goToAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
+                <button id="go-to-adjustment-btn" onclick="createNewAdjustment()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-lg">
                     <i class="fa-solid fa-paper-plane"></i> 運用調整連絡へ
                 </button>
             </div>
@@ -594,6 +594,13 @@
 
     <!-- Initialization -->
     <script>
+        // bfcache対策: 戻るボタンで戻った際に古い状態が残らないようリロードする
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+
         // Fallback for toggleMenu
         function toggleMenu() {
             const menu = document.getElementById('side-menu');
