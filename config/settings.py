@@ -7,6 +7,9 @@ import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# --- 安全装置: テストおよび開発環境の設定 ---
+TESTING = 'test' in sys.argv
+
 env = environ.Env(
     # set casting, default value
     DEBUG=(bool, False)
@@ -152,7 +155,7 @@ LINE_WORKS_SERVICE_ACCOUNT = env('LINE_WORKS_SERVICE_ACCOUNT', default='')
 LINE_WORKS_PRIVATE_KEY_PATH = env('LINE_WORKS_PRIVATE_KEY_PATH', default='')
 
 # Resolve relative path to absolute path using BASE_DIR
-if LINE_WORKS_PRIVATE_KEY_PATH:
+if not TESTING and LINE_WORKS_PRIVATE_KEY_PATH:
     if not os.path.isabs(LINE_WORKS_PRIVATE_KEY_PATH):
         full_key_path = os.path.join(BASE_DIR, LINE_WORKS_PRIVATE_KEY_PATH)
     else:
@@ -170,7 +173,8 @@ if LINE_WORKS_PRIVATE_KEY_PATH:
         print(f"Private key file not found: {full_key_path}")
         LINE_WORKS_PRIVATE_KEY = ''
 else:
-    LINE_WORKS_PRIVATE_KEY = ''
+    # テスト時やパス未設定時はダミーまたは空
+    LINE_WORKS_PRIVATE_KEY = 'dummy_key_for_testing' if TESTING else ''
 
 LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')
 LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', default='')
@@ -185,8 +189,6 @@ DROPBOX_APP_SECRET = env('DROPBOX_APP_SECRET', default='')
 DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:8084/auth/dropbox/callback/')
 
 # --- 安全装置: テストおよび開発環境の設定 ---
-TESTING = 'test' in sys.argv
-
 if TESTING:
     # テスト実行時はメールをインメモリにする
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
