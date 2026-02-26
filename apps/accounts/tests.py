@@ -1,5 +1,6 @@
-from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
+from django.test import RequestFactory, TestCase
+
 from .models import AuditLog
 from .utils import log_action
 

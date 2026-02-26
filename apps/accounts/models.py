@@ -1,13 +1,13 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.contrib.auth.signals import user_logged_in, user_login_failed
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey
-
 from django.utils import timezone
-from datetime import timedelta
 
 
 class UserProfile(models.Model):
@@ -43,14 +43,6 @@ class UserProfile(models.Model):
     def __str__(self):
         return f'{self.user.username} ({self.get_role_display()})'
 
-    @property
-    def full_name(self):
-        return f'{self.family_name} {self.given_name}'.strip() or self.user.first_name
-
-    @property
-    def full_kana(self):
-        return f'{self.phonetic_family_name} {self.phonetic_given_name}'.strip()
-
     def save(self, *args, **kwargs):
         # ロールに基づいて User の権限を同期
         if self.role == self.Role.ADMIN:
@@ -66,6 +58,14 @@ class UserProfile(models.Model):
                 self.user.save(update_fields=['is_staff', 'is_superuser'])
 
         super().save(*args, **kwargs)
+
+    @property
+    def full_name(self):
+        return f'{self.family_name} {self.given_name}'.strip() or self.user.first_name
+
+    @property
+    def full_kana(self):
+        return f'{self.phonetic_family_name} {self.phonetic_given_name}'.strip()
 
 
 @receiver(post_save, sender=User)
@@ -169,10 +169,10 @@ class DropboxToken(models.Model):
 
     service_name = models.CharField(max_length=50, default='backup', unique=True, verbose_name='サービス名')
     access_token = models.TextField(verbose_name='アクセストークン')
-    refresh_token = models.TextField(null=True, blank=True, verbose_name='リフレッシュトークン')
+    refresh_token = models.TextField(blank=True, default='', verbose_name='リフレッシュトークン')
     token_type = models.CharField(max_length=20, default='Bearer')
-    account_id = models.CharField(max_length=100, null=True, blank=True, verbose_name='アカウントID')
-    account_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='アカウント名')
+    account_id = models.CharField(max_length=100, blank=True, default='', verbose_name='アカウントID')
+    account_name = models.CharField(max_length=100, blank=True, default='', verbose_name='アカウント名')
     expires_at = models.DateTimeField(null=True, blank=True, verbose_name='有効期限')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

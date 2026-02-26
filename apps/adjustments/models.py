@@ -43,7 +43,7 @@ class OperationAdjustment(models.Model):
 
     extra_53ch = models.BooleanField(default=False, verbose_name='53ch併用')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='ステータス')
-    
+
     parent = models.ForeignKey(
         'self',
         null=True,
@@ -70,11 +70,11 @@ class OperationAdjustment(models.Model):
         JSONデータ（辞書形式）を受け取り、モデルインスタンスを保存・更新する。
         """
         from django.db import transaction
-        
+
         with transaction.atomic():
             adjustment_id = data.get('id')
             parent_id = data.get('parent_id')
-            
+
             if adjustment_id:
                 try:
                     # 更新時は、IDだけでなくユーザーの一致も確認する (セキュリティ強化)
@@ -83,14 +83,14 @@ class OperationAdjustment(models.Model):
                         instance = cls.objects.select_for_update().get(pk=adjustment_id)
                         if instance.status == 'submitted':
                             raise ValueError('既に送信済みのデータは変更できません。')
-                        
+
                         # 作成者本人でない場合の下書き上書きを制限
                         if instance.user and instance.user != user:
                             raise PermissionError('他のユーザーの下書きを編集する権限がありません。')
                     else:
                         raise PermissionError('ログインが必要です。')
-                except cls.DoesNotExist:
-                    raise ValueError('対象のデータが見つかりません。')
+                except cls.DoesNotExist as e:
+                    raise ValueError('対象のデータが見つかりません。') from e
             else:
                 instance = cls()
 

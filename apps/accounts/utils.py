@@ -1,5 +1,4 @@
 import unicodedata
-from django.conf import settings
 
 
 def log_action(user=None, action='', description='', request=None, obj=None):
@@ -12,8 +11,9 @@ def log_action(user=None, action='', description='', request=None, obj=None):
     :param request: IPアドレス取得用のHttpRequestオブジェクト
     :param obj: 関連するモデルオブジェクト（任意）
     """
-    from .models import AuditLog
     from django.contrib.contenttypes.models import ContentType
+
+    from .models import AuditLog
 
     if user is None and request and getattr(request.user, 'is_authenticated', False):
         user = request.user

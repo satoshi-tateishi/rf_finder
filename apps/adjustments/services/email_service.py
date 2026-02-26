@@ -3,11 +3,12 @@ from datetime import datetime
 from email.mime.application import MIMEApplication
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage
 from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
 
 from apps.accounts.models import EmailTemplate
+
 from ..constants import APP_TYPE_MAP
 from ..utils import get_adjustment_filename
 
@@ -61,12 +62,12 @@ def send_adjustment_email(data, member, pdf_buffer):
     template = EmailTemplate.objects.filter(name='adjustment').first()
     if not template:
         template = EmailTemplate.objects.first()
-        
+
     if not template:
         msg = 'メールテンプレートが登録されていません。管理画面から "adjustment" という名前で作成してください。'
         logger.error(msg)
         raise RuntimeError(msg)
-        
+
     recipient = template.to_address
     if not recipient:
         msg = '送信先メールアドレス(to_address)が設定されていません。'
@@ -76,14 +77,14 @@ def send_adjustment_email(data, member, pdf_buffer):
     # 送信先アドレスのバリデーション
     try:
         validate_email(recipient)
-    except ValidationError:
+    except ValidationError as e:
         msg = f"不正なメールアドレス形式です: {recipient}"
         logger.error(msg)
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from e
 
     # 2. 置換データの準備
     app_type_jp = APP_TYPE_MAP.get(data.get('app_type'), '新規')
-    
+
     # 会員情報の取得（引数 member を活用）
     member_name = member.name if member else ''
     manager_name = member.manager_name if member else ''
@@ -102,7 +103,7 @@ def send_adjustment_email(data, member, pdf_buffer):
         '{会員名}': member_name,
         '{運用担当者}': manager_name,
     }
-    
+
     # 置換の実行（共通関数化）
     subject = _apply_replacements(subject_template, replacements)
     body = _apply_replacements(body_template, replacements)

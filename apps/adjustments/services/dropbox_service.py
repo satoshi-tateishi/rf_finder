@@ -1,16 +1,18 @@
-import os
-import subprocess
-import gzip
-import shutil
-import logging
-import tempfile
 import fcntl
+import gzip
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timedelta
+
+import dropbox
 from django.conf import settings
 from django.utils import timezone
-from apps.accounts.models import DropboxToken
-import dropbox
 from dropbox.exceptions import ApiError
+
+from apps.accounts.models import DropboxToken
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +100,13 @@ class DropboxService:
             return True
         except Exception as e:
             logger.error(f'Dropboxトークンの更新に失敗しました: {e}')
-            raise DropboxAuthError(f'Dropboxトークンの更新に失敗しました: {str(e)}')
+            raise DropboxAuthError(f'Dropboxトークンの更新に失敗しました: {str(e)}') from e
 
     def ensure_folder_exists(self, client, folder_path):
         """フォルダが存在することを確認し、なければ作成する"""
         if folder_path == '/' or not folder_path:
             return
-        
+
         try:
             client.files_get_metadata(folder_path)
         except ApiError as e:
@@ -123,7 +125,7 @@ class DropboxService:
         """ファイルをDropboxにアップロードする (チャンクアップロード統一)"""
         client = self.get_client()
         file_size = os.path.getsize(local_path)
-        
+
         # 親フォルダの存在確認
         remote_dir = os.path.dirname(remote_path)
         self.ensure_folder_exists(client, remote_dir)
@@ -152,15 +154,15 @@ class DropboxService:
                         else:
                             client.files_upload_session_append_v2(f.read(CHUNK_SIZE), cursor)
                             cursor.offset = f.tell()
-                
+
                 logger.info(f'Dropboxにファイルをアップロードしました: {remote_path} ({file_size} バイト)')
                 return True
             except ApiError as e:
                 logger.error(f'アップロード中にDropbox APIエラーが発生しました: {e}')
-                raise DropboxBackupError(f'アップロード中にDropbox APIエラーが発生しました: {str(e)}')
+                raise DropboxBackupError(f'アップロード中にDropbox APIエラーが発生しました: {str(e)}') from e
             except Exception as e:
                 logger.error(f'アップロード中に予期しないエラーが発生しました: {e}')
-                raise DropboxBackupError(f'アップロード中に予期しないエラーが発生しました: {str(e)}')
+                raise DropboxBackupError(f'アップロード中に予期しないエラーが発生しました: {str(e)}') from e
 
     def create_db_backup(self):
         """MySQLのバックアップを作成し、Dropboxにアップロードする"""
@@ -203,7 +205,7 @@ class DropboxService:
                             cnf.write(f'host={db_host}\n')
                         if db_port:
                             cnf.write(f'port={db_port}\n')
-                    
+
                     # パーミッションを 600 (所有者のみ読み書き可能) に設定
                     os.chmod(cnf_path, 0o600)
 
@@ -225,7 +227,7 @@ class DropboxService:
                         '--skip-ssl',
                         db_name
                     ]
-                    
+
                     try:
                         with open(sql_file, 'w') as f:
                             subprocess.run(cmd, stdout=f, check=True, stderr=subprocess.PIPE)
@@ -235,7 +237,7 @@ class DropboxService:
                         if db_pass:
                             err_msg = err_msg.replace(db_pass, '********')
                         logger.error(f'mysqldump実行エラー: {err_msg}')
-                        raise DropboxBackupError(f'データベースのダンプ作成に失敗しました: {err_msg}')
+                        raise DropboxBackupError(f'データベースのダンプ作成に失敗しました: {err_msg}') from e
 
                     # gzip 圧縮
                     with open(sql_file, 'rb') as f_in:
@@ -264,10 +266,10 @@ class DropboxService:
                 error_str = str(e)
                 if db_pass:
                     error_str = error_str.replace(db_pass, '********')
-                
+
                 logger.error(f'データベースバックアップ失敗: {error_str}')
                 log_action(action='DB_BACKUP_FAILED', description=f'データベースバックアップ失敗: {error_str}')
-                raise DropboxBackupError(f'データベースバックアップ失敗: {error_str}')
+                raise DropboxBackupError(f'データベースバックアップ失敗: {error_str}') from e
             finally:
                 # 一時ファイルの削除
                 try:
@@ -285,7 +287,7 @@ class DropboxService:
         """Dropbox上のバックアップファイル一覧を取得する"""
         client = self.get_client()
         backups = []
-        
+
         try:
             # /backups 以下の .sql.gz ファイルを探す
             result = client.files_search_v2(
@@ -296,7 +298,7 @@ class DropboxService:
                     file_extensions=['gz']
                 )
             )
-            
+
             for match in result.matches:
                 metadata = match.metadata.get_metadata()
                 if isinstance(metadata, dropbox.files.FileMetadata):
@@ -304,7 +306,7 @@ class DropboxService:
                     server_modified = metadata.server_modified
                     if timezone.is_naive(server_modified):
                         server_modified = timezone.make_aware(server_modified, timezone.utc)
-                    
+
                     dt_local = timezone.localtime(server_modified)
                     backups.append({
                         'name': metadata.name,
@@ -312,7 +314,7 @@ class DropboxService:
                         'size': metadata.size,
                         'server_modified': dt_local.strftime('%Y-%m-%d %H:%M:%S')
                     })
-            
+
             # 日付の新しい順にソート
             backups.sort(key=lambda x: x['server_modified'], reverse=True)
             return backups
@@ -329,7 +331,7 @@ class DropboxService:
             return True
         except ApiError as e:
             logger.error(f'ダウンロード中にDropbox APIエラーが発生しました: {e}')
-            raise DropboxBackupError(f'ファイルのダウンロードに失敗しました: {str(e)}')
+            raise DropboxBackupError(f'ファイルのダウンロードに失敗しました: {str(e)}') from e
 
     def restore_db_from_backup(self, remote_path, confirm=False):
         """指定されたバックアップファイルからデータベースを復元する"""
@@ -343,8 +345,8 @@ class DropboxService:
         lock_file = open(lock_file_path, 'w')
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise DropboxBackupError('復元処理またはバックアップ処理が既に実行中です。')
+        except BlockingIOError as e:
+            raise DropboxBackupError('復元処理またはバックアップ処理が既に実行中です。') from e
 
         # データベース設定の取得
         db_config = settings.DATABASES['default']
@@ -371,10 +373,14 @@ class DropboxService:
                 cnf_path = os.path.join(tmpdir, 'my.cnf')
                 with open(cnf_path, 'w') as cnf:
                     cnf.write('[client]\n')
-                    if db_user: cnf.write(f'user={db_user}\n')
-                    if db_pass: cnf.write(f'password={db_pass}\n')
-                    if db_host: cnf.write(f'host={db_host}\n')
-                    if db_port: cnf.write(f'port={db_port}\n')
+                    if db_user:
+                        cnf.write(f'user={db_user}\n')
+                    if db_pass:
+                        cnf.write(f'password={db_pass}\n')
+                    if db_host:
+                        cnf.write(f'host={db_host}\n')
+                    if db_port:
+                        cnf.write(f'port={db_port}\n')
                 os.chmod(cnf_path, 0o600)
 
                 # 4. mysql コマンドでインポート (バイナリモードで読み込み)
@@ -384,7 +390,7 @@ class DropboxService:
                     '--skip-ssl',
                     db_name
                 ]
-                
+
                 logger.info(f'データベースのリストアを実行しています: {db_name}')
                 try:
                     with open(sql_file, 'rb') as f:
@@ -394,7 +400,7 @@ class DropboxService:
                     if db_pass:
                         err_msg = err_msg.replace(db_pass, '********')
                     logger.error(f'mysql実行エラー: {err_msg}')
-                    raise DropboxBackupError(f'データベースのリストアに失敗しました: {err_msg}')
+                    raise DropboxBackupError(f'データベースのリストアに失敗しました: {err_msg}') from e
 
                 # 5. マイグレーションの実行 (スキーマ不整合の解消)
                 logger.info('スキーマを最新の状態に更新するためにマイグレーションを実行しています...')
@@ -405,7 +411,7 @@ class DropboxService:
                     logger.error(f'リストア後のマイグレーションに失敗しました: {err_msg}')
                     # マイグレーション失敗は重大だが、データ自体は入っている可能性があるため警告に留めるか検討
                     # ここではエラーとして扱い、ログに記録する
-                    raise DropboxBackupError(f'リストア後のマイグレーションに失敗しました: {err_msg}')
+                    raise DropboxBackupError(f'リストア後のマイグレーションに失敗しました: {err_msg}') from e
 
                 # 監査ログ記録
                 log_action(action='DB_RESTORE', description=f'データベース復元成功: {remote_path}')
@@ -419,23 +425,22 @@ class DropboxService:
                 error_str = error_str.replace(db_pass, '********')
             logger.error(f'復元処理に失敗しました: {error_str}')
             log_action(action='DB_RESTORE_FAILED', description=f'データベース復元失敗: {error_str}')
-            raise DropboxBackupError(f'復元処理に失敗しました: {error_str}')
+            raise DropboxBackupError(f'復元処理に失敗しました: {error_str}') from e
         finally:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
-
     def clean_old_backups(self, keep_latest=5, keep_monthly_months=3):
         """保持ポリシーに基づき、古いバックアップを削除する"""
         client = self.get_client()
         logger.info(f'保持ポリシーの適用を開始します (最新{keep_latest}件, 月次アーカイブ{keep_monthly_months}ヶ月)。')
-        
+
         try:
             # 1. 全てのバックアップファイルを再帰的に取得
             files = []
-            
+
             # /backups ディレクトリ以下の全ファイルをリストアップ
             res = client.files_list_folder('/backups', recursive=True)
-            
+
             def process_entries(entries):
                 for entry in entries:
                     if isinstance(entry, dropbox.files.FileMetadata) and entry.name.endswith('.sql.gz'):
@@ -445,7 +450,7 @@ class DropboxService:
                             # naive datetime としてパースした後、timezone-aware (JST) に変換
                             naive_dt = datetime.strptime(date_str, '%Y%m%d_%H%M%S')
                             dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
-                            
+
                             files.append({
                                 'path': entry.path_lower,
                                 'name': entry.name,
@@ -469,24 +474,24 @@ class DropboxService:
 
             # 3. 保護対象の選定
             keep_paths = set()
-            
+
             # (A) 最新の N 件を保護
             for i in range(min(len(files), keep_latest)):
                 keep_paths.add(files[i]['path'])
-            
+
             # (B) 月次アーカイブ（過去 M ヶ月の各月の最終バックアップ）を保護
             now = timezone.localtime(timezone.now())
             monthly_archives = {}
-            
+
             for file in files:
                 m_key = file['month_key']
                 if m_key not in monthly_archives:
                     monthly_archives[m_key] = file
-            
+
             # 現在の月を除外した月次アーカイブから、過去 N ヶ月分を特定
             current_month = now.strftime('%Y-%m')
             sorted_months = sorted([m for m in monthly_archives.keys() if m != current_month], reverse=True)
-            
+
             added_months = 0
             for m_key in sorted_months:
                 keep_paths.add(monthly_archives[m_key]['path'])
@@ -512,10 +517,10 @@ class DropboxService:
             if e.error.is_path() and e.error.get_path().is_not_found():
                 logger.info('バックアップフォルダが存在しないため、削除処理をスキップします。')
                 return 0
-            raise DropboxBackupError(f'保持ポリシー適用中にDropboxエラーが発生しました: {str(e)}')
+            raise DropboxBackupError(f'保持ポリシー適用中にDropboxエラーが発生しました: {str(e)}') from e
         except Exception as e:
             logger.error(f'保持ポリシー適用中に予期しないエラーが発生しました: {e}')
-            raise DropboxBackupError(f'保持ポリシー適用中にエラーが発生しました: {str(e)}')
+            raise DropboxBackupError(f'保持ポリシー適用中にエラーが発生しました: {str(e)}') from e
 
     def get_auth_url(self, redirect_uri, session):
         """OAuth認証用のURLを生成する"""
@@ -541,7 +546,7 @@ class DropboxService:
         )
         try:
             result = flow.finish(query_params)
-            
+
             # トークン情報を保存
             token_model, created = DropboxToken.objects.get_or_create(service_name='backup')
             token_model.access_token = result.access_token
@@ -558,12 +563,12 @@ class DropboxService:
             token_model.account_name = acc.name.display_name
 
             token_model.save()
-            
+
             from apps.accounts.utils import log_action
             log_action(action='DROPBOX_AUTH', description=f'Dropbox連携成功: {token_model.account_name}')
-            
+
             logger.info(f'Dropboxの認証が完了しました: {token_model.account_name}')
             return token_model
         except Exception as e:
             logger.error(f'Dropboxの認証に失敗しました: {e}', exc_info=True)
-            raise DropboxAuthError(f'Dropboxの認証に失敗しました: {str(e)}')
+            raise DropboxAuthError(f'Dropboxの認証に失敗しました: {str(e)}') from e

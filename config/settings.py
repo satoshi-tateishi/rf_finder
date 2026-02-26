@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 import environ
@@ -156,7 +157,7 @@ if LINE_WORKS_PRIVATE_KEY_PATH:
         full_key_path = os.path.join(BASE_DIR, LINE_WORKS_PRIVATE_KEY_PATH)
     else:
         full_key_path = LINE_WORKS_PRIVATE_KEY_PATH
-    
+
     if os.path.exists(full_key_path):
         try:
             with open(full_key_path, 'r') as f:
@@ -184,8 +185,6 @@ DROPBOX_APP_SECRET = env('DROPBOX_APP_SECRET', default='')
 DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:8084/auth/dropbox/callback/')
 
 # --- 安全装置: テストおよび開発環境の設定 ---
-import sys
-
 TESTING = 'test' in sys.argv
 
 if TESTING:

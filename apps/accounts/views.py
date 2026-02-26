@@ -14,9 +14,9 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from apps.adjustments.services import LineBotService, DropboxService
+from apps.adjustments.services import DropboxService, LineBotService
 
-from .models import UserProfile, AuditLog
+from .models import AuditLog, UserProfile
 from .utils import normalize_phonetic
 
 logger = logging.getLogger(__name__)
@@ -156,13 +156,11 @@ def lineworks_callback(request):
             phonetic_family = normalize_phonetic(name_info.get('phoneticLastName', ''))
             phonetic_given = normalize_phonetic(name_info.get('phoneticFirstName', ''))
 
-            full_name = f'{family_name} {given_name}'.strip() or name_info.get('fullName') or decoded.get('name')
             phone = lw_user_data.get('telephone') or lw_user_data.get('cellPhone') or ''
             email = lw_user_data.get('privateEmail') or lw_user_data.get('email') or email
         else:
             family_name = decoded.get('family_name', '')
             given_name = decoded.get('given_name', '')
-            full_name = f'{family_name} {given_name}'.strip() or decoded.get('name') or decoded.get('email') or 'Guest'
 
         user, created = User.objects.get_or_create(
             username=sub,

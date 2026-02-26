@@ -1,7 +1,6 @@
-from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.db.models import Case, Q, When
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import never_cache
 
 from apps.adjustments.utils import api_error, api_success

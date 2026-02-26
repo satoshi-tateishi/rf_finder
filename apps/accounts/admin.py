@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 
-from .models import EmailTemplate, Member, UserProfile, AuditLog, DropboxToken
+from .models import AuditLog, DropboxToken, EmailTemplate, Member, UserProfile
 from .resources import EmailTemplateResource, MemberResource
 
 
@@ -94,6 +94,9 @@ class DropboxAuthHelper(models.Model):
         verbose_name = '1. Dropbox連携を開始する'
         verbose_name_plural = '1. Dropbox連携を開始する'
         managed = False
+
+    def __str__(self):
+        return str(self._meta.verbose_name)
 
 
 @admin.register(DropboxAuthHelper)

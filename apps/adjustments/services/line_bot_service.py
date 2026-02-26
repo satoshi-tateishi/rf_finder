@@ -1,9 +1,8 @@
-import io
 import logging
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import jwt
 import requests
@@ -22,7 +21,7 @@ class LineBotService:
 
     CACHE_KEY = 'line_works_access_token_v2'
     TOKEN_EXPIRY = 86400 - 300  # 24時間 - 5分のバッファ
-    
+
     # API ベース URL
     AUTH_BASE_URL = getattr(settings, 'LINE_WORKS_AUTH_BASE_URL', 'https://auth.worksmobile.com')
     API_BASE_URL = getattr(settings, 'LINE_WORKS_API_BASE_URL', 'https://www.worksapis.com')
@@ -33,7 +32,7 @@ class LineBotService:
         self.service_account = settings.LINE_WORKS_SERVICE_ACCOUNT
         self.private_key = settings.LINE_WORKS_PRIVATE_KEY
         self.bot_id = settings.LINE_WORKS_BOT_ID
-        
+
         # リトライロジックを含むセッション設定
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -90,12 +89,12 @@ class LineBotService:
                 'client_secret': self.client_secret,
                 'scope': 'bot,user.read',
             }
-            
+
             response = self.session.post(url, data=data, timeout=10)
             if response.ok:
                 res_data = response.json()
                 token = res_data.get('access_token')
-                
+
                 try:
                     expires_in = int(res_data.get('expires_in', self.TOKEN_EXPIRY))
                 except (ValueError, TypeError):
@@ -123,7 +122,7 @@ class LineBotService:
         url = f'{self.API_BASE_URL}/v1.0{path}'
         headers = kwargs.pop('headers', {})
         headers['Authorization'] = f'Bearer {access_token}'
-        
+
         return self.session.request(method, url, headers=headers, **kwargs)
 
     def _get_upload_url(self, access_token: str, file_name: str) -> Tuple[Optional[str], Optional[str]]:

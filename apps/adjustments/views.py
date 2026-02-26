@@ -1,14 +1,11 @@
 import traceback
 
 from django.db import transaction
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse
 from django.utils import timezone
-from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import csrf_exempt
 
 from apps.accounts.models import Member
 from apps.accounts.utils import log_action
-from apps.facilities.models import Facility
 
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
 from .models import OperationAdjustment
@@ -100,7 +97,7 @@ def get_adjustment(request, pk):
     """単一データの取得"""
     try:
         adj = OperationAdjustment.objects.get(pk=pk)
-        
+
         # 認可チェック: 作成者本人または管理者のみ許可
         if adj.user and adj.user != request.user and getattr(request.user.profile, 'role', 'viewer') != 'admin':
             from apps.adjustments.utils import api_error
@@ -161,10 +158,10 @@ def preview_pdf(request, data):
         content = buffer.getvalue()
         response = HttpResponse(content, content_type='application/pdf')
         response['Content-Length'] = len(content)
-        
+
         # クエリパラメータで強制ダウンロード指定があるか確認（フロントからは未対応だが拡張性のため）
         disposition = request.GET.get('disposition', 'inline')
-        
+
         # デフォルトはインラインだが、ファイル名も指定する
         response['Content-Disposition'] = f"{disposition}; filename*=UTF-8''{escape_uri_path(filename)}"
         return response
@@ -198,7 +195,7 @@ def send_email(request, data):
 
         # 3. LINE Bot連携 (外部サービス呼び出しはトランザクション外が望ましい)
         bot_service = LineBotService()
-        
+
         # 通知用データに実際に送信したユーザー名を追加
         if hasattr(request.user, 'profile'):
             data['sender_name'] = request.user.profile.full_name

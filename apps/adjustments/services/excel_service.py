@@ -66,7 +66,7 @@ class Cells:
 
 def _write_common_info(ws, data, member, current_date, pad_func):
     """共通情報（申請者、催事、マイク数など）をシートに書き込む"""
-    
+
     # 0. 提出日
     ws[Cells.SUBMISSION_DATE] = current_date
 
@@ -111,7 +111,7 @@ def _write_common_info(ws, data, member, current_date, pad_func):
     ws[Cells.MIC_COUNTS['digital_rm_10mw']] = (mc.get('digital_rm') or {}).get('10mw', '')
     ws[Cells.MIC_COUNTS['digital_rm_20mw']] = (mc.get('digital_rm') or {}).get('20mw', '')
     ws[Cells.MIC_COUNTS['digital_rm_50mw']] = (mc.get('digital_rm') or {}).get('50mw', '')
-    
+
     ws[Cells.MIC_COUNTS['digital_53ch_10mw']] = (mc.get('digital_53ch') or {}).get('10mw', '')
     ws[Cells.MIC_COUNTS['digital_53ch_20mw']] = (mc.get('digital_53ch') or {}).get('20mw', '')
     ws[Cells.MIC_COUNTS['digital_53ch_50mw']] = (mc.get('digital_53ch') or {}).get('50mw', '')
@@ -119,7 +119,7 @@ def _write_common_info(ws, data, member, current_date, pad_func):
     ws[Cells.MIC_COUNTS['digital_12g_10mw']] = (mc.get('digital_12g') or {}).get('10mw', '')
     ws[Cells.MIC_COUNTS['digital_12g_20mw']] = (mc.get('digital_12g') or {}).get('20mw', '')
     ws[Cells.MIC_COUNTS['digital_12g_50mw']] = (mc.get('digital_12g') or {}).get('50mw', '')
-    
+
     ws[Cells.LMH_12G] = mc.get('12g_lmh', '')
 
     if data.get('extra_53ch') == '○':
@@ -135,14 +135,14 @@ def _write_facilities(ws, facilities_slice, pad_func):
         ws.cell(row=base_row, column=22).value = f.get('start_time', '')
         ws.cell(row=base_row, column=27).value = f.get('end_time', '')
         ws.cell(row=base_row + 2, column=10).value = pad_func(f.get('postal_code', ''))
-        
+
         address_display = f'{f.get("prefecture", "") or ""}{f.get("address", "") or ""}'
         ws.cell(row=base_row + 2, column=18).value = pad_func(address_display)
-        
+
         ws.cell(row=base_row + 4, column=12).value = pad_func(f.get('category', ''))
         ws.cell(row=base_row + 4, column=18).value = pad_func(f.get('name', ''))
         ws.cell(row=base_row + 6, column=15).value = pad_func(f.get('applied_area', ''))
-        
+
         channels = f.get('selectedChannels')
         if not isinstance(channels, list):
             channels = []
@@ -163,7 +163,7 @@ def generate_adjustment_excel(data, member=None, for_pdf=False):
     # 施設データの型安全性とフィルタリング
     raw_facilities = data.get('facilities') or []
     facilities = [f for f in raw_facilities if isinstance(f, dict)]
-    
+
     num_facilities = len(facilities)
 
     # 使用するシートを決定
