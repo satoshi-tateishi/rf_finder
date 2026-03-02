@@ -198,6 +198,10 @@ PORTAL_LOGIN_URL = env('PORTAL_LOGIN_URL', default='https://portal.shin-on1981.c
 # ポータルトップURL（PORTAL_LOGIN_URL からパスを除いたベースURL）
 PORTAL_URL = '/'.join(PORTAL_LOGIN_URL.split('/')[:3]) + '/'
 
+# Apache リバースプロキシ背後での HTTPS 認識設定
+# request.build_absolute_uri() が https:// を返すように設定
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # --- 安全装置: テストおよび開発環境の設定 ---
 if TESTING:
     # テスト実行時はメールをインメモリにする
