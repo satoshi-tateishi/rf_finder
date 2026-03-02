@@ -195,6 +195,8 @@ PORTAL_JWT_ISSUER = env('PORTAL_JWT_ISSUER', default='https://portal.shin-on1981
 PORTAL_JWT_AUDIENCE = env('PORTAL_JWT_AUDIENCE', default='shin-on-apps')
 # 未認証時のリダイレクト先（開発: http://localhost/login/ / 本番: https://portal.shin-on1981.com/login/）
 PORTAL_LOGIN_URL = env('PORTAL_LOGIN_URL', default='https://portal.shin-on1981.com/login/')
+# ポータルトップURL（PORTAL_LOGIN_URL からパスを除いたベースURL）
+PORTAL_URL = '/'.join(PORTAL_LOGIN_URL.split('/')[:3]) + '/'
 
 # --- 安全装置: テストおよび開発環境の設定 ---
 if TESTING:

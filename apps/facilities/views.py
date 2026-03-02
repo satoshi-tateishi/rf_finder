@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Case, Q, When
 from django.shortcuts import render
@@ -27,6 +28,7 @@ def index(request):
         'index.html',
         {
             'devices': devices,
+            'portal_url': settings.PORTAL_URL,
         },
     )
 

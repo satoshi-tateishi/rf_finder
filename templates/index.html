@@ -168,7 +168,10 @@
                         <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i> バックアップ管理
                     </button>
                     {% endif %}
-                    <a href="{% url 'accounts:logout' %}" class="block px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-red-600 mt-2 border-t">
+                    <a href="{{ portal_url }}" class="block px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-gray-700 border-t">
+                        <i class="fa-solid fa-house-lock text-green-600"></i> shin•on Portal
+                    </a>
+                    <a href="{% url 'accounts:logout' %}" class="block px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-red-600">
                         <i class="fa-solid fa-right-from-bracket"></i> ログアウト
                     </a>
                 {% else %}
