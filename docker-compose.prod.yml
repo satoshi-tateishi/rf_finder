@@ -24,10 +24,13 @@ services:
       - db
     networks:
       - rf_network
+      - shin-on-internal   # apache-gateway からのリバースプロキシを受け付けるために追加
 
 networks:
   rf_network:
     driver: bridge
+  shin-on-internal:
+    external: true   # docker network create shin-on-internal で事前作成が必要
 
 volumes:
   mysql_data:
