@@ -53,10 +53,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Added for static files without Apache
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # shin•on Portal の portal_jwt クッキーを検証して Django セッションに紐付ける
+    # AuthenticationMiddleware の直後に配置することで、未認証時のみ JWT 認証を試みる
+    'apps.accounts.middleware.PortalJWTMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -148,7 +152,7 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='webmaster@localhost')
 
-# LINE WORKS Bot API Settings
+# LINE WORKS Bot API Settings（メッセージ通知用）
 LINE_WORKS_CLIENT_ID = env('LINE_WORKS_CLIENT_ID', default='')
 LINE_WORKS_CLIENT_SECRET = env('LINE_WORKS_CLIENT_SECRET', default='')
 LINE_WORKS_SERVICE_ACCOUNT = env('LINE_WORKS_SERVICE_ACCOUNT', default='')
@@ -179,14 +183,18 @@ else:
 LINE_WORKS_BOT_ID = env('LINE_WORKS_BOT_ID', default='')
 LINE_WORKS_NOTIFICATION_CHANNEL_ID = env('LINE_WORKS_NOTIFICATION_CHANNEL_ID', default='')
 
-# SSO Settings
-LINE_WORKS_REDIRECT_URI = env('LINE_WORKS_REDIRECT_URI', default='http://localhost:8084/auth/lineworks/callback/')
-LINE_WORKS_DOMAIN = env('LINE_WORKS_DOMAIN', default='shin-on1981')
-
 # Dropbox Backup Settings
 DROPBOX_APP_KEY = env('DROPBOX_APP_KEY', default='')
 DROPBOX_APP_SECRET = env('DROPBOX_APP_SECRET', default='')
 DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:8084/auth/dropbox/callback/')
+
+# shin•on Portal JWT 連携設定
+# PortalJWTMiddleware が portal_jwt クッキーを検証するために使用する
+PORTAL_JWKS_URL = env('PORTAL_JWKS_URL', default='http://localhost/api/jwks/')
+PORTAL_JWT_ISSUER = env('PORTAL_JWT_ISSUER', default='https://portal.shin-on1981.com')
+PORTAL_JWT_AUDIENCE = env('PORTAL_JWT_AUDIENCE', default='shin-on-apps')
+# 未認証時のリダイレクト先（開発: http://localhost/login/ / 本番: https://portal.shin-on1981.com/login/）
+PORTAL_LOGIN_URL = env('PORTAL_LOGIN_URL', default='https://portal.shin-on1981.com/login/')
 
 # --- 安全装置: テストおよび開発環境の設定 ---
 if TESTING:

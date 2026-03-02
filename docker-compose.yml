@@ -20,32 +20,24 @@ services:
     build: .
     container_name: rf_finder_web
     command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8084:8000"
     volumes:
       - .:/code
+      - ./static:/static
     env_file:
       - .env
     depends_on:
       - db
     networks:
       - rf_network
-
-  apache:
-    build:
-      context: .
-      dockerfile: docker/apache/Dockerfile
-    container_name: rf_finder_apache
-    ports:
-      - "8084:80"
-    volumes:
-      - ./static:/static
-    depends_on:
-      - web
-    networks:
-      - rf_network
+      - shin-on-internal   # portal-app:8000 へ直接アクセスするために追加
 
 networks:
   rf_network:
     driver: bridge
+  shin-on-internal:
+    external: true   # docker network create shin-on-internal で事前作成が必要
 
 volumes:
   mysql_data:

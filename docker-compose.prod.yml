@@ -15,9 +15,7 @@ services:
   web:
     build: .
     container_name: rf_finder_web
-    command: python manage.py runserver 0.0.0.0:80
-    volumes:
-      - .:/code
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:80 --workers 3
     ports:
       - '${APP_PORT:-8085}:80'
     env_file:

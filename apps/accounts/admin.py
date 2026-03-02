@@ -63,9 +63,9 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('get_lw_uuid', 'role', 'full_name', 'phone_number', 'email')
     list_filter = ('role',)
     search_fields = ('user__username', 'family_name', 'given_name', 'email')
-    readonly_fields = ('otp_code', 'otp_expires_at', 'otp_locked_until')
+    readonly_fields = ('portal_uuid',)
     fieldsets = (
-        ('基本情報', {'fields': ('user', 'role')}),
+        ('基本情報', {'fields': ('user', 'role', 'portal_uuid')}),
         (
             'LINE WORKS同期情報',
             {
@@ -76,10 +76,6 @@ class UserProfileAdmin(admin.ModelAdmin):
                     'email',
                 )
             },
-        ),
-        (
-            'セキュリティ (OTP)',
-            {'fields': ('otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until'), 'classes': ('collapse',)},
         ),
     )
 

@@ -11,7 +11,7 @@ from django.utils import timezone
 
 
 class UserProfile(models.Model):
-    """ユーザーごとの追加情報（OTP、役割、プロフィールなど）"""
+    """ユーザーごとの追加情報（役割、プロフィールなど）"""
 
     class Role(models.TextChoices):
         ADMIN = 'admin', '管理者'
@@ -22,6 +22,17 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.GENERAL, verbose_name='役割')
 
+    # ポータル連携用UUID（portal_uuid = User.username on shin•on Portal）
+    portal_uuid = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        verbose_name='ポータルUUID',
+        help_text='shin•on Portal の portal_uuid（不変ID）。JWT 連携時に自動設定される。',
+    )
+
     # LINE WORKS から取得・同期する情報
     family_name = models.CharField(max_length=100, blank=True, default='', verbose_name='姓')
     given_name = models.CharField(max_length=100, blank=True, default='', verbose_name='名')
@@ -29,12 +40,6 @@ class UserProfile(models.Model):
     phonetic_given_name = models.CharField(max_length=100, blank=True, default='', verbose_name='名(ふりがな)')
     phone_number = models.CharField(max_length=20, blank=True, default='', verbose_name='電話番号')
     email = models.EmailField(blank=True, default='', verbose_name='メールアドレス')
-
-    # OTP関連
-    otp_code = models.CharField(max_length=255, blank=True, default='', verbose_name='OTPコード(ハッシュ)')
-    otp_expires_at = models.DateTimeField(blank=True, null=True, verbose_name='OTP有効期限')
-    otp_attempts = models.IntegerField(default=0, verbose_name='試行回数')
-    otp_locked_until = models.DateTimeField(blank=True, null=True, verbose_name='ロック解除日時')
 
     class Meta:
         verbose_name = 'ユーザープロフィール'
