@@ -15,6 +15,12 @@ services:
       - mysql_data_dev:/var/lib/mysql
     networks:
       - rf_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
 
   web:
     build: .
@@ -28,7 +34,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - rf_network
       - shin-on-internal   # portal-app:8000 へ直接アクセスするために追加

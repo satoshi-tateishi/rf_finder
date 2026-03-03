@@ -11,6 +11,12 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - rf_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
 
   web:
     build: .
@@ -21,7 +27,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - rf_network
       - shin-on-internal   # apache-gateway からのリバースプロキシを受け付けるために追加
