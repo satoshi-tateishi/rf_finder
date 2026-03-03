@@ -1,6 +1,7 @@
 import json
 from functools import wraps
 
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 
 
@@ -39,10 +40,12 @@ def api_error(message, status=400, errors=None):
 def json_api_view(validate=False):
     """
     POSTリクエストの解析とバリデーションを共通化するデコレータ。
+    認証チェック・メソッドチェック・JSONパース・バリデーションを一括処理する。
     """
 
     def decorator(view_func):
         @wraps(view_func)
+        @login_required(login_url='accounts:login')
         def _wrapped_view(request, *args, **kwargs):
             if request.method != 'POST':
                 return api_error('Method not allowed', status=405)

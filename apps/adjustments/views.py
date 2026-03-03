@@ -1,5 +1,6 @@
 import traceback
 
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
@@ -58,6 +59,7 @@ def save_adjustment(request, data):
         return api_error(str(e), status=500)
 
 
+@login_required(login_url='accounts:login')
 def list_adjustments(request):
     """保存済み一覧の取得"""
     event_name = request.GET.get('event_name')
@@ -95,6 +97,7 @@ def list_adjustments(request):
     return api_success(results)
 
 
+@login_required(login_url='accounts:login')
 def get_adjustment(request, pk):
     """単一データの取得"""
     try:
@@ -102,8 +105,6 @@ def get_adjustment(request, pk):
 
         # 認可チェック: 作成者本人または管理者のみ許可
         if adj.user and adj.user != request.user and getattr(request.user.profile, 'role', 'viewer') != 'admin':
-            from apps.adjustments.utils import api_error
-
             return api_error('Permission denied', status=403)
 
         data = {
@@ -267,8 +268,10 @@ def export_wsm(request, data):
             obj=facility,
         )
 
+        from django.utils.encoding import escape_uri_path
+
         response = HttpResponse(csv_content, content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{escape_uri_path(filename)}"
         return response
     except Facility.DoesNotExist:
         return api_error('Facility not found', status=404)

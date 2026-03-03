@@ -33,6 +33,7 @@ def index(request):
     )
 
 
+@login_required(login_url='accounts:login')
 def facility_search(request):
     """施設を名称で検索するAPI"""
     q = request.GET.get('q', '')
@@ -55,6 +56,7 @@ def facility_search(request):
     return api_success({'results': results})
 
 
+@login_required(login_url='accounts:login')
 def facility_detail(request, facility_id):
     """施設ごとの利用可能周波数リストを返すAPI"""
     try:

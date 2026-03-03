@@ -1,6 +1,6 @@
 import json
 import logging
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.contrib.auth import logout
@@ -54,6 +54,10 @@ def login_view(request):
     # login_required が ?next=/path/ をセットするのでフルURLに変換してポータルへ渡す
     # ポータルは OTP完了後にこのURLへリダイレクトしてくれる
     next_path = request.GET.get('next', '/')
+    # Open Redirect 対策: 外部URLを拒否し、相対パスのみ許可する
+    parsed = urlparse(next_path)
+    if parsed.scheme or parsed.netloc:
+        next_path = '/'
     next_url = request.build_absolute_uri(next_path)
     portal_url = f'{settings.PORTAL_LOGIN_URL}?{urlencode({"next": next_url})}'
     return redirect(portal_url)
@@ -78,6 +82,8 @@ def get_my_profile(request):
 
 
 def logout_view(request):
+    if request.method != 'POST':
+        return redirect('facilities:index')
     logout(request)
     return redirect('accounts:login')
 

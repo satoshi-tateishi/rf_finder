@@ -54,6 +54,11 @@ class FrequencyCalculationTest(TestCase):
 
 class FacilityAPITest(TestCase):
     def setUp(self):
+        from django.contrib.auth.models import User
+
+        self.user = User.objects.create_user(username='facilitytest', password='password')
+        self.client.force_login(self.user)
+
         self.f1 = Facility.objects.create(name='東京ドーム', prefecture='東京都', address='文京区')
         self.f2 = Facility.objects.create(name='明治座', prefecture='東京都', address='中央区')
         TVChannelStatus.objects.create(facility=self.f1, channel_number=13, is_available=True)
@@ -85,3 +90,61 @@ class FacilityAPITest(TestCase):
         """存在しない施設IDの場合は404を返すこと"""
         response = self.client.get(reverse('facilities:detail', args=[99999]))
         self.assertEqual(response.status_code, 404)
+
+
+class TVChannelStatusFrequencyTest(TestCase):
+    def setUp(self):
+        self.facility = Facility.objects.create(
+            name='周波数テスト施設', prefecture='東京都', address='千代田区'
+        )
+
+    def _make_ch(self, ch):
+        return TVChannelStatus.objects.create(facility=self.facility, channel_number=ch, is_available=True)
+
+    def test_ch13_start_frequency(self):
+        """ch13 の開始周波数は 470,000 kHz であること"""
+        ch = self._make_ch(13)
+        self.assertEqual(ch.frequency_start_khz, 470000)
+
+    def test_ch14_start_frequency(self):
+        """ch14 の開始周波数は 476,000 kHz（6MHz幅）であること"""
+        ch = self._make_ch(14)
+        self.assertEqual(ch.frequency_start_khz, 476000)
+
+    def test_ch53_start_frequency(self):
+        """ch53 の開始周波数は 710,000 kHz であること"""
+        ch = self._make_ch(53)
+        self.assertEqual(ch.frequency_start_khz, 470000 + (53 - 13) * 6000)
+        self.assertEqual(ch.frequency_start_khz, 710000)
+
+    def test_normal_channel_end_frequency(self):
+        """通常チャンネルの終了周波数は開始 + 6,000 kHz であること"""
+        ch = self._make_ch(30)
+        self.assertEqual(ch.frequency_end_khz, ch.frequency_start_khz + 6000)
+
+    def test_ch53_end_frequency_is_4mhz_wide(self):
+        """ch53 の終了周波数は開始 + 4,000 kHz（A帯特殊）であること"""
+        ch = self._make_ch(53)
+        self.assertEqual(ch.frequency_end_khz, ch.frequency_start_khz + 4000)
+        self.assertEqual(ch.frequency_end_khz, 714000)
+
+
+class FacilitySearchEdgeCaseTest(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+
+        self.user = User.objects.create_user(username='searchedgeuser', password='password')
+        self.client.force_login(self.user)
+        Facility.objects.create(name='横浜アリーナ', prefecture='神奈川県', address='横浜市')
+
+    def test_empty_query_returns_empty(self):
+        """クエリが空の場合は空結果を返すこと"""
+        response = self.client.get(reverse('facilities:search'), {'q': ''})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['data']['results']), 0)
+
+    def test_no_match_returns_empty(self):
+        """一致する施設がない場合は空結果を返すこと"""
+        response = self.client.get(reverse('facilities:search'), {'q': '存在しない施設名XYZ'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['data']['results']), 0)

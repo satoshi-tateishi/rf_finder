@@ -202,6 +202,15 @@ PORTAL_URL = '/'.join(PORTAL_LOGIN_URL.split('/')[:3]) + '/'
 # request.build_absolute_uri() が https:// を返すように設定
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# --- 本番セキュリティ設定 ---
+# Apache が SSL 終端しているため SECURE_SSL_REDIRECT は不要
+# Cookie は HTTPS 経由でのみ送信する（セッションハイジャック対策）
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# HSTS: ブラウザに1年間 HTTPS を強制させる
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+
 # --- 安全装置: テストおよび開発環境の設定 ---
 if TESTING:
     # テスト実行時はメールをインメモリにする

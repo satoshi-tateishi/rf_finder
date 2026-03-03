@@ -159,14 +159,15 @@ def log_user_login(sender, request, user, **kwargs):
 
     log_action(user=user, action='LOGIN', description='ログイン成功', request=request)
 
-    @receiver(user_login_failed)
-    def log_user_login_failed(sender, credentials, request, **kwargs):
-        from .utils import log_action
 
-        username = credentials.get('username', 'unknown')
-        log_action(
-            user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request
-        )
+@receiver(user_login_failed)
+def log_user_login_failed(sender, credentials, request, **kwargs):
+    from .utils import log_action
+
+    username = credentials.get('username', 'unknown')
+    log_action(
+        user=None, action='LOGIN_FAILED', description=f'ログイン失敗 (ユーザー名: {username})', request=request
+    )
 
 
 class DropboxToken(models.Model):
