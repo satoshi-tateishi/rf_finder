@@ -105,13 +105,18 @@ class PortalJWTMiddleware:
         portal_uuid でユーザーを検索する。
 
         見つからなければ email で既存ユーザーを検索して portal_uuid を自動リンクする（初回のみ）。
-        どちらも見つからなければ None を返す（新規自動作成は行わない）。
+        email でも見つからなければ JWT ペイロードの情報で新規ユーザーを自動作成する。
         """
         from .models import UserProfile
 
         # 1. portal_uuid で既存の紐付けを検索
         try:
             profile = UserProfile.objects.select_related('user').get(portal_uuid=portal_uuid)
+            # JWT に含まれる電話番号を常に最新値で同期する
+            jwt_phone = payload.get('phone_number', '')
+            if jwt_phone and profile.phone_number != jwt_phone:
+                profile.phone_number = jwt_phone
+                profile.save(update_fields=['phone_number'])
             return profile.user
         except UserProfile.DoesNotExist:
             pass
@@ -123,8 +128,27 @@ class PortalJWTMiddleware:
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            logger.info(f'email={email} に対応するローカルユーザーが存在しません')
-            return None
+            # 3. 新規ユーザーを自動作成（ポータル経由の初回アクセス）
+            user = User.objects.create_user(
+                username=portal_uuid,
+                email=email,
+                password=None,
+            )
+            # user.profile を経由してキャッシュを更新する。
+            # get_or_create だとキャッシュが更新されず、login() 後の
+            # update_last_login → post_save → save_user_profile で
+            # 古いキャッシュ（portal_uuid=None）に上書きされてしまう。
+            profile = user.profile
+            profile.portal_uuid = portal_uuid
+            profile.family_name = payload.get('family_name', '')
+            profile.given_name = payload.get('given_name', '')
+            profile.phonetic_family_name = payload.get('phonetic_family_name', '')
+            profile.phonetic_given_name = payload.get('phonetic_given_name', '')
+            profile.phone_number = payload.get('phone_number', '')
+            profile.email = email
+            profile.save()
+            logger.info(f'新規ユーザーを自動作成しました: {email} (portal_uuid={portal_uuid})')
+            return user
         except User.MultipleObjectsReturned:
             logger.warning(f'email={email} のユーザーが複数存在します。最初の1件を使用します。')
             user = User.objects.filter(email=email).order_by('id').first()
@@ -141,6 +165,8 @@ class PortalJWTMiddleware:
             profile.phonetic_family_name = payload.get('phonetic_family_name', '')
         if not profile.phonetic_given_name:
             profile.phonetic_given_name = payload.get('phonetic_given_name', '')
+        if not profile.phone_number:
+            profile.phone_number = payload.get('phone_number', '')
         if not profile.email:
             profile.email = email
         profile.save()

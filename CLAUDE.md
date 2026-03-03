@@ -8,7 +8,7 @@
 
 **RF Finder** — 特定ラジオマイク（A帯）の施設別空きチャンネル検索・運用調整届の自動生成・送信を行う Web アプリケーション。
 
-- **フレームワーク**: Django 4.2 / MySQL 8.0
+- **フレームワーク**: Django 4.2 / MySQL 8.4
 - **認証**: shin•on Portal JWT (`portal_jwt` クッキー検証)
 - **コンテナ**: Docker (web + db), Apache リバースプロキシ
 - **静的解析**: Ruff (`pyproject.toml` 参照)
@@ -26,7 +26,7 @@
 | ジョブ | 内容 |
 |--------|------|
 | `lint-python` | Ruff による Python 静的解析 |
-| `test-python` | MySQL 8.0 を使った Django ユニットテスト |
+| `test-python` | MySQL 8.4 を使った Django ユニットテスト |
 | `deploy` | 上記2ジョブ成功後、SSH で自宅サーバーへ本番デプロイ |
 
 #### デプロイ手順（サーバー側で自動実行）
@@ -47,18 +47,39 @@
 | `DEPLOY_KEY` | SSH 秘密鍵 |
 | `DEPLOY_PATH` | サーバー上のプロジェクトパス |
 
+## Docker Compose ファイルの使い分け
+
+**`docker compose` コマンド実行時は必ずファイルを明示すること。** ファイルを省略すると dev 用（`docker-compose.yml`）が使われ、本番サイトが停止する。
+
+| ファイル | 用途 | 起動コマンド |
+|---------|------|------------|
+| `docker-compose.yml` | **開発環境**（`runserver`、ポート8000） | `docker compose up -d --build` |
+| `docker-compose.prod.yml` | **本番環境**（`gunicorn`、ポート80） | `docker compose -f docker-compose.prod.yml up -d --build` |
+
+> **注意**: 本番環境のコンテナをリビルドする場合は必ず `docker-compose.prod.yml` を指定すること。
+> dev compose で起動すると Apache（`rf_finder_web:80`）との接続が切れ、本番サイトが 503 になる。
+
+### Apache ネットワーク接続について
+
+`apache-gateway` は `shin-on-internal` ネットワークへの接続が**コンテナ再起動後にリセットされる**。
+`apache-gateway` が再起動した場合は以下を手動で実行すること：
+
+```bash
+docker network connect shin-on-internal apache-gateway
+```
+
 ## テスト実行
 
 **開発環境でのテストは Docker コンテナ上で実行すること。** ホスト環境には Django や MySQL クライアントが入っていないため、`manage.py test` をホストから直接実行しても動作しない。
 
 ```bash
-docker exec rf_finder_web python manage.py test
+docker exec rf_finder_web_dev python manage.py test
 ```
 
 詳細な出力が必要な場合：
 
 ```bash
-docker exec rf_finder_web python manage.py test --verbosity=2
+docker exec rf_finder_web_dev python manage.py test --verbosity=2
 ```
 
 ## コード品質ルール

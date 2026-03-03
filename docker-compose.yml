@@ -1,7 +1,7 @@
 services:
   db:
     image: mysql:8.4
-    container_name: rf_finder_db
+    container_name: rf_finder_db_dev
     restart: always
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
@@ -12,13 +12,13 @@ services:
     ports:
       - "3309:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data_dev:/var/lib/mysql
     networks:
       - rf_network
 
   web:
     build: .
-    container_name: rf_finder_web
+    container_name: rf_finder_web_dev
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8084:8000"
@@ -40,4 +40,4 @@ networks:
     external: true   # docker network create shin-on-internal で事前作成が必要
 
 volumes:
-  mysql_data:
+  mysql_data_dev:

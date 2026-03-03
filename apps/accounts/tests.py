@@ -1,12 +1,16 @@
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import User
+import jwt as pyjwt
+from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import IntegrityError
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from .middleware import PortalJWTMiddleware
 from .models import AuditLog, DropboxToken, UserProfile
 from .utils import katakana_to_hiragana, log_action, normalize_phonetic
 
@@ -168,6 +172,154 @@ class AuditLogWithObjectTest(TestCase):
         request.user = self.user
         log = log_action(action='FWD_TEST', description='forwarded ip', request=request)
         self.assertEqual(log.ip_address, '203.0.113.1')
+
+
+class PortalJWTMiddlewareTest(TestCase):
+    """PortalJWTMiddleware の動作テスト"""
+
+    PORTAL_UUID = 'test-portal-uuid-001'
+    EMAIL = 'testuser@example.com'
+    PAYLOAD = {
+        'sub': PORTAL_UUID,
+        'email': EMAIL,
+        'family_name': '山田',
+        'given_name': '太郎',
+        'phonetic_family_name': 'やまだ',
+        'phonetic_given_name': 'たろう',
+    }
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.mock_jwks_client = MagicMock()
+        # ネットワーク呼び出しをしないようクラス変数にモックを注入
+        PortalJWTMiddleware._jwks_client = self.mock_jwks_client
+        self.middleware = PortalJWTMiddleware(lambda req: None)
+
+    def tearDown(self):
+        PortalJWTMiddleware._jwks_client = None
+
+    def _make_request(self, with_jwt=True):
+        """セッション付きリクエストを生成する"""
+        request = self.factory.get('/')
+        request.COOKIES = {'portal_jwt': 'fake.jwt.token'} if with_jwt else {}
+        request.user = AnonymousUser()
+        # login() が必要とするセッションをセットアップ
+        SessionMiddleware(lambda req: None).process_request(request)
+        request.session.save()
+        return request
+
+    def _run_with_payload(self, payload=None):
+        """指定ペイロードを返すモックJWTでミドルウェアを実行する"""
+        if payload is None:
+            payload = self.PAYLOAD
+        request = self._make_request()
+        mock_key = MagicMock()
+        self.mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
+        with patch('apps.accounts.middleware.jwt.decode', return_value=payload):
+            self.middleware(request)
+        return request
+
+    # ── スキップ系 ──────────────────────────────────────────────
+
+    def test_no_cookie_skips_auth(self):
+        """portal_jwt クッキーがない場合は認証を試みないこと"""
+        request = self._make_request(with_jwt=False)
+        self.middleware(request)
+        self.assertFalse(request.user.is_authenticated)
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_expired_jwt_skips_auth(self):
+        """期限切れ JWT の場合は認証をスキップすること"""
+        request = self._make_request()
+        self.mock_jwks_client.get_signing_key_from_jwt.side_effect = pyjwt.ExpiredSignatureError
+        self.middleware(request)
+        self.assertFalse(request.user.is_authenticated)
+
+    def test_invalid_jwt_skips_auth(self):
+        """不正な JWT の場合は認証をスキップすること"""
+        request = self._make_request()
+        self.mock_jwks_client.get_signing_key_from_jwt.side_effect = pyjwt.InvalidTokenError('bad token')
+        self.middleware(request)
+        self.assertFalse(request.user.is_authenticated)
+
+    def test_missing_sub_claim_skips_auth(self):
+        """JWT に sub クレームがない場合は認証をスキップすること"""
+        self._run_with_payload({'email': self.EMAIL})  # sub なし
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_already_authenticated_skips_jwt(self):
+        """認証済みユーザーのリクエストは JWT 処理をスキップすること"""
+        existing = User.objects.create_user(username='already', password='x')
+        request = self._make_request()
+        request.user = existing
+        self.middleware(request)
+        # JWKS クライアントが呼ばれていないことを確認
+        self.mock_jwks_client.get_signing_key_from_jwt.assert_not_called()
+
+    def test_inactive_user_is_rejected(self):
+        """is_active=False のユーザーはログインを拒否すること"""
+        user = User.objects.create_user(username='inactive', email=self.EMAIL, password=None, is_active=False)
+        user.profile.portal_uuid = self.PORTAL_UUID
+        user.profile.save()
+        request = self._run_with_payload()
+        self.assertFalse(request.user.is_authenticated)
+
+    # ── ユーザー照合・作成 ────────────────────────────────────────
+
+    def test_existing_user_found_by_portal_uuid(self):
+        """portal_uuid が一致する既存ユーザーで認証されること"""
+        user = User.objects.create_user(username='byuuid', email=self.EMAIL, password=None)
+        user.profile.portal_uuid = self.PORTAL_UUID
+        user.profile.save()
+        request = self._run_with_payload()
+        self.assertEqual(request.user, user)
+
+    def test_existing_user_found_by_email_links_portal_uuid(self):
+        """portal_uuid 未設定のユーザーが email で見つかり、portal_uuid が紐付けられること"""
+        user = User.objects.create_user(username='byemail', email=self.EMAIL, password=None)
+        request = self._run_with_payload()
+        self.assertEqual(request.user, user)
+        user.profile.refresh_from_db()
+        self.assertEqual(user.profile.portal_uuid, self.PORTAL_UUID)
+
+    def test_new_user_created_when_email_not_found(self):
+        """DB にメールが存在しない場合、新規ユーザーが自動作成されること"""
+        self.assertEqual(User.objects.count(), 0)
+        request = self._run_with_payload()
+        self.assertEqual(User.objects.count(), 1)
+        user = User.objects.get(email=self.EMAIL)
+        self.assertTrue(request.user.is_authenticated)
+        self.assertEqual(request.user, user)
+
+    def test_new_user_has_unusable_password(self):
+        """自動作成されたユーザーはパスワードなし（JWT 認証専用）であること"""
+        self._run_with_payload()
+        user = User.objects.get(email=self.EMAIL)
+        self.assertFalse(user.has_usable_password())
+
+    def test_new_user_profile_fields_saved_correctly(self):
+        """自動作成されたユーザーのプロフィールに JWT ペイロードの情報が正しく保存されること"""
+        self._run_with_payload()
+        profile = UserProfile.objects.get(user__email=self.EMAIL)
+        self.assertEqual(profile.portal_uuid, self.PORTAL_UUID)
+        self.assertEqual(profile.family_name, '山田')
+        self.assertEqual(profile.given_name, '太郎')
+        self.assertEqual(profile.phonetic_family_name, 'やまだ')
+        self.assertEqual(profile.phonetic_given_name, 'たろう')
+        self.assertEqual(profile.email, self.EMAIL)
+
+    def test_profile_fields_not_overwritten_after_login(self):
+        """
+        【リグレッション】login() が update_last_login を発火し
+        user.save() → post_save → save_user_profile シグナルが連鎖しても
+        portal_uuid やプロフィールが古いキャッシュで上書きされないこと。
+        """
+        self._run_with_payload()
+        # DB から直接再取得して確認（キャッシュを使わない）
+        profile = UserProfile.objects.get(user__email=self.EMAIL)
+        self.assertEqual(profile.portal_uuid, self.PORTAL_UUID)
+        self.assertEqual(profile.family_name, '山田')
+        self.assertEqual(profile.given_name, '太郎')
 
 
 class AccountsViewTest(TestCase):
