@@ -1,0 +1,132 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>tailwind.config = { darkMode: 'class' }</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    /* 標準フォーム要素を非表示にして自作 UI に置き換える */
+    #content-main form { display: none !important; }
+    #content > h1 { display: none !important; }
+    .pretitle { display: none !important; }
+    #content-main h2 { display: none !important; }
+    main > h2 { display: none !important; }
+    .object-tools { display: none !important; }
+    /* Django Admin のチェックボックスをそのまま使う */
+    .custom-form-field input[type="checkbox"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        accent-color: #2563eb;
+        cursor: pointer;
+    }
+    .custom-form-field select {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        color: #1f2937;
+        background-color: #fff;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block pretitle %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content_subtitle %}{% endblock %}
+{% block object-tools %}{% endblock %}
+
+{% block content %}
+<div id="custom-detail-container" class="max-w-4xl mx-auto my-8 px-4">
+    <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}{% if form_url %}action="{{ form_url }}" {% endif %}method="post" id="{{ opts.model_name }}_form" novalidate>
+        {% csrf_token %}
+
+        <!-- ヘッダー -->
+        <div class="flex justify-between items-end mb-8 border-b-2 border-gray-900 pb-6">
+            <div>
+                <h1 class="text-3xl font-black text-gray-900 tracking-tight">ユーザープロフィール</h1>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-2">User profile</p>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <span class="text-[10px] font-black text-gray-400 uppercase block mb-1">Status</span>
+                    {% if adminform.form.instance.user.is_active %}
+                        <span class="bg-blue-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg shadow-blue-100">ACTIVE</span>
+                    {% else %}
+                        <span class="bg-gray-400 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg shadow-gray-100">INACTIVE</span>
+                    {% endif %}
+                </div>
+                <button type="submit" name="_save" class="bg-gray-900 hover:bg-blue-600 text-white text-[10px] font-black px-8 py-3 rounded-2xl transition-all active:scale-95 shadow-xl shadow-gray-200 uppercase tracking-widest">
+                    変更を保存
+                </button>
+            </div>
+        </div>
+
+        <!-- フォーム本体 -->
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {% for fieldset in adminform %}
+                <div class="{% if not forloop.first %}border-t-8 border-gray-50{% endif %}">
+                    {% if fieldset.name %}
+                        <div class="bg-gray-50/50 px-8 py-4 border-b border-gray-100">
+                            <h2 class="text-[11px] font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                                {{ fieldset.name }}
+                            </h2>
+                            {% if fieldset.description %}
+                                <p class="text-[10px] text-gray-400 mt-1 ml-3.5">{{ fieldset.description }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    <table class="w-full border-collapse">
+                        <tbody class="divide-y divide-gray-50">
+                            {% for line in fieldset %}
+                                {% for field in line %}
+                                    <tr class="group hover:bg-gray-50/30 transition-colors">
+                                        <!-- ラベル（右寄せ） -->
+                                        <th class="w-1/3 py-5 pr-10 text-right align-top bg-gray-50/20">
+                                            <label class="text-[11px] font-black text-gray-400 uppercase tracking-wider">
+                                                {{ field.field.label }}
+                                            </label>
+                                        </th>
+                                        <!-- 値 -->
+                                        <td class="py-5 pl-4 text-left align-top">
+                                            <div class="text-sm font-bold text-gray-800 leading-relaxed">
+                                                {% if field.is_readonly %}
+                                                    <span class="text-gray-500">{{ field.contents|default:"—" }}</span>
+                                                {% else %}
+                                                    <div class="custom-form-field">
+                                                        {{ field.field }}
+                                                        {% if field.field.help_text %}
+                                                            <p class="text-[9px] text-gray-400 mt-1">{{ field.field.help_text|safe }}</p>
+                                                        {% endif %}
+                                                        {{ field.field.errors }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        </div>
+    </form>
+
+    <!-- フッター -->
+    <div class="mt-10 flex items-center justify-between">
+        <a href="../" class="inline-flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors group">
+            <i class="fa-solid fa-arrow-left text-xs transition-transform group-hover:-translate-x-1"></i>
+            <span class="text-[10px] font-black uppercase tracking-widest text-gray-900">一覧に戻る</span>
+        </a>
+        <div class="text-[9px] text-gray-400 font-bold italic">
+            <i class="fa-solid fa-rotate text-gray-300 mr-1"></i>
+            Synced from shin•on Portal
+        </div>
+    </div>
+</div>
+{% endblock %}

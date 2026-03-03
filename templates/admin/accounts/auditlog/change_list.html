@@ -1,0 +1,127 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>tailwind.config = { darkMode: 'class' }</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .results { border: none !important; background: transparent !important; }
+    #result_list { display: none; }
+    .paginator {
+        background: white !important;
+        padding: 1rem !important;
+        margin-top: 2rem !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+    }
+    #toolbar {
+        background: transparent !important;
+        border: none !important;
+        margin-bottom: 2rem !important;
+    }
+    #changelist-search input[type="text"] {
+        border-radius: 12px !important;
+        padding: 0.6rem 1.25rem !important;
+        border: 1px solid #e2e8f0 !important;
+        width: 350px !important;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    }
+    #changelist-search input[type="submit"] {
+        border-radius: 12px !important;
+        background: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 800 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+    #changelist-search input[type="submit"]:hover {
+        background: #1d4ed8 !important;
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block result_list %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-12">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse m-0 p-0">
+            <thead>
+                <tr class="bg-gray-50/50 border-b border-gray-100">
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight w-40">日時</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight w-36">ユーザー</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight w-36">操作</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight">詳細</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight w-32">IPアドレス</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {% for log in cl.result_list %}
+                <tr class="hover:bg-gray-50/50 transition-colors">
+                    <!-- 日時 -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-xs font-bold text-gray-700">{{ log.timestamp|date:"Y/m/d" }}</div>
+                        <div class="text-[11px] text-gray-400 mt-0.5">{{ log.timestamp|date:"H:i:s" }}</div>
+                    </td>
+
+                    <!-- ユーザー（氏名） -->
+                    <td class="!pl-6 py-4 align-top">
+                        {% if log.user %}
+                            {% if log.user.profile.full_name %}
+                                <div class="text-sm font-bold text-gray-800">{{ log.user.profile.full_name }}</div>
+                            {% else %}
+                                <div class="text-sm font-bold text-gray-800">{{ log.user.username }}</div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-sm text-gray-400">—</div>
+                        {% endif %}
+                    </td>
+
+                    <!-- 操作種別 -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-0.5">{{ log.action }}</div>
+                        <div class="text-xs text-gray-600">
+                            {% if log.action == "LOGIN" %}ログイン成功
+                            {% elif log.action == "LOGIN_FAILED" %}ログイン失敗
+                            {% elif log.action == "PDF_EXPORT" %}PDF出力
+                            {% elif log.action == "EXCEL_EXPORT" %}Excel出力
+                            {% elif log.action == "WSM_EXPORT" %}WSM出力
+                            {% elif log.action == "EMAIL_SEND" %}メール送信
+                            {% elif log.action == "DB_BACKUP" %}バックアップ成功
+                            {% elif log.action == "DB_BACKUP_FAILED" %}バックアップ失敗
+                            {% elif log.action == "DB_RESTORE" %}データベース復元
+                            {% elif log.action == "DB_RESTORE_FAILED" %}復元失敗
+                            {% elif log.action == "DROPBOX_AUTH" %}Dropbox連携
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- 詳細 -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-sm text-gray-600 leading-relaxed">{{ log.description }}</div>
+                    </td>
+
+                    <!-- IPアドレス -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-[11px] font-mono text-gray-400">{{ log.ip_address|default:"—" }}</div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-24 text-center">
+                        <p class="text-gray-400 font-black">ログが見つかりません</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="hidden">
+    {# 標準テーブルのレンダリングを抑止 #}
+</div>
+{% endblock %}

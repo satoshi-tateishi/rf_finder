@@ -1,0 +1,106 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>tailwind.config = { darkMode: 'class' }</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .results { border: none !important; background: transparent !important; }
+    #result_list { display: none; }
+    .paginator {
+        background: white !important;
+        padding: 1rem !important;
+        margin-top: 2rem !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+    }
+    #toolbar {
+        background: transparent !important;
+        border: none !important;
+        margin-bottom: 2rem !important;
+    }
+    #changelist-search input[type="text"] {
+        border-radius: 12px !important;
+        padding: 0.6rem 1.25rem !important;
+        border: 1px solid #e2e8f0 !important;
+        width: 350px !important;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    }
+    #changelist-search input[type="submit"] {
+        border-radius: 12px !important;
+        background: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 800 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+    #changelist-search input[type="submit"]:hover {
+        background: #1d4ed8 !important;
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block result_list %}
+<div id="custom-changelist-container" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-12">
+    <div class="overflow-x-auto">
+        <table id="custom-result-table" class="w-full text-left border-collapse m-0 p-0">
+            <thead>
+                <tr class="bg-gray-50/50 border-b border-gray-100">
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight">氏名</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight">役割</th>
+                    <th class="!pl-6 py-4 text-left text-[11px] font-black text-gray-400 uppercase tracking-tight">連絡先</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {% for profile in cl.result_list %}
+                <tr class="hover:bg-blue-50/40 transition-colors group cursor-pointer" onclick="location.href='{% url opts|admin_urlname:'change' profile.pk %}'">
+                    <!-- 氏名 + ふりがな + ステータス -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-sm font-black text-gray-900 mb-0.5">
+                            {{ profile.family_name }} {{ profile.given_name }}
+                        </div>
+                        {% if profile.phonetic_family_name or profile.phonetic_given_name %}
+                        <div class="text-[11px] text-gray-400 mb-1.5">
+                            {{ profile.phonetic_family_name }} {{ profile.phonetic_given_name }}
+                        </div>
+                        {% endif %}
+                        {% if profile.user.is_active %}
+                            <span class="bg-blue-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase inline-block">Active</span>
+                        {% else %}
+                            <span class="bg-gray-400 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase inline-block">Inactive</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- 役割 -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-sm font-bold text-gray-700">{{ profile.get_role_display }}</div>
+                    </td>
+
+                    <!-- 連絡先 -->
+                    <td class="!pl-6 py-4 align-top">
+                        <div class="text-sm font-bold text-gray-700 leading-tight">{{ profile.email|default:"-" }}</div>
+                        <div class="text-[11px] font-medium text-gray-500 mt-1">{{ profile.phone_number|default:"-" }}</div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="px-6 py-24 text-center">
+                        <p class="text-gray-400 font-black">ユーザーが見つかりません</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Django Admin 標準のresult_listは非表示（カスタム一覧で代替） -->
+<div class="hidden">
+    {# 標準テーブルのレンダリングを抑止 #}
+</div>
+{% endblock %}

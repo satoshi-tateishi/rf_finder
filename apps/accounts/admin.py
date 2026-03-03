@@ -8,6 +8,30 @@ from .models import AuditLog, DropboxToken, EmailTemplate, Member, UserProfile
 from .resources import EmailTemplateResource, MemberResource
 
 
+class AuditLogUserFilter(admin.SimpleListFilter):
+    title = 'ユーザー'
+    parameter_name = 'user'
+
+    def lookups(self, request, model_admin):
+        # ログに存在するユーザーのみ、氏名で一覧表示
+        user_ids = AuditLog.objects.exclude(user=None).values_list('user_id', flat=True).distinct()
+        profiles = (
+            UserProfile.objects.filter(user_id__in=user_ids)
+            .select_related('user')
+            .order_by('family_name', 'given_name')
+        )
+        result = []
+        for profile in profiles:
+            name = profile.full_name or profile.user.username
+            result.append((profile.user_id, name))
+        return result
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(user_id=self.value())
+        return queryset
+
+
 @admin.register(DropboxToken)
 class DropboxTokenAdmin(admin.ModelAdmin):
     list_display = ('account_name', 'service_name', 'updated_at', 'status_display', 'action_buttons')
@@ -34,11 +58,11 @@ class DropboxTokenAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'user', 'action', 'description', 'ip_address')
-    list_filter = ('action', 'timestamp', 'user')
-    search_fields = ('description', 'user__username', 'ip_address')
+    list_display = ('timestamp', 'get_user_display', 'action', 'description', 'ip_address')
+    list_filter = ('action', 'timestamp', AuditLogUserFilter)
+    search_fields = ('description', 'user__profile__family_name', 'user__profile__given_name', 'ip_address')
     readonly_fields = (
-        'user',
+        'get_user_display',
         'action',
         'description',
         'ip_address',
@@ -57,31 +81,101 @@ class AuditLogAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    @admin.display(description='ユーザー', ordering='user__profile__family_name')
+    def get_user_display(self, obj):
+        if not obj.user:
+            return '—'
+        if hasattr(obj.user, 'profile'):
+            name = obj.user.profile.full_name
+            if name:
+                return name
+        return obj.user.username
+
+
+class UserProfileAdminForm(forms.ModelForm):
+    is_active = forms.BooleanField(
+        label='アカウント有効',
+        required=False,
+        help_text='無効にするとログインできなくなります。削除の代わりにこのフラグで管理してください。',
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ('user', 'role', 'portal_uuid', 'family_name', 'given_name',
+                  'phonetic_family_name', 'phonetic_given_name', 'phone_number', 'email')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['is_active'].initial = self.instance.user.is_active
+
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('get_lw_uuid', 'role', 'full_name', 'phone_number', 'email')
-    list_filter = ('role',)
+    form = UserProfileAdminForm
+    list_display = ('get_lw_uuid', 'role', 'full_name', 'phone_number', 'email', 'get_is_active')
+    list_filter = ('role', 'user__is_active')
     search_fields = ('user__username', 'family_name', 'given_name', 'email')
-    readonly_fields = ('portal_uuid',)
     fieldsets = (
-        ('基本情報', {'fields': ('user', 'role', 'portal_uuid')}),
         (
-            'LINE WORKS同期情報',
+            '基本情報',
             {
+                'description': 'Portal 同期情報は shin•on Portal JWT から自動同期されます。このアプリからは編集できません。',
                 'fields': (
                     ('family_name', 'given_name'),
                     ('phonetic_family_name', 'phonetic_given_name'),
-                    'phone_number',
+                    'get_user_uuid',
+                    'portal_uuid',
                     'email',
-                )
+                    'phone_number',
+                    'is_active',
+                ),
+            },
+        ),
+        (
+            'RF Finder 設定',
+            {
+                'fields': ('role',),
             },
         ),
     )
 
+    # JWT で同期されるフィールド（role・is_active・get_user_uuid は除く）
+    _JWT_SYNC_FIELDS = (
+        'portal_uuid',
+        'family_name',
+        'given_name',
+        'phonetic_family_name',
+        'phonetic_given_name',
+        'phone_number',
+        'email',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return ('get_user_uuid',) + self._JWT_SYNC_FIELDS
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        obj.user.is_active = form.cleaned_data.get('is_active', True)
+        obj.user.save(update_fields=['is_active'])
+
+    @admin.display(description='LINE WORKS UUID')
+    def get_user_uuid(self, obj):
+        return obj.user.username if obj.user else '—'
+
     @admin.display(description='LW_UUID', ordering='user__username')
     def get_lw_uuid(self, obj):
         return obj.user.username
+
+    @admin.display(description='有効', boolean=True, ordering='user__is_active')
+    def get_is_active(self, obj):
+        return obj.user.is_active
 
 
 # Dropbox連携開始用のダミー
