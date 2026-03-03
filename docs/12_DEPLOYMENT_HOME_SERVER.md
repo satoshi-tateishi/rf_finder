@@ -236,3 +236,21 @@ Web UI のハンバーガーメニューから実行するか、以下のコマ�
 ```bash
 docker compose -f docker-compose.prod.yml exec web python manage.py backup_db
 ```
+
+### 本番公開前のデータクリア
+
+テスト運用中に作成した申請履歴・監査ログを本番公開前に削除します.
+`docker exec` コマンドはコンテナ名を直接指定するため、どのディレクトリからでも実行できます.
+
+**申請履歴（運用調整届）のクリア**
+```bash
+docker exec rf_finder_web python manage.py shell -c \
+  "from apps.adjustments.models import OperationAdjustment; count, _ = OperationAdjustment.objects.all().delete(); print(f'{count} 件削除しました')"
+```
+> ManyToMany の中間テーブル（施設との紐付け）も Django が自動的に連鎖削除します.
+
+**監査ログのクリア**
+```bash
+docker exec rf_finder_web python manage.py shell -c \
+  "from apps.accounts.models import AuditLog; count, _ = AuditLog.objects.all().delete(); print(f'{count} 件削除しました')"
+```
