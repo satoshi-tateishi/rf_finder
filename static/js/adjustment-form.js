@@ -405,15 +405,18 @@ async function previewPDF() {
         return;
     }
 
+    // ポップアップブロッカー対策：ユーザー操作の同期コンテキスト内でウィンドウを開く
+    const previewWin = window.open('', '_blank');
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
 
     try {
         const blob = await Api.previewPDF(data);
-        PdfPreview.open(blob);
+        PdfPreview.open(blob, previewWin);
         showToast('PDFプレビューを表示しました', 'success');
     } catch (err) {
-        // API から返ってくる構造化されたエラーまたは一般的なエラー
+        if (previewWin && !previewWin.closed) previewWin.close();
         handleValidationErrors(err);
     } finally {
         btn.disabled = false;

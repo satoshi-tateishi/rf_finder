@@ -4,40 +4,37 @@
 const PdfPreview = (function() {
     let _currentUrl = null;
 
-    function open(blob) {
+    function open(blob, targetWindow = null) {
         if (_currentUrl) window.URL.revokeObjectURL(_currentUrl);
         _currentUrl = window.URL.createObjectURL(blob);
 
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        // デスクトップ：事前に開いたウィンドウへ PDF をナビゲート
+        if (!isMobile && targetWindow && !targetWindow.closed) {
+            targetWindow.location.href = _currentUrl;
+            return;
+        }
+
+        // モバイル or フォールバック：モーダルで「直接開く」ボタンを表示
         const embed = document.getElementById('preview-embed');
         const modal = document.getElementById('preview-modal');
         const mobileMsg = document.getElementById('preview-mobile-msg');
 
-        if (!embed || !modal || !mobileMsg) {
+        if (!modal || !mobileMsg) {
             console.error('Preview modal elements not found');
             return;
         }
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            embed.classList.add('hidden');
-            mobileMsg.classList.remove('hidden');
-        } else {
-            embed.src = _currentUrl;
-            embed.classList.remove('hidden');
-            mobileMsg.classList.add('hidden');
-        }
-
+        if (embed) embed.classList.add('hidden');
+        mobileMsg.classList.remove('hidden');
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     }
 
     function close() {
         const modal = document.getElementById('preview-modal');
-        const embed = document.getElementById('preview-embed');
-
         if (modal) modal.classList.add('hidden');
-        if (embed) embed.removeAttribute('src');
         document.body.classList.remove('overflow-hidden');
 
         if (_currentUrl) {
