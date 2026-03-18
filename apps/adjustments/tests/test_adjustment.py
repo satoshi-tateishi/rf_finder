@@ -1,6 +1,8 @@
 import io
 import json
-from unittest.mock import patch
+import subprocess
+import unittest.mock
+from unittest.mock import MagicMock, patch
 
 from django.core import mail
 from django.test import TestCase
@@ -12,6 +14,7 @@ from apps.adjustments.services import (
     generate_adjustment_pdf,
     send_adjustment_email,
 )
+from apps.adjustments.services.pdf_service import convert_excel_to_pdf
 from apps.adjustments.utils import format_channels
 
 
@@ -321,3 +324,86 @@ class EmailServiceDetailTest(TestCase):
         self.assertEqual(sent.subject, '新規:ハムレット')
         self.assertIn('太郎 様 (taro@ex.com)', sent.body)
         self.assertIn('運用日: 2026年5月10日', sent.body)
+
+
+class ConvertExcelToPdfTest(TestCase):
+    """convert_excel_to_pdf のユニットテスト。
+
+    subprocess.run を mock してコマンド実行を伴わずに
+    各シナリオ（成功・フォールバック・失敗・ファイル未生成）を検証する。
+    """
+
+    def _make_excel_buffer(self):
+        """ダミーの xlsx バッファを返す"""
+        buf = io.BytesIO(b'dummy xlsx content')
+        buf.seek(0)
+        return buf
+
+    @patch('apps.adjustments.services.pdf_service.subprocess.run')
+    @patch('apps.adjustments.services.pdf_service.os.path.exists', return_value=True)
+    def test_successful_conversion(self, mock_exists, mock_run):
+        """subprocess が成功し PDF ファイルが生成されたとき BytesIO を返す"""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with patch('builtins.open', unittest.mock.mock_open(read_data=b'%PDF-dummy')):
+            result = convert_excel_to_pdf(self._make_excel_buffer())
+
+        self.assertIsInstance(result, io.BytesIO)
+
+    @patch('apps.adjustments.services.pdf_service.subprocess.run')
+    @patch('apps.adjustments.services.pdf_service.os.path.exists', return_value=True)
+    def test_fallback_to_soffice(self, mock_exists, mock_run):
+        """`libreoffice` が FileNotFoundError → `soffice` で成功するフォールバック"""
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == 'libreoffice':
+                raise FileNotFoundError('libreoffice not found')
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = side_effect
+
+        with patch('builtins.open', unittest.mock.mock_open(read_data=b'%PDF-dummy')):
+            result = convert_excel_to_pdf(self._make_excel_buffer())
+
+        self.assertIsInstance(result, io.BytesIO)
+        called_cmds = [c[0][0][0] for c in mock_run.call_args_list]
+        self.assertIn('soffice', called_cmds)
+
+    @patch('apps.adjustments.services.pdf_service.subprocess.run')
+    def test_all_commands_fail_raises_runtime_error(self, mock_run):
+        """`libreoffice` も `soffice` も FileNotFoundError → RuntimeError"""
+        mock_run.side_effect = FileNotFoundError('command not found')
+
+        with patch('builtins.open', unittest.mock.mock_open()):
+            with self.assertRaises(RuntimeError) as ctx:
+                convert_excel_to_pdf(self._make_excel_buffer())
+
+        self.assertIn('PDF conversion failed', str(ctx.exception))
+
+    @patch('apps.adjustments.services.pdf_service.subprocess.run')
+    def test_exit_code_77_raises_runtime_error(self, mock_run):
+        """exit code 77（User installation could not be completed）→ RuntimeError
+
+        Dockerfile の appuser ホームディレクトリ未作成時に発生した障害の再発防止。
+        """
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=77,
+            cmd=['soffice', '--headless', '--convert-to', 'pdf'],
+            stderr='Fatal Error: The application cannot be started. '
+                   'User installation could not be completed.',
+        )
+
+        with patch('builtins.open', unittest.mock.mock_open()):
+            with self.assertRaises(RuntimeError) as ctx:
+                convert_excel_to_pdf(self._make_excel_buffer())
+
+        self.assertIn('PDF conversion failed', str(ctx.exception))
+
+    @patch('apps.adjustments.services.pdf_service.subprocess.run')
+    @patch('apps.adjustments.services.pdf_service.os.path.exists', return_value=False)
+    def test_pdf_file_not_created_raises_file_not_found(self, mock_exists, mock_run):
+        """subprocess 成功でも PDF ファイルが存在しない → FileNotFoundError"""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with patch('builtins.open', unittest.mock.mock_open()):
+            with self.assertRaises(FileNotFoundError):
+                convert_excel_to_pdf(self._make_excel_buffer())
