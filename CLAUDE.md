@@ -100,7 +100,7 @@ ruff check .
 | ドキュメント | 内容 |
 |------------|------|
 | [docs/PHASES.md](docs/PHASES.md) | 開発進捗・フェーズ別完了状況 |
-| [docs/REFACTORING.md](docs/REFACTORING.md) | リファクタリング実績と残課題 |
+| [docs/10_REFACTORING.md](docs/10_REFACTORING.md) | リファクタリング実績と残課題 |
 | [docs/LINE_WORKS_SSO.md](docs/LINE_WORKS_SSO.md) | 認証フロー（Portal JWT 連携の概要） |
 | [docs/06_APP_INTEGRATION_GUIDE.md](docs/06_APP_INTEGRATION_GUIDE.md) | shin•on Portal JWT 統合実装ガイド |
 | [docs/LINE_WORKS_API.md](docs/LINE_WORKS_API.md) | LINE WORKS Bot API 技術リファレンス |

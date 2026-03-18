@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -59,6 +60,44 @@ class ListAdjustmentsTest(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['event_name'], '夏のイベント')
 
+    def test_filter_by_status_draft(self):
+        """`status=draft` で下書きのみ絞り込めること"""
+        response = self.client.get(reverse('adjustments:list_adjustments'), {'status': 'draft'})
+        self.assertEqual(response.status_code, 200)
+        results = response.json()['data']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['status'], '下書き')
+
+    def test_filter_by_status_submitted(self):
+        """`status=submitted` で送信済みのみ絞り込めること"""
+        response = self.client.get(reverse('adjustments:list_adjustments'), {'status': 'submitted'})
+        self.assertEqual(response.status_code, 200)
+        results = response.json()['data']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['status'], '送信済み')
+
+    def test_filter_by_invalid_status_returns_all(self):
+        """不正な `status` 値は無視されて全件返ること"""
+        response = self.client.get(reverse('adjustments:list_adjustments'), {'status': 'invalid'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['data']), 2)
+
+    def test_response_includes_parent_id(self):
+        """一覧レスポンスに `parent_id` フィールドが含まれること"""
+        child = OperationAdjustment.objects.create(
+            user=self.user,
+            app_type='change',
+            user_name='子申請者',
+            event_name='子申請',
+            status='draft',
+            parent=self.adj1,
+        )
+        response = self.client.get(reverse('adjustments:list_adjustments'), {'event_name': '子申請'})
+        results = response.json()['data']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['parent_id'], self.adj1.id)
+        child.delete()
+
 
 class GetAdjustmentTest(TestCase):
     def setUp(self):
@@ -102,6 +141,23 @@ class GetAdjustmentTest(TestCase):
         response = self.client.get(reverse('adjustments:get_adjustment', args=[99999]))
         self.assertEqual(response.status_code, 404)
 
+    def test_response_includes_parent_id(self):
+        """詳細レスポンスに `parent_id` フィールドが含まれること"""
+        child = OperationAdjustment.objects.create(
+            user=self.owner,
+            app_type='change',
+            user_name='子申請者',
+            event_name='子催事',
+            status='draft',
+            parent=self.adj,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse('adjustments:get_adjustment', args=[child.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()['data']
+        self.assertEqual(data['parent_id'], self.adj.id)
+        child.delete()
+
 
 class JsonApiViewDecoratorTest(TestCase):
     def setUp(self):
@@ -121,3 +177,97 @@ class JsonApiViewDecoratorTest(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse('adjustments:save_adjustment'))
         self.assertEqual(response.status_code, 405)
+
+
+class ValidateAdjustmentLoggingTest(TestCase):
+    """バリデーションエラーが print でなく logger で記録されること"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='logtest', password='password')
+        self.client.force_login(self.user)
+
+    def test_validation_error_uses_logger_not_print(self):
+        """バリデーションエラー発生時に logger.warning が呼ばれ、print は呼ばれないこと。
+        validate=True のエンドポイント(preview_pdf)に不正データを送信して確認する。"""
+        # facilities・mic_counts が空なのでバリデーション失敗する
+        invalid_data = json.dumps({
+            'app_type': 'new',
+            'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090-0000-0000', 'email': 'u@example.com'},
+            'event': {'name': '催事', 'comment': ''},
+            'facilities': [],
+            'mic_counts': {},
+            'selected_channels': [],
+        })
+        with self.assertLogs('apps.adjustments.views', level='WARNING') as log_ctx:
+            with patch('builtins.print') as mock_print:
+                self.client.post(
+                    reverse('adjustments:preview_pdf'),
+                    data=invalid_data,
+                    content_type='application/json',
+                )
+                mock_print.assert_not_called()
+        self.assertTrue(any('Validation Error' in msg for msg in log_ctx.output))
+
+    def test_preview_pdf_entry_uses_logger_not_print(self):
+        """preview_pdf 呼び出し時に print が呼ばれないこと"""
+        valid_data = json.dumps({
+            'app_type': 'new',
+            'user': {'name': '使用者', 'kana': 'しようしゃ', 'tel': '090-0000-0000', 'email': 'u@example.com'},
+            'event': {'name': '催事', 'comment': ''},
+            'facilities': [],
+            'mic_counts': {},
+            'selected_channels': [],
+        })
+        with patch('apps.adjustments.views.generate_adjustment_pdf') as mock_pdf:
+            import io
+            mock_pdf.return_value = io.BytesIO(b'%PDF-dummy')
+            with patch('builtins.print') as mock_print:
+                self.client.post(
+                    reverse('adjustments:preview_pdf'),
+                    data=valid_data,
+                    content_type='application/json',
+                )
+                mock_print.assert_not_called()
+
+
+class ListAdjustmentsQueryCountTest(TestCase):
+    """list_adjustments のクエリ数が件数に比例して増加しないこと（N+1対策）"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='querytest', password='password')
+        self.client.force_login(self.user)
+
+    def _create_adjustments(self, count):
+        for i in range(count):
+            OperationAdjustment.objects.create(
+                user=self.user,
+                app_type='new',
+                user_name=f'ユーザー{i}',
+                event_name=f'催事{i}',
+                status='draft',
+            )
+
+    def test_query_count_does_not_grow_with_records(self):
+        """2件と5件でクエリ数が同じであること（N+1クエリがないこと）"""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._create_adjustments(2)
+        url = reverse('adjustments:list_adjustments')
+
+        with CaptureQueriesContext(connection) as ctx_2:
+            self.client.get(url)
+        count_2 = len(ctx_2.captured_queries)
+
+        OperationAdjustment.objects.all().delete()
+        self._create_adjustments(5)
+
+        with CaptureQueriesContext(connection) as ctx_5:
+            self.client.get(url)
+        count_5 = len(ctx_5.captured_queries)
+
+        self.assertEqual(
+            count_2,
+            count_5,
+            f'N+1クエリの疑い: 2件={count_2}クエリ, 5件={count_5}クエリ',
+        )

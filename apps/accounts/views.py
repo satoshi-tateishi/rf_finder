@@ -9,17 +9,18 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 from apps.adjustments.services import DropboxService
+from apps.adjustments.services.dropbox_token import DropboxAuthError
 
 from .models import AuditLog, UserProfile
+from .utils import require_admin, require_admin_redirect
 
 logger = logging.getLogger(__name__)
 
 
 @login_required
+@require_admin
 def list_audit_logs(request):
     """管理者用：監査ログの一覧を取得する"""
-    if request.user.profile.role != 'admin':
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
 
     action = request.GET.get('action')
     description = request.GET.get('description')
@@ -50,7 +51,7 @@ def list_audit_logs(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('facilities:index')
+        return redirect('index')
     # login_required が ?next=/path/ をセットするのでフルURLに変換してポータルへ渡す
     # ポータルは OTP完了後にこのURLへリダイレクトしてくれる
     next_path = request.GET.get('next', '/')
@@ -83,17 +84,15 @@ def get_my_profile(request):
 
 def logout_view(request):
     if request.method != 'POST':
-        return redirect('facilities:index')
+        return redirect('index')
     logout(request)
     return redirect('accounts:login')
 
 
 @login_required
+@require_admin_redirect('index')
 def dropbox_login(request):
     """Dropbox連携を開始する (管理者のみ)"""
-    if request.user.profile.role != 'admin':
-        return redirect('facilities:index')
-
     service = DropboxService()
     redirect_uri = settings.DROPBOX_REDIRECT_URI
     # セッションを渡す
@@ -114,16 +113,15 @@ def dropbox_callback(request):
         # クエリパラメータ全体とセッションを渡す
         service.finish_auth(request.GET, request.session, redirect_uri)
         return redirect('/admin/accounts/dropboxtoken/')
-    except Exception as e:
-        logger.error(f'Dropbox Callback Error: {e}')
+    except DropboxAuthError as e:
+        logger.error('Dropbox認証コールバックでエラーが発生しました: %s', e)
         return render(request, 'index.html', {'error': f'Dropbox認証に失敗しました: {str(e)}'})
 
 
 @login_required
+@require_admin
 def run_db_backup(request):
     """手動でデータベースバックアップを実行する"""
-    if request.user.profile.role != 'admin':
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
 
     service = DropboxService()
     try:
@@ -134,10 +132,9 @@ def run_db_backup(request):
 
 
 @login_required
+@require_admin
 def list_backups(request):
     """Dropbox上のバックアップ一覧を取得する"""
-    if request.user.profile.role != 'admin':
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
 
     service = DropboxService()
     try:
@@ -148,10 +145,9 @@ def list_backups(request):
 
 
 @login_required
+@require_admin
 def restore_db(request):
     """指定されたバックアップからデータベースを復元する"""
-    if request.user.profile.role != 'admin':
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
 
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'POST request required'}, status=405)

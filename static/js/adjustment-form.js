@@ -711,26 +711,30 @@ async function refreshHistory() {
     const event_name = document.getElementById('history-search-event').value;
     const facility_name = document.getElementById('history-search-facility').value;
     const user_name = document.getElementById('history-search-user').value;
-    
+    const status = document.getElementById('history-filter-status')?.value || '';
+
     const container = document.getElementById('history-list');
     container.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin fa-2x text-gray-300"></i></div>';
-    
+
     try {
-        const items = await Api.listAdjustments({ event_name, facility_name, user_name });
+        const params = { event_name, facility_name, user_name };
+        if (status) params.status = status;
+        const items = await Api.listAdjustments(params);
         container.innerHTML = '';
-        
+
         if (items.length === 0) {
             container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">データが見つかりません</div>';
             return;
         }
-        
+
         items.forEach(item => {
             // Renderer を使用して DOM 要素を生成し、追加
             const card = UIRenderer.createHistoryCard(item, {
                 onLoad: loadAdjustment,
                 onPreview: previewHistoryItem,
                 onCreateChange: (id) => createDerivedAdjustment(id, 'change'),
-                onCreateDelete: (id) => createDerivedAdjustment(id, 'delete')
+                onCreateDelete: (id) => createDerivedAdjustment(id, 'delete'),
+                onCreateResend: (id, appTypeDisplay) => createResendCopy(id, appTypeDisplay)
             });
             container.appendChild(card);
         });
@@ -790,6 +794,38 @@ async function createDerivedAdjustment(parentId, type) {
         closeHistoryModal();
         applyRoleConstraints();
         showToast(`${typeName}申請を作成しました`, 'success');
+        FormStorage.save(data);
+    } catch (err) {
+        showToast(`作成に失敗しました: ${err.message}`, 'error');
+    }
+}
+
+/**
+ * 送信済み申請から同一区分のコピー（修正・再送信用）を作成する
+ * @param {number} parentId  元申請の ID
+ * @param {string} appTypeDisplay  元申請の区分（日本語表示値: '新規'|'変更'|'削除'）
+ */
+async function createResendCopy(parentId, appTypeDisplay) {
+    try {
+        const confirmed = await showDecisionModal({
+            title: '修正コピーを作成',
+            message: `【${appTypeDisplay}申請】のコピーを作成します。<br>内容を修正して再送信できます。`,
+            okText: 'コピーを作成',
+            cancelText: 'キャンセル',
+            iconClass: 'fa-copy'
+        });
+        if (!confirmed) return;
+
+        const data = await Api.getAdjustment(parentId);
+        data.id = null;
+        data.status = 'draft';
+        data.parent_id = parentId;
+        // app_type は元申請と同じ（変更しない）
+
+        await applyStateToForm(data);
+        closeHistoryModal();
+        applyRoleConstraints();
+        showToast(`${appTypeDisplay}申請の修正コピーを作成しました`, 'success');
         FormStorage.save(data);
     } catch (err) {
         showToast(`作成に失敗しました: ${err.message}`, 'error');

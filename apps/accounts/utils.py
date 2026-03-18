@@ -1,4 +1,48 @@
 import unicodedata
+from functools import wraps
+
+from django.http import JsonResponse
+
+
+def is_admin(user) -> bool:
+    """ユーザーが管理者ロールを持つか判定する。"""
+    try:
+        return user.profile.role == 'admin'
+    except Exception:
+        return False
+
+
+def require_admin(view_func):
+    """管理者ロール（admin）のみアクセスを許可するデコレータ。
+    非管理者には 403 JSON レスポンスを返す。API ビュー向け。
+    """
+
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not is_admin(request.user):
+            return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def require_admin_redirect(redirect_to: str = 'facilities:index'):
+    """管理者ロール（admin）のみアクセスを許可するデコレータ。
+    非管理者は指定 URL にリダイレクトする。Web ビュー向け。
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped(request, *args, **kwargs):
+            if not is_admin(request.user):
+                from django.shortcuts import redirect
+
+                return redirect(redirect_to)
+            return view_func(request, *args, **kwargs)
+
+        return _wrapped
+
+    return decorator
 
 
 def log_action(user=None, action='', description='', request=None, obj=None):

@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from .middleware import PortalJWTMiddleware
 from .models import AuditLog, DropboxToken, UserProfile
-from .utils import katakana_to_hiragana, log_action, normalize_phonetic
+from .utils import is_admin, katakana_to_hiragana, log_action, normalize_phonetic
 
 
 class AuditLogTest(TestCase):
@@ -374,3 +374,167 @@ class AccountsViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()['data']
         self.assertTrue(all(entry['action'] == 'LOGIN' for entry in data))
+
+
+class IsAdminHelperTest(TestCase):
+    """is_admin() ヘルパー関数の動作テスト"""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(username='isadmin_admin', password='password')
+        self.admin.profile.role = UserProfile.Role.ADMIN
+        self.admin.profile.save()
+
+        self.general = User.objects.create_user(username='isadmin_general', password='password')
+        self.general.profile.role = UserProfile.Role.GENERAL
+        self.general.profile.save()
+
+        self.editor = User.objects.create_user(username='isadmin_editor', password='password')
+        self.editor.profile.role = UserProfile.Role.EDITOR
+        self.editor.profile.save()
+
+    def test_returns_true_for_admin(self):
+        """admin ロールは True を返すこと"""
+        self.assertTrue(is_admin(self.admin))
+
+    def test_returns_false_for_general(self):
+        """general ロールは False を返すこと"""
+        self.assertFalse(is_admin(self.general))
+
+    def test_returns_false_for_editor(self):
+        """editor ロールは False を返すこと"""
+        self.assertFalse(is_admin(self.editor))
+
+    def test_returns_false_for_user_without_profile(self):
+        """profile を持たないユーザーは False を返すこと（クラッシュしないこと）"""
+        user = User.objects.create_user(username='noprofile', password='password')
+        user.profile.delete()
+        user.refresh_from_db()
+        self.assertFalse(is_admin(user))
+
+
+class AdminRequiredEndpointsTest(TestCase):
+    """管理者専用エンドポイントへの非管理者アクセスが 403 になること"""
+
+    def setUp(self):
+        self.non_admin = User.objects.create_user(username='notadmin_req', password='password')
+        self.non_admin.profile.role = UserProfile.Role.GENERAL
+        self.non_admin.profile.save()
+        self.client.force_login(self.non_admin)
+
+    def test_run_db_backup_non_admin_forbidden(self):
+        response = self.client.post(reverse('accounts:run_db_backup'))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['status'], 'error')
+
+    def test_list_backups_non_admin_forbidden(self):
+        response = self.client.get(reverse('accounts:list_backups'))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['status'], 'error')
+
+    def test_restore_db_non_admin_forbidden(self):
+        import json as json_mod
+        response = self.client.post(
+            reverse('accounts:restore_db'),
+            data=json_mod.dumps({'path': '/backups/test.sql.gz'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['status'], 'error')
+
+
+class DropboxTokenManagerTest(TestCase):
+    """DropboxTokenManager の単体テスト（OAuth・トークン管理）"""
+
+    def setUp(self):
+        from apps.adjustments.services.dropbox_token import DropboxTokenManager
+        self.manager = DropboxTokenManager()
+
+    def test_get_token_model_returns_none_when_no_token(self):
+        """トークンが存在しない場合は None を返すこと"""
+        self.assertIsNone(self.manager.get_token_model())
+
+    def test_is_authenticated_false_when_no_token(self):
+        """トークンが存在しない場合は認証されていないこと"""
+        self.assertFalse(self.manager.is_authenticated())
+
+    def test_is_authenticated_true_when_token_exists(self):
+        """アクセストークンが存在する場合は認証済みと判定されること"""
+        DropboxToken.objects.create(
+            access_token='test_access',
+            refresh_token='test_refresh',
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+        self.assertTrue(self.manager.is_authenticated())
+
+    def test_get_token_model_returns_token(self):
+        """保存済みトークンが正しく取得されること"""
+        token = DropboxToken.objects.create(
+            service_name='backup',
+            access_token='abc',
+            refresh_token='xyz',
+        )
+        result = self.manager.get_token_model()
+        self.assertEqual(result.pk, token.pk)
+
+    def test_get_client_raises_auth_error_when_no_token(self):
+        """トークンなしで get_client() を呼ぶと DropboxAuthError が発生すること"""
+        from apps.adjustments.services.dropbox_token import DropboxAuthError
+        with self.assertRaises(DropboxAuthError):
+            self.manager.get_client()
+
+
+class DropboxLoginPermissionTest(TestCase):
+    """dropbox_login ビューの権限チェックテスト（#1）"""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(username='dbx_admin', password='password')
+        self.admin.profile.role = UserProfile.Role.ADMIN
+        self.admin.profile.save()
+
+        self.non_admin = User.objects.create_user(username='dbx_general', password='password')
+        self.non_admin.profile.role = UserProfile.Role.GENERAL
+        self.non_admin.profile.save()
+
+    def test_non_admin_redirected_to_index(self):
+        """非管理者が dropbox_login にアクセスすると facilities:index にリダイレクトされること"""
+        self.client.force_login(self.non_admin)
+        response = self.client.get(reverse('accounts:dropbox_login'))
+        self.assertRedirects(response, '/', fetch_redirect_response=False)
+
+    def test_admin_proceeds_to_dropbox(self):
+        """管理者は dropbox_login にアクセスすると Dropbox の OAuth URL にリダイレクトされること"""
+        from unittest.mock import patch
+        self.client.force_login(self.admin)
+        with patch('apps.accounts.views.DropboxService') as MockService:
+            MockService.return_value.get_auth_url.return_value = 'https://dropbox.com/oauth/authorize?state=x'
+            response = self.client.get(reverse('accounts:dropbox_login'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('dropbox.com', response['Location'])
+
+
+class DropboxCallbackExceptionTest(TestCase):
+    """dropbox_callback の例外ハンドリングテスト（#3）"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='dbx_cb_user', password='password')
+        self.client.force_login(self.user)
+
+    def test_auth_error_renders_error_page(self):
+        """DropboxAuthError 発生時にエラーページが返されること（500 ではなく 200）"""
+        from unittest.mock import patch
+
+        from apps.adjustments.services.dropbox_token import DropboxAuthError
+        with patch('apps.accounts.views.DropboxService') as MockService:
+            MockService.return_value.finish_auth.side_effect = DropboxAuthError('テスト認証エラー')
+            response = self.client.get(
+                reverse('accounts:dropbox_callback'),
+                {'code': 'dummy_code', 'state': 'dummy_state'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Dropbox認証に失敗しました', response.context['error'])
+
+    def test_no_code_renders_cancel_message(self):
+        """code パラメータなしでアクセスするとキャンセルメッセージが返されること"""
+        response = self.client.get(reverse('accounts:dropbox_callback'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('キャンセル', response.context['error'])

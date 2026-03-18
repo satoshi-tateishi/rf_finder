@@ -99,6 +99,10 @@ class AdjustmentAPITest(TestCase):
         self.mock_convert = self.pdf_patcher.start()
         self.mock_convert.return_value = io.BytesIO(b'dummy pdf')
 
+        # LINE Bot サービスのモック化（実APIを呼ばないようにする）
+        self.line_bot_patcher = patch('apps.adjustments.views.LineBotService')
+        self.mock_line_bot = self.line_bot_patcher.start()
+
         from django.contrib.auth.models import User
 
         from apps.accounts.models import UserProfile
@@ -132,6 +136,7 @@ class AdjustmentAPITest(TestCase):
 
     def tearDown(self):
         self.pdf_patcher.stop()
+        self.line_bot_patcher.stop()
 
     def test_preview_pdf_api(self):
         """PDFプレビューAPIが正常にPDFを返すこと"""

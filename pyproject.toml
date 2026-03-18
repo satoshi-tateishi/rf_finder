@@ -10,7 +10,7 @@ exclude = ["**/migrations/*"]
 # I: isort (import sorting)
 # B: flake8-bugbear
 # DJ: flake8-django
-select = ["E", "F", "W", "I", "B", "DJ"]
+select = ["E", "F", "W", "I", "B", "DJ", "G"]
 ignore = [
     "E501", # Line too long
 ]
@@ -23,3 +23,23 @@ quote-style = "single"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+python_classes = ["*Test", "Test*"]
+python_functions = ["test_*"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["apps"]
+omit = [
+    "*/migrations/*",
+    "*/tests*",
+    "*/admin.py",
+    "manage.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

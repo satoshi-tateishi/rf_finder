@@ -1,14 +1,12 @@
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.facilities import views as facility_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('apps.facilities.urls')),
-    path('api/facilities/', include(('apps.facilities.urls', 'facilities'), namespace='api-facilities')),
-    path('api/adjustments/', include('apps.adjustments.urls')),
-    # path('api/accounts/', include('apps.accounts.urls')), # Removed to avoid duplicate namespace
-    path('auth/', include('apps.accounts.urls')),  # Web画面用
+    path('', facility_views.index, name='index'),               # メイン画面（SPA）
+    path('api/facilities/', include('apps.facilities.urls')),   # 施設検索・詳細 API
+    path('api/adjustments/', include('apps.adjustments.urls')), # 調整届 API
+    path('auth/', include('apps.accounts.urls')),               # 認証・アカウント
 ]
-
-# if settings.DEBUG:
-#     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

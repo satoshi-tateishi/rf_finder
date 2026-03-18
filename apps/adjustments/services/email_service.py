@@ -55,7 +55,7 @@ def send_adjustment_email(data, member, pdf_buffer):
             # YYYY年M月D日 に変換
             start_date_formatted = f'{dt.year}年{dt.month}月{dt.day}日'
         except ValueError:
-            logger.warning(f'Invalid date format: {start_date_raw}')
+            logger.warning('Invalid date format: %s', start_date_raw)
             pass
 
     # 1. テンプレートの取得 (name='adjustment' を優先取得し、なければ最初の一件)
@@ -137,11 +137,11 @@ def send_adjustment_email(data, member, pdf_buffer):
     try:
         sent_count = email.send(fail_silently=False)
         if sent_count != 1:
-            logger.warning(f'Unexpected sent_count: {sent_count} (expected 1) for {subject}')
+            logger.warning('Unexpected sent_count: %s (expected 1) for %s', sent_count, subject)
         else:
-            logger.info(f'Email sent successfully: {subject} to {recipient}')
+            logger.info('Email sent successfully: %s to %s', subject, recipient)
         return sent_count
     except Exception:
         # exc_info=True でスタックトレースをログに出力
-        logger.error('Failed to send email', exc_info=True)
+        logger.exception('Failed to send email')
         raise

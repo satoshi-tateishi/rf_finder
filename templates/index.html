@@ -451,6 +451,11 @@
                         </div>
                         <div class="flex gap-2">
                             <input type="text" id="history-search-user" placeholder="作成者..." class="flex-1 border p-2 rounded-lg text-sm">
+                            <select id="history-filter-status" class="border p-2 rounded-lg text-sm bg-white">
+                                <option value="">すべて</option>
+                                <option value="draft">下書き</option>
+                                <option value="submitted">送信済み</option>
+                            </select>
                             <button onclick="refreshHistory()" class="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold flex-none">
                                 検索
                             </button>

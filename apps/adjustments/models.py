@@ -3,22 +3,14 @@ from django.db import models
 
 from apps.facilities.models import Facility
 
+from .constants import APP_TYPE_CHOICES, APP_TYPE_NEW, STATUS_CHOICES, STATUS_DRAFT, STATUS_SUBMITTED
+
 
 class OperationAdjustment(models.Model):
     """運用調整届データ（永続化・再編集用）"""
 
-    APP_TYPE_CHOICES = [
-        ('new', '新規'),
-        ('change', '変更'),
-        ('delete', '削除'),
-    ]
-    STATUS_CHOICES = [
-        ('draft', '下書き'),
-        ('submitted', '送信済み'),
-    ]
-
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='作成者')
-    app_type = models.CharField(max_length=10, choices=APP_TYPE_CHOICES, default='new', verbose_name='申請区分')
+    app_type = models.CharField(max_length=10, choices=APP_TYPE_CHOICES, default=APP_TYPE_NEW, verbose_name='申請区分')
 
     # 申請者情報（申請時の値を保持）
     user_name = models.CharField(max_length=100, verbose_name='氏名')
@@ -42,7 +34,7 @@ class OperationAdjustment(models.Model):
     selected_channels_json = models.JSONField(default=list, verbose_name='選択周波数データ')
 
     extra_53ch = models.BooleanField(default=False, verbose_name='53ch併用')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='ステータス')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, verbose_name='ステータス')
 
     parent = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children', verbose_name='元申請'
@@ -76,7 +68,7 @@ class OperationAdjustment(models.Model):
                     if user and user.is_authenticated:
                         # 既に送信済みの場合は、一切の変更を拒否する (既存のIDを指定しての再送信も不可)
                         instance = cls.objects.select_for_update().get(pk=adjustment_id)
-                        if instance.status == 'submitted':
+                        if instance.status == STATUS_SUBMITTED:
                             raise ValueError('既に送信済みのデータは変更できません。')
 
                         # 作成者本人でない場合の下書き上書きを制限
@@ -100,11 +92,11 @@ class OperationAdjustment(models.Model):
                     pass
 
             # ステータス遷移の制限: draft または submitted のみを許可
-            if status not in ['draft', 'submitted']:
+            if status not in [STATUS_DRAFT, STATUS_SUBMITTED]:
                 raise ValueError('不正なステータス指定です。')
             instance.status = status
 
-            instance.app_type = data.get('app_type', 'new')
+            instance.app_type = data.get('app_type', APP_TYPE_NEW)
 
             user_data = data.get('user', {})
             instance.user_name = user_data.get('name', '')

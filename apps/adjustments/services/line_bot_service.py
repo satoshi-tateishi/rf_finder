@@ -105,10 +105,10 @@ class LineBotService:
                 cache.set(self.CACHE_KEY, token, cache_time)
                 return token
             else:
-                logger.error(f'[LineBotService] Failed to get access token: {response.status_code}')
+                logger.error('[LineBotService] Failed to get access token: %s', response.status_code)
                 return None
         except Exception as e:
-            logger.error(f'[LineBotService] Error getting access token: {e}')
+            logger.error('[LineBotService] Error getting access token: %s', e)
             return None
         finally:
             # 自分がセットしたロックのみを削除
@@ -138,10 +138,10 @@ class LineBotService:
                 res_data = response.json()
                 return res_data.get('uploadUrl'), res_data.get('fileId')
             else:
-                logger.error(f'[LineBotService] Failed to get upload URL: {response.status_code}')
+                logger.error('[LineBotService] Failed to get upload URL: %s', response.status_code)
                 return None, None
         except Exception as e:
-            logger.error(f'[LineBotService] Error getting upload URL: {e}')
+            logger.error('[LineBotService] Error getting upload URL: %s', e)
             return None, None
 
     def _upload_file(self, upload_url: str, access_token: str, file_content: bytes, file_name: str) -> bool:
@@ -157,10 +157,10 @@ class LineBotService:
             if response.ok:
                 return True
             else:
-                logger.error(f'[LineBotService] Failed to upload file content: {response.status_code}')
+                logger.error('[LineBotService] Failed to upload file content: %s', response.status_code)
                 return False
         except Exception as e:
-            logger.error(f'[LineBotService] Error uploading file: {e}')
+            logger.error('[LineBotService] Error uploading file: %s', e)
             return False
 
     def send_pdf(self, channel_id: str, file_content: bytes, file_name: str = 'adjustment_request.pdf') -> bool:
@@ -173,7 +173,7 @@ class LineBotService:
 
         # 安全装置: テストモードまたはデバッグモードでの誤送信防止
         if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
-            logger.info(f'[LineBotService][MOCK] Sending PDF to {channel_id}: {file_name} ({len(file_content)} bytes)')
+            logger.info('[LineBotService][MOCK] Sending PDF to %s: %s (%s bytes)', channel_id, file_name, len(file_content))
             return True
 
         access_token = self._get_access_token()
@@ -196,13 +196,13 @@ class LineBotService:
         try:
             response = self._request('POST', path, access_token, json=data, timeout=10)
             if response.ok:
-                logger.info(f'[LineBotService] Successfully sent PDF to channel {channel_id}')
+                logger.info('[LineBotService] Successfully sent PDF to channel %s', channel_id)
                 return True
             else:
-                logger.error(f'[LineBotService] Failed to send file message: {response.status_code}')
+                logger.error('[LineBotService] Failed to send file message: %s', response.status_code)
                 return False
         except Exception as e:
-            logger.error(f'[LineBotService] Error sending PDF message: {e}')
+            logger.error('[LineBotService] Error sending PDF message: %s', e)
             return False
 
     def send_flex_message(self, channel_id: str, flex_content: Dict[str, Any], alt_text: str = 'Flex Message') -> bool:
@@ -213,7 +213,7 @@ class LineBotService:
             return False
 
         if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
-            logger.info(f'[LineBotService][MOCK] Sending Flex Message to {channel_id}: {alt_text}')
+            logger.info('[LineBotService][MOCK] Sending Flex Message to %s: %s', channel_id, alt_text)
             return True
 
         access_token = self._get_access_token()
@@ -228,10 +228,10 @@ class LineBotService:
             if response.ok:
                 return True
             else:
-                logger.error(f'[LineBotService] Failed to send Flex Message: {response.status_code}')
+                logger.error('[LineBotService] Failed to send Flex Message: %s', response.status_code)
                 return False
         except Exception as e:
-            logger.error(f'[LineBotService] Error sending Flex Message: {e}')
+            logger.error('[LineBotService] Error sending Flex Message: %s', e)
             return False
 
     def send_text_message(self, channel_id: str, text: str) -> bool:
@@ -242,7 +242,7 @@ class LineBotService:
             return False
 
         if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
-            logger.info(f'[LineBotService][MOCK] Sending Text to {channel_id}: {text[:50]}...')
+            logger.info('[LineBotService][MOCK] Sending Text to %s: %s...', channel_id, text[:50])
             return True
 
         access_token = self._get_access_token()
@@ -257,10 +257,10 @@ class LineBotService:
             if response.ok:
                 return True
             else:
-                logger.error(f'[LineBotService] Failed to send text message: {response.status_code}')
+                logger.error('[LineBotService] Failed to send text message: %s', response.status_code)
                 return False
         except Exception as e:
-            logger.error(f'[LineBotService] Error sending text message: {e}')
+            logger.error('[LineBotService] Error sending text message: %s', e)
             return False
 
     def send_user_message(self, user_id: str, text: str) -> bool:
@@ -271,7 +271,7 @@ class LineBotService:
             return False
 
         if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
-            logger.info(f'[LineBotService][MOCK] Sending User Message to {user_id}: {text[:50]}...')
+            logger.info('[LineBotService][MOCK] Sending User Message to %s: %s...', user_id, text[:50])
             return True
 
         access_token = self._get_access_token()
@@ -286,10 +286,10 @@ class LineBotService:
             if response.ok:
                 return True
             else:
-                logger.error(f'[LineBotService] Failed to send user message: {response.status_code}')
+                logger.error('[LineBotService] Failed to send user message: %s', response.status_code)
                 return False
         except Exception as e:
-            logger.error(f'[LineBotService] Error sending user message: {e}')
+            logger.error('[LineBotService] Error sending user message: %s', e)
             return False
 
     def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -307,10 +307,10 @@ class LineBotService:
             if response.ok:
                 return response.json()
             else:
-                logger.error(f'[LineBotService] Failed to fetch user info for {user_id}: {response.status_code}')
+                logger.error('[LineBotService] Failed to fetch user info for %s: %s', user_id, response.status_code)
                 return None
         except Exception as e:
-            logger.error(f'[LineBotService] Error fetching user info: {e}')
+            logger.error('[LineBotService] Error fetching user info: %s', e)
             return None
 
     def build_submission_notification_message(self, data: Dict[str, Any]) -> str:

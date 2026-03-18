@@ -1,4 +1,4 @@
-import traceback
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -6,8 +6,9 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from apps.accounts.models import Member
-from apps.accounts.utils import log_action
+from apps.accounts.utils import is_admin, log_action
 
+from .constants import STATUS_DRAFT, STATUS_SUBMITTED
 from .forms import AdjustmentRequestForm, EventInfoForm, UserInfoForm
 from .models import OperationAdjustment
 from .services import (
@@ -18,6 +19,8 @@ from .services import (
     send_adjustment_email,
 )
 from .utils import api_error, api_success, get_adjustment_filename, json_api_view
+
+logger = logging.getLogger(__name__)
 
 
 def validate_adjustment_data(data):
@@ -42,7 +45,7 @@ def validate_adjustment_data(data):
         all_errors.update({f'event_{k}': v for k, v in event_form.errors.items()})
 
     if all_errors:
-        print(f'[Validation Error] {all_errors}')
+        logger.warning('[Validation Error] %s', all_errors)
         return False, all_errors
 
     return True, None
@@ -55,7 +58,7 @@ def save_adjustment(request, data):
         adjustment = OperationAdjustment.save_from_json(data, user=request.user, status='draft')
         return api_success({'id': adjustment.id, 'message': 'Saved as draft'})
     except Exception as e:
-        traceback.print_exc()
+        logger.exception('調整届の保存に失敗しました: %s', e)
         return api_error(str(e), status=500)
 
 
@@ -65,9 +68,10 @@ def list_adjustments(request):
     event_name = request.GET.get('event_name')
     facility_name = request.GET.get('facility_name')
     user_name = request.GET.get('user_name')
+    status = request.GET.get('status')  # 'draft' or 'submitted'
 
-    # 最終更新日時（updated_at）の降順で取得
-    queryset = OperationAdjustment.objects.all().order_by('-updated_at')
+    # 最終更新日時（updated_at）の降順で取得（N+1クエリ防止）
+    queryset = OperationAdjustment.objects.select_related('user__profile').prefetch_related('facilities').order_by('-updated_at')
 
     if event_name:
         queryset = queryset.filter(event_name__icontains=event_name)
@@ -75,12 +79,15 @@ def list_adjustments(request):
         queryset = queryset.filter(facilities__name__icontains=facility_name).distinct()
     if user_name:
         queryset = queryset.filter(user_name__icontains=user_name)
+    if status in (STATUS_DRAFT, STATUS_SUBMITTED):
+        queryset = queryset.filter(status=status)
 
     results = []
     for adj in queryset[:20]:
         results.append(
             {
                 'id': adj.id,
+                'parent_id': adj.parent_id,
                 'event_name': adj.event_name,
                 'user_name': adj.user_name,  # 現地使用者
                 'sender_name': adj.user.profile.full_name
@@ -104,11 +111,12 @@ def get_adjustment(request, pk):
         adj = OperationAdjustment.objects.get(pk=pk)
 
         # 認可チェック: 作成者本人または管理者のみ許可
-        if adj.user and adj.user != request.user and getattr(request.user.profile, 'role', 'viewer') != 'admin':
+        if adj.user and adj.user != request.user and not is_admin(request.user):
             return api_error('Permission denied', status=403)
 
         data = {
             'id': adj.id,
+            'parent_id': adj.parent_id,
             'app_type': adj.app_type,
             'user': {
                 'name': adj.user_name,
@@ -151,7 +159,7 @@ def preview_excel(request, data):
 
 @json_api_view(validate=True)
 def preview_pdf(request, data):
-    print('>>> preview_pdf called')
+    logger.debug('preview_pdf called')
     member = Member.objects.first()
     try:
         buffer = generate_adjustment_pdf(data, member)
@@ -217,7 +225,7 @@ def send_email(request, data):
             try:
                 bot_service.send_pdf(channel_id, pdf_content, file_name=filename)
             except Exception as bot_err:
-                print(f'Error sending PDF to requester: {bot_err}')
+                logger.warning('依頼元トークルームへのPDF送信に失敗しました: %s', bot_err, exc_info=True)
 
         # 3.2 指定の通知グループへ送信 (設定があれば)
         from django.conf import settings
@@ -231,12 +239,11 @@ def send_email(request, data):
                 bot_service.send_text_message(notify_channel_id, msg)
                 bot_service.send_pdf(notify_channel_id, pdf_content, file_name=filename)
             except Exception as notify_err:
-                print(f'Error sending notification to LW group: {notify_err}')
+                logger.warning('通知グループへの送信に失敗しました: %s', notify_err, exc_info=True)
 
         return api_success({'message': 'Email sent successfully', 'id': adjustment.id})
     except Exception as e:
-        print(f'Error sending email: {e}')
-        traceback.print_exc()
+        logger.exception('メール送信処理に失敗しました: %s', e)
         return api_error(str(e), status=500)
 
 

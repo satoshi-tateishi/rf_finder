@@ -1,54 +1,30 @@
-# リファクタリング実績と今後の計画
+# リファクタリング計画・残課題
 
-本プロジェクトでは、保守性と堅牢性を向上させるため、段階的なリファクタリングを実施しました。
+## 残課題
 
-## 1. 完了済みのリファクタリング
-
-### サービス層の分離と最適化
-- **モジュール化**: `excel`, `pdf`, `email`, `line_bot`, `dropbox`, `wsm` の各サービスを独立させ、単一責任原則を適用。
-- **シングルトン化**: `LineBotService` をシングルトン化し、Djangoキャッシュを用いたトークン管理を導入。
-- **DRY化**: `json_api_view` デコレータを導入し、View層の共通処理（JSON解析、バリデーション）を統合。
-
-### フロントエンドの刷新 (完了)
-- **モジュール化**: 機能ごとに JS ファイルを分割（`api`, `keep-list`, `form-storage`, `pdf-preview`, `adjustment-form`, `app-state`, `form-service`, `validation-service`, `ui-renderers`, `ui-controller`, `notifications`, `constants`）。
-- **[Step 7.1 完了] UI レンダリングの抽象化**: `ui-renderers.js` を導入。JS 内のインライン HTML 文字列を完全に排除し、DOM 生成ロジックを一元化。
-- **[Step 7.2 完了] セントラルステート (State) による状態管理**: `app-state.js` を導入。グローバル変数を廃止し、申請 ID、ステータス、施設リスト、ユーザー情報等の一貫性を確保。画面遷移時の値保持やボタンロック状態の不整合を解消。
-- **[Step 7.3 完了] ビジネスロジックと DOM 操作の完全分離**:
-    - **FormService / ValidationService の抽出**: `collectFormData` を廃止し、データ収集と検証ロジックを独立。
-    - **ドメインルールの厳格化**: 送信済みデータの完全ロック（サーバーサイド防御含む）、派生申請（変更・削除）の親子関係管理、催事名のロック機能を実装。
-    - **バリデーションの高度化**: 同日内時間チェック、メール形式チェック、全施設選択チェックを統合。
-    - **設計の安定化**: 初期化 (`createNewAdjustment`) と画面遷移 (`goToAdjustment`) の責務を分離。ID ベースのデータ紐付けによる堅牢なデータ収集を実現。
-- **UX改善**: `showToast` による非同期通知、全画面 PDF プレビューモーダル、入力内容の自動保存・復元、ブラウザの「戻る」ボタン対策 (bfcache対応) を実装。
-
-### 認証方式の刷新 (完了)
-- **旧方式の削除**: LINE WORKS OIDC (Authorization Code Flow) + OTP の独自実装を全廃。
-- **新方式への移行**: shin•on Portal 発行の `portal_jwt` クッキーを検証する `PortalJWTMiddleware` に一本化。
-    - PyJWKClient による JWKS 経由の RS256 署名検証。
-    - `portal_uuid` による UserProfile の自動検索・リンク。
-- **Apache mod_auth_mellon 依存の解消**: Portal 集中認証への移行により不要となった。
-
-### 信頼性と品質の向上
-- **バリデーションの強化**: Django Forms とフロントエンド二重チェックによる厳格な入力検証。
-- **出力の動的化**: PDF/Excel の命名規則を自動生成。
-- **セキュリティの強化**: 送信済みデータの不変化、下書きの所有権チェック、施設 ID の整合性検証をサーバーサイドで実装。
-- **静的解析**: `ruff` によるコード標準化。
-- **Tailwind CSS のローカルビルド化**: CDN 依存を排除し、本番環境でのセキュリティと安定性を向上。
-
-### バックエンドのロジック集約 (Fat View の解消)
-- **モデルへの移譲**: `OperationAdjustment` モデルに JSON データの永続化ロジック (`save_from_json`) を移行し、トランザクション管理 (`transaction.atomic`) を導入。
-- **通知メッセージの抽象化**: `LineBotService` に通知文面の構築ロジックをカプセル化し、「現地使用者」と「申請者（操作ユーザー）」の明示的区別を導入。
+現時点ですべての計画済みリファクタリング課題は完了済み。
 
 ---
 
-## 2. 残課題
+## 対応しないと判断した項目
 
-### □ フロントエンド (Phase 8.3)
-- [ ] **修正・再送信フローの充実**: 過去データからのコピー作成、ステータス管理と履歴表示の改善。
+| 内容 | 理由 |
+|------|------|
+| docstring・型アノテーションの全面補充 | 動作に影響なし。現状のコードは十分に可読 |
+| Excel セル座標のテンプレートファイル化 | `Cells` クラスで管理されており現状でも保守可能 |
+| `except Exception` の全廃 | 外部サービス連携（LINE WORKS・Dropbox）では意図的に `Exception` を catch して `DropboxError` 等でラップする設計。不必要な絞り込みは保守コストを上げる |
+| Playwright E2E テスト | 現状の 118 件ユニットテストで十分にカバーされており、UI テストの追加は費用対効果が低い |
 
-### □ バックエンド・インフラ
-- [ ] **定数管理の統合**: `apps/adjustments/constants.py` への申請区分・チャンネル定義の完全集約。
-- [ ] **Docker セキュリティ**: 実行ユーザーの非 root 化。
+---
 
-### □ テスト
-- [ ] **accounts / facilities アプリのテスト**: 現状テストが未実装。主要なビューとモデルのテストを追加する。
-- [ ] **Playwright E2E テスト**: UI の統合テストを実装する。
+## アーキテクチャメモ（経緯が重要なもの）
+
+- **認証**: shin•on Portal JWT（`portal_jwt` クッキー）に一本化。旧 LINE WORKS OIDC + OTP は全廃。
+- **権限チェック**: `require_admin`（JSON 403 返し）/ `require_admin_redirect(url)`（リダイレクト）デコレータで統一。`is_admin(user)` ヘルパーを `accounts/utils.py` に集約。
+- **Dropbox**: `DropboxTokenManager`（OAuth・トークン管理）と `DropboxService`（バックアップ・リストア）に分離。`services/dropbox_token.py` が前者を担当。
+- **ロギング**: `logger.xxx('%s', var)` 遅延評価スタイルに統一（Ruff `G` ルール準拠）。`exc_info=True` の代わりに `logger.exception()` を使用。
+- **テストランナー**: `manage.py test`（Django 標準）→ `pytest` + `pytest-django` + `pytest-cov` に移行。テスト間キャッシュ汚染のバグ修正（`AdjustmentAPITest` で `LineBotService` をモック化、`LineBotServiceTest` で setUp に `cache.clear()` を追加）。
+- **URL 設計**: `apps.facilities.urls` の二重マウントを解消。`index` ビューは `config/urls.py` に直接登録（`path('', facility_views.index, name='index')`）。施設 API は `/api/facilities/` 配下のみ。`namespace='api-facilities'` ハックを廃止し `app_name = 'facilities'` を自然に使用。
+- **定数管理**: `adjustments/constants.py` に `STATUS_DRAFT`, `STATUS_SUBMITTED`, `APP_TYPE_NEW/CHANGE/DELETE`, `APP_TYPE_CHOICES`, `STATUS_CHOICES`, `APP_TYPE_MAP` を集約。`models.py` でインポートして使用。
+- **admin 構成**: `facilities/admin/` および `accounts/admin/` パッケージに分割。機能別ファイル（filters.py, facility.py, wireless.py / audit_log.py, dropbox.py, user_profile.py, member.py, email_template.py）で管理。
+- **Docker セキュリティ**: 本番コンテナは非 root ユーザー（`appuser` UID 1000）で実行。開発環境はボリュームマウントの都合上 `user: root` を明示指定。

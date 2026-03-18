@@ -74,10 +74,10 @@ class PortalJWTMiddleware:
             logger.info('portal_jwt が期限切れです。再認証が必要です。')
             return
         except jwt.InvalidTokenError as e:
-            logger.warning(f'portal_jwt の検証に失敗しました: {e}')
+            logger.warning('portal_jwt の検証に失敗しました: %s', e)
             return
         except Exception as e:
-            logger.error(f'portal_jwt 処理中に予期しないエラー: {e}', exc_info=True)
+            logger.exception('portal_jwt 処理中に予期しないエラー: %s', e)
             return
 
         portal_uuid = payload.get('sub')
@@ -89,16 +89,16 @@ class PortalJWTMiddleware:
 
         user = self._get_or_link_user(portal_uuid, email, payload)
         if user is None:
-            logger.info(f'portal_uuid={portal_uuid} に対応するユーザーが見つかりません。アクセスを拒否します。')
+            logger.info('portal_uuid=%s に対応するユーザーが見つかりません。アクセスを拒否します。', portal_uuid)
             return
 
         if not user.is_active:
-            logger.info(f'非アクティブユーザーのアクセスを拒否しました: {user.email}')
+            logger.info('非アクティブユーザーのアクセスを拒否しました: %s', user.email)
             return
 
         # Django セッションにログイン状態を記録（以降のリクエストはセッションを利用）
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-        logger.debug(f'JWT 認証成功: {user.email} (portal_uuid={portal_uuid})')
+        logger.debug('JWT 認証成功: %s (portal_uuid=%s)', user.email, portal_uuid)
 
     def _get_or_link_user(self, portal_uuid: str, email: str, payload: dict) -> User | None:
         """
@@ -147,10 +147,10 @@ class PortalJWTMiddleware:
             profile.phone_number = payload.get('phone_number', '')
             profile.email = email
             profile.save()
-            logger.info(f'新規ユーザーを自動作成しました: {email} (portal_uuid={portal_uuid})')
+            logger.info('新規ユーザーを自動作成しました: %s (portal_uuid=%s)', email, portal_uuid)
             return user
         except User.MultipleObjectsReturned:
-            logger.warning(f'email={email} のユーザーが複数存在します。最初の1件を使用します。')
+            logger.warning('email=%s のユーザーが複数存在します。最初の1件を使用します。', email)
             user = User.objects.filter(email=email).order_by('id').first()
 
         # UserProfile に portal_uuid を保存（以降は portal_uuid で高速検索）
@@ -171,5 +171,5 @@ class PortalJWTMiddleware:
             profile.email = email
         profile.save()
 
-        logger.info(f'portal_uuid を自動リンクしました: {user.email} -> portal_uuid={portal_uuid}')
+        logger.info('portal_uuid を自動リンクしました: %s -> portal_uuid=%s', user.email, portal_uuid)
         return user

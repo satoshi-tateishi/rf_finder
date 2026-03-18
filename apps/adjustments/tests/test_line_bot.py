@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from apps.adjustments.services import LineBotService
@@ -7,6 +8,7 @@ from apps.adjustments.services import LineBotService
 
 class LineBotServiceTest(TestCase):
     def setUp(self):
+        cache.clear()
         # 2048bit RSA private key (dummy for testing)
         self.dummy_private_key = (
             '-----BEGIN RSA PRIVATE KEY-----\n'

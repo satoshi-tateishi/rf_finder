@@ -9,25 +9,25 @@ const UIRenderer = (function() {
      * 履歴カードの DOM 要素を生成する
      */
     function createHistoryCard(item, handlers = {}) {
-        const { onLoad, onPreview, onCreateChange, onCreateDelete } = handlers;
+        const { onLoad, onPreview, onCreateChange, onCreateDelete, onCreateResend } = handlers;
         const div = document.createElement('div');
         const isDeleteType = (item.app_type === '削除');
-        const isNewType = (item.app_type === '新規');
         const isDerivableType = (item.app_type === '新規' || item.app_type === '変更');
         const isSubmitted = (item.status === '送信済み');
-        
-        // 「新規」かつ送信済みの場合は、再編集を禁止するためクリック不可にする
-        const isReadLayer = isDeleteType || (isNewType && isSubmitted);
-        
+        const isDraft = (item.status === '下書き');
+        const hasParent = !!item.parent_id;
+
+        // 削除申請のみクリック不可（内容確認の必要がないため）
+        const isReadLayer = isDeleteType;
+
         div.className = `p-3 bg-white border rounded-xl shadow-sm transition-all ${isReadLayer ? 'bg-gray-50' : 'hover:border-blue-500 cursor-pointer'}`;
-        
-        // 読み取り専用レイヤー（削除済み、または送信済み新規）以外の場合のみクリックで読み込み
+
         if (!isReadLayer && onLoad) {
             div.onclick = () => onLoad(item.id);
         }
-        
-        const statusColor = item.status === '下書き' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700';
-        
+
+        const statusColor = isDraft ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700';
+
         let typeColor = 'bg-gray-100 text-gray-600';
         if (item.app_type === '新規') typeColor = 'bg-blue-100 text-blue-700';
         if (item.app_type === '変更') typeColor = 'bg-yellow-100 text-yellow-700';
@@ -35,22 +35,41 @@ const UIRenderer = (function() {
 
         const contentOpacity = isDeleteType ? 'opacity-50' : '';
 
-        // 新規または変更、かつ送信済みの場合のみ、派生申請ボタンを表示
-        const actionButtonsHtml = (isDerivableType && isSubmitted) ? `
-            <div class="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+        // 親申請バッジ（派生申請の場合）
+        const parentBadgeHtml = hasParent
+            ? `<span class="text-[9px] text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-medium"><i class="fa-solid fa-code-branch fa-xs"></i> 派生申請</span>`
+            : '';
+
+        // 送信済みの新規・変更に対して「変更/削除を作成」と「修正コピーを作成」を表示
+        const derivedButtonsHtml = (isDerivableType && isSubmitted) ? `
                 <button class="create-change-btn flex-1 text-[9px] font-bold text-yellow-600 border border-yellow-600 py-1 rounded hover:bg-yellow-50 transition-colors">
                     <i class="fa-solid fa-pen-to-square"></i> 変更を作成
                 </button>
                 <button class="create-delete-btn flex-1 text-[9px] font-bold text-red-600 border border-red-600 py-1 rounded hover:bg-red-50 transition-colors">
                     <i class="fa-solid fa-trash-can"></i> 削除を作成
                 </button>
+        ` : '';
+
+        // 送信済みの場合「修正コピーを作成」を表示（削除を除く）
+        const resendButtonHtml = (isSubmitted && !isDeleteType) ? `
+                <button class="create-resend-btn flex-1 text-[9px] font-bold text-purple-600 border border-purple-600 py-1 rounded hover:bg-purple-50 transition-colors">
+                    <i class="fa-solid fa-copy"></i> 修正コピーを作成
+                </button>
+        ` : '';
+
+        const actionButtonsHtml = (derivedButtonsHtml || resendButtonHtml) ? `
+            <div class="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                ${derivedButtonsHtml}${resendButtonHtml}
             </div>
         ` : '';
 
         div.innerHTML = `
             <div class="${contentOpacity}">
                 <div class="flex justify-between items-start mb-1">
-                    <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="text-xs font-bold px-2 py-0.5 rounded ${statusColor}">${item.status}</span>
+                        ${parentBadgeHtml}
+                    </div>
                     <span class="text-[10px] text-gray-400">${item.updated_at}</span>
                 </div>
                 <div class="flex items-center gap-2 mb-1">
@@ -92,6 +111,14 @@ const UIRenderer = (function() {
             deleteBtn.onclick = (e) => {
                 e.stopPropagation();
                 onCreateDelete(item.id);
+            };
+        }
+
+        const resendBtn = div.querySelector('.create-resend-btn');
+        if (resendBtn && onCreateResend) {
+            resendBtn.onclick = (e) => {
+                e.stopPropagation();
+                onCreateResend(item.id, item.app_type);
             };
         }
 
