@@ -14,7 +14,9 @@ ENV PYTHONUNBUFFERED 1
 
 # 非 root ユーザーを作成（UID 1000 はホストの一般ユーザーと一致させる）
 RUN groupadd --system --gid 1000 appgroup && \
-    useradd --system --uid 1000 --gid appgroup --no-create-home appuser
+    useradd --system --uid 1000 --gid appgroup --no-create-home appuser && \
+    mkdir -p /home/appuser && \
+    chown appuser:appgroup /home/appuser
 
 WORKDIR /code
 
