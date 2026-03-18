@@ -88,9 +88,9 @@ push to release
 ## 次回作業再開プロンプト
 
 ```
-前回のコードレビューで以下が対応済みです（コミット 0484bf7）。
+CSP（Content-Security-Policy）対応が完了しました（コミット 9e85ff8）。
 
-【対応済み】
+【対応済み（累計）】
 - XSS修正（ui-renderers.js / ui-controller.js の escapeHtml 導入）
 - line_bot_service.py の os.sys.argv バグ修正
 - User.email ユニーク制約（MySQL関数インデックス、migration 0014）
@@ -99,13 +99,12 @@ push to release
 - セキュリティヘッダ追加（X-Content-Type-Options / Referrer-Policy / X-Frame-Options）
 - 一覧上限をハードコードから設定変数化（FACILITY_SEARCH_LIMIT 等）
 - サービス層テスト追加（EmailServiceEdgeCaseTest / ExcelServiceCellTest 等）
+- CSP 対応：インライン script/style を完全外部化、CspMiddleware で strict CSP ヘッダ付与
 
-【残課題（docs/10_REFACTORING.md に詳細あり）】
-- CSP（Content-Security-Policy）未対応：インライン script/style の外部化が必要
+【残課題】
 - Dropbox 分散ロック：シングルサーバーなら実害なし。スケールアウト時に対応
 
-現在のコード品質スコアは 9.0 / 10。
-CSP 対応が完了すれば 9.5〜9.8 に到達できます。
+現在のコード品質スコアは 9.5 / 10。
 次のタスクを指示してください。
 ```
 
