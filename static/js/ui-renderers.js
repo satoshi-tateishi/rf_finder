@@ -128,7 +128,7 @@ const UIRenderer = (function() {
     /**
      * 施設フォーム（使用場所・日程）の DOM 要素を生成する
      */
-    function createFacilityFormItem(facility, index, savedData = {}) {
+    function createFacilityFormItem(facility, index, savedData = {}, onChangeChannels = null) {
         const div = document.createElement('div');
         div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
         div.setAttribute('data-facility-id', facility.id);
@@ -142,8 +142,11 @@ const UIRenderer = (function() {
                 <span class="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">${index + 1}</span>
                 <span class="font-bold text-sm text-gray-800">${facility.name}</span>
             </div>
-            <div class="ml-7 mb-3 text-[10px] text-blue-600 font-medium">
-                使用チャンネル : ${formattedChannels}
+            <div class="ml-7 mb-3 flex items-center gap-2">
+                <span class="channel-display text-[10px] text-blue-600 font-medium">使用チャンネル : ${formattedChannels}</span>
+                <button class="change-channels-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-400 text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-center gap-1.5">
+                    <i class="fa-solid fa-pen-to-square fa-xs"></i> 変更
+                </button>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -170,6 +173,13 @@ const UIRenderer = (function() {
                 </div>
             </div>
         `;
+        const changeBtn = div.querySelector('.change-channels-btn');
+        if (changeBtn && onChangeChannels) {
+            changeBtn.onclick = () => onChangeChannels(facility.id, div);
+        } else if (changeBtn) {
+            changeBtn.classList.add('hidden');
+        }
+
         return div;
     }
 

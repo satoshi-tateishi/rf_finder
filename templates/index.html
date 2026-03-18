@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RF Finder - 特ラ運用調整支援</title>
+    <title>RF Finder</title>
 
     <!-- Favicon & Icons -->
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
@@ -122,10 +122,10 @@
     <!-- Header -->
     <nav class="bg-[#00c300] text-white p-4 shadow-md sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold flex items-center gap-2">
-                <i class="fa-solid fa-tower-broadcast"></i> RF Finder
+            <h1 class="text-xl font-bold">
+                RF Finder
             </h1>
-            <a href="{{ portal_url }}" class="text-white text-sm font-bold flex items-center gap-2 hover:bg-green-600 px-3 py-2 rounded-lg transition-colors">
+            <a href="{{ portal_url }}" class="text-white text-sm font-bold flex items-center gap-2 hover:bg-green-600 px-3 py-2 rounded-lg transition-colors border border-white">
                 <i class="fa-solid fa-house-lock"></i> to shin•on Portal
             </a>
             <div class="flex items-center gap-3">
@@ -553,6 +553,44 @@
         </div>
     </div>
     
+    <!-- Channel Edit Modal -->
+    <div id="channel-edit-modal" class="fixed inset-0 z-[170] hidden bg-black/60 flex flex-col justify-end sm:items-center sm:justify-center sm:p-4">
+        <div class="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh]">
+            <!-- ボトムシート用ドラッグハンドル（モバイルのみ表示） -->
+            <div class="sm:hidden flex justify-center pt-3 pb-1">
+                <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div class="p-4 border-b flex justify-between items-start sm:items-center bg-blue-50 sm:rounded-t-2xl">
+                <h3 class="font-bold text-base sm:text-lg text-gray-800 flex items-start sm:items-center gap-2 flex-1 min-w-0 pr-3">
+                    <i class="fa-solid fa-tower-broadcast text-blue-600 mt-0.5 sm:mt-0 shrink-0"></i>
+                    <span class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 min-w-0">
+                        <span>使用チャンネル変更</span>
+                        <span id="channel-edit-facility-name" class="text-xs sm:text-sm font-normal text-gray-500 truncate"></span>
+                    </span>
+                </h3>
+                <button onclick="closeChannelEditModal()" class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
+                    <i class="fa-solid fa-xmark fa-lg"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto p-4">
+                <p class="text-[10px] text-gray-400 mb-3">
+                    空きチャンネルをクリックして選択・解除できます。確定ボタンを押すと申請フォームに反映されます。
+                </p>
+                <div id="channel-edit-grid" class="ch-grid"></div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 sm:rounded-b-2xl flex gap-3">
+                <button onclick="closeChannelEditModal()"
+                    class="flex-1 py-3 sm:py-2 rounded-xl sm:rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors font-medium">
+                    キャンセル
+                </button>
+                <button onclick="confirmChannelEdit()"
+                    class="flex-1 py-3 sm:py-2 rounded-xl sm:rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 active:bg-blue-800 transition-colors">
+                    <i class="fa-solid fa-check"></i> 確定
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Decision Modal (Custom Confirm) -->
     <div id="decision-modal" class="fixed inset-0 z-[1000] hidden bg-black/70 flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden relative">
@@ -579,18 +617,18 @@
         </div>
     </div>
     <!-- Modular JS Files -->
-    <script src="/static/js/constants.js?v=1.2"></script>
-    <script src="/static/js/api.js?v=1.2"></script>
-    <script src="/static/js/app-state.js?v=1.2"></script>
-    <script src="/static/js/form-service.js?v=1.2"></script>
-    <script src="/static/js/validation-service.js?v=1.2"></script>
-    <script src="/static/js/ui-renderers.js?v=1.2"></script>
-    <script src="/static/js/notifications.js?v=1.2"></script>
-    <script src="/static/js/form-storage.js?v=1.2"></script>
-    <script src="/static/js/pdf-preview.js?v=1.2"></script>
-    <script src="/static/js/keep-list.js?v=1.2"></script>
-    <script src="/static/js/adjustment-form.js?v=1.2"></script>
-    <script src="/static/js/ui-controller.js?v=1.2"></script>
+    <script src="/static/js/constants.js?v=1.3"></script>
+    <script src="/static/js/api.js?v=1.3"></script>
+    <script src="/static/js/app-state.js?v=1.3"></script>
+    <script src="/static/js/form-service.js?v=1.3"></script>
+    <script src="/static/js/validation-service.js?v=1.3"></script>
+    <script src="/static/js/ui-renderers.js?v=1.3"></script>
+    <script src="/static/js/notifications.js?v=1.3"></script>
+    <script src="/static/js/form-storage.js?v=1.3"></script>
+    <script src="/static/js/pdf-preview.js?v=1.3"></script>
+    <script src="/static/js/keep-list.js?v=1.3"></script>
+    <script src="/static/js/adjustment-form.js?v=1.3"></script>
+    <script src="/static/js/ui-controller.js?v=1.3"></script>
 
     <!-- Initialization -->
     <script>

@@ -270,6 +270,64 @@ function renderRFGrid(facility, gridElement) {
     }
 }
 
+// ============================================================
+// Channel Edit Modal
+// ============================================================
+
+let _channelEditContext = {
+    facilityId: null,
+    backup: [],
+    formItemDiv: null
+};
+
+function openChannelEditModal(facilityId, formItemDiv) {
+    const facility = AppState.KeepList.find(facilityId);
+    if (!facility) return;
+
+    _channelEditContext.facilityId  = facilityId;
+    _channelEditContext.backup      = [...facility.selectedChannels];
+    _channelEditContext.formItemDiv = formItemDiv;
+
+    const nameEl = document.getElementById('channel-edit-facility-name');
+    if (nameEl) nameEl.textContent = `— ${facility.name}`;
+
+    const gridEl = document.getElementById('channel-edit-grid');
+    renderRFGrid(facility, gridEl);
+
+    document.getElementById('channel-edit-modal').classList.remove('hidden');
+}
+
+function closeChannelEditModal() {
+    const { facilityId, backup } = _channelEditContext;
+    const facility = AppState.KeepList.find(facilityId);
+    if (facility && backup) {
+        facility.selectedChannels = [...backup];
+    }
+    document.getElementById('channel-edit-modal').classList.add('hidden');
+    _channelEditContext = { facilityId: null, backup: [], formItemDiv: null };
+}
+
+function confirmChannelEdit() {
+    const { facilityId, formItemDiv } = _channelEditContext;
+    const facility = AppState.KeepList.find(facilityId);
+
+    if (facility && formItemDiv) {
+        const formatted = (typeof Api !== 'undefined' && Api.formatChannels)
+            ? Api.formatChannels(facility.selectedChannels)
+            : facility.selectedChannels.join(', ');
+        const displayEl = formItemDiv.querySelector('.channel-display');
+        if (displayEl) displayEl.textContent = `使用チャンネル : ${formatted}`;
+    }
+
+    const data = FormService.collect();
+    data.status = AppState.currentStatus;
+    FormStorage.save(data);
+    updateAdjustmentButtonState();
+
+    document.getElementById('channel-edit-modal').classList.add('hidden');
+    _channelEditContext = { facilityId: null, backup: [], formItemDiv: null };
+}
+
 // Global scope initialization
 window.addEventListener('DOMContentLoaded', () => {
     // Legend initialization

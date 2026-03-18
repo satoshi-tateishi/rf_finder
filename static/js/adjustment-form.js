@@ -104,7 +104,7 @@ function goToAdjustment() {
         };
         
         // Renderer を使用して DOM 要素を生成し、追加
-        const facilityItem = UIRenderer.createFacilityFormItem(f, index, currentData);
+        const facilityItem = UIRenderer.createFacilityFormItem(f, index, currentData, openChannelEditModal);
         container.appendChild(facilityItem);
     });
 
@@ -218,6 +218,18 @@ function applyRoleConstraints() {
                     btn.innerHTML = isSubmitted ? '<i class="fa-solid fa-check"></i> 送信済み' : '<i class="fa-solid fa-envelope"></i> 特ラ機構へ送信';
                 }
             }
+        }
+    });
+
+    // 使用チャンネル変更ボタンの制御
+    document.querySelectorAll('.change-channels-btn').forEach(btn => {
+        if (isReadOnly) {
+            btn.disabled = true;
+            btn.onclick = null;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     });
 
