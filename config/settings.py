@@ -55,6 +55,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Added for static files without Apache
+    # CSP ヘッダを全レスポンスに付与（SecurityMiddleware の直後に配置）
+    'apps.accounts.middleware.CspMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -219,9 +221,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
 # X-Frame-Options: クリックジャッキング対策（XFrameOptionsMiddleware が使用）
 X_FRAME_OPTIONS = 'DENY'
-# Content-Security-Policy: テンプレート内のインラインスクリプト・スタイルが存在するため
-# 完全な CSP 適用にはテンプレートへの nonce 導入が必要。
-# 現時点では上記3ヘッダで対応し、CSP は今後の課題とする。
+# Content-Security-Policy: CspMiddleware（apps.accounts.middleware.CspMiddleware）で設定。
+# インライン script/style を排除したうえで strict な CSP を適用している。
 
 # --- 一覧取得の上限設定 ---
 FACILITY_SEARCH_LIMIT = 20

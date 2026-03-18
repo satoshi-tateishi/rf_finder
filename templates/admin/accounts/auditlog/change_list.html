@@ -3,46 +3,10 @@
 
 {% block extrahead %}
 {{ block.super }}
-<script>tailwind.config = { darkMode: 'class' }</script>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-    .results { border: none !important; background: transparent !important; }
-    #result_list { display: none; }
-    .paginator {
-        background: white !important;
-        padding: 1rem !important;
-        margin-top: 2rem !important;
-        border-radius: 16px !important;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
-    }
-    #toolbar {
-        background: transparent !important;
-        border: none !important;
-        margin-bottom: 2rem !important;
-    }
-    #changelist-search input[type="text"] {
-        border-radius: 12px !important;
-        padding: 0.6rem 1.25rem !important;
-        border: 1px solid #e2e8f0 !important;
-        width: 350px !important;
-        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
-    }
-    #changelist-search input[type="submit"] {
-        border-radius: 12px !important;
-        background: #2563eb !important;
-        color: white !important;
-        border: none !important;
-        padding: 0.6rem 1.5rem !important;
-        font-weight: 800 !important;
-        cursor: pointer !important;
-        transition: all 0.2s !important;
-    }
-    #changelist-search input[type="submit"]:hover {
-        background: #1d4ed8 !important;
-        transform: translateY(-1px);
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+      crossorigin="anonymous" referrerpolicy="no-referrer">
 {% endblock %}
 
 {% block result_list %}

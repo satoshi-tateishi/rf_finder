@@ -1,5 +1,5 @@
 """
-PortalJWTMiddleware
+CspMiddleware と PortalJWTMiddleware
 
 shin•on Portal が発行した portal_jwt クッキー（RS256 署名）を検証し、
 認証済みユーザーを Django セッションに紐付けるミドルウェア。
@@ -32,6 +32,38 @@ from django.contrib.auth.models import User
 from jwt import PyJWKClient
 
 logger = logging.getLogger(__name__)
+
+
+class CspMiddleware:
+    """
+    Content-Security-Policy ヘッダを全レスポンスに付与するミドルウェア。
+
+    インライン script/style を排除したうえで strict な CSP を設定する。
+    外部リソース:
+    - cdn.jsdelivr.net  : SortableJS（SRI 付き）
+    - cdnjs.cloudflare.com : FontAwesome CSS + フォント（SRI 付き）
+    """
+
+    CSP = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "connect-src 'self'; "
+        "frame-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['Content-Security-Policy'] = self.CSP
+        return response
 
 
 class PortalJWTMiddleware:

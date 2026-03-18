@@ -12,16 +12,9 @@
     <link rel="shortcut icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
     <meta name="color-scheme" content="light">
-    <style>
-        /* ライトモード固定 */
-        html {
-            color-scheme: light !important;
-        }
-    </style>
-    <script>
-        /* Django Admin のテーマ切り替えよりも前にライトモードを強制 */
-        document.documentElement.setAttribute('data-theme', 'light');
-    </script>
+    <link rel="stylesheet" href="{% static 'css/admin-custom.css' %}">
+    <!-- テーマ強制: DOMContentLoaded 前に実行する必要があるため early-load -->
+    <script src="{% static 'js/admin-theme.js' %}"></script>
 {% endblock %}
 
 {% block nav-global %}{% endblock %}

@@ -3,34 +3,10 @@
 
 {% block extrahead %}
 {{ block.super }}
-<script>tailwind.config = { darkMode: 'class' }</script>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-    /* 標準フォーム要素を非表示にして自作 UI に置き換える */
-    #content-main form { display: none !important; }
-    #content > h1 { display: none !important; }
-    .pretitle { display: none !important; }
-    #content-main h2 { display: none !important; }
-    main > h2 { display: none !important; }
-    .object-tools { display: none !important; }
-    /* Django Admin のチェックボックスをそのまま使う */
-    .custom-form-field input[type="checkbox"] {
-        width: 1.25rem;
-        height: 1.25rem;
-        accent-color: #2563eb;
-        cursor: pointer;
-    }
-    .custom-form-field select {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.875rem;
-        color: #1f2937;
-        background-color: #fff;
-        cursor: pointer;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+      crossorigin="anonymous" referrerpolicy="no-referrer">
 {% endblock %}
 
 {% block pretitle %}{% endblock %}
