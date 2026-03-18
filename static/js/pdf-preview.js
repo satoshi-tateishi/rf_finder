@@ -7,39 +7,39 @@ const PdfPreview = (function() {
     function open(blob) {
         if (_currentUrl) window.URL.revokeObjectURL(_currentUrl);
         _currentUrl = window.URL.createObjectURL(blob);
-        
-        const iframe = document.getElementById('preview-iframe');
+
+        const embed = document.getElementById('preview-embed');
         const modal = document.getElementById('preview-modal');
         const mobileMsg = document.getElementById('preview-mobile-msg');
-        
-        if (!iframe || !modal || !mobileMsg) {
+
+        if (!embed || !modal || !mobileMsg) {
             console.error('Preview modal elements not found');
             return;
         }
-        
+
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
+
         if (isMobile) {
-            iframe.classList.add('hidden');
+            embed.classList.add('hidden');
             mobileMsg.classList.remove('hidden');
         } else {
-            iframe.src = _currentUrl + '#toolbar=0&navpanes=0&scrollbar=0';
-            iframe.classList.remove('hidden');
+            embed.src = _currentUrl;
+            embed.classList.remove('hidden');
             mobileMsg.classList.add('hidden');
         }
-        
+
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     }
 
     function close() {
         const modal = document.getElementById('preview-modal');
-        const iframe = document.getElementById('preview-iframe');
-        
+        const embed = document.getElementById('preview-embed');
+
         if (modal) modal.classList.add('hidden');
-        if (iframe) iframe.src = '';
+        if (embed) embed.removeAttribute('src');
         document.body.classList.remove('overflow-hidden');
-        
+
         if (_currentUrl) {
             window.URL.revokeObjectURL(_currentUrl);
             _currentUrl = null;
