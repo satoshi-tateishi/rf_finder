@@ -19,12 +19,13 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-default-key-change-me')
+# .env で SECRET_KEY を必ず設定すること。未設定時は起動エラーになる。
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Proxy settings for generating correct absolute URLs
 USE_X_FORWARDED_HOST = True
@@ -210,6 +211,22 @@ CSRF_COOKIE_SECURE = not DEBUG
 # HSTS: ブラウザに1年間 HTTPS を強制させる
 SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+
+# --- セキュリティヘッダ ---
+# X-Content-Type-Options: nosniff（MIME スニッフィング防止）
+SECURE_CONTENT_TYPE_NOSNIFF = True
+# Referrer-Policy: リファラー情報を同一オリジンのみに制限
+SECURE_REFERRER_POLICY = 'same-origin'
+# X-Frame-Options: クリックジャッキング対策（XFrameOptionsMiddleware が使用）
+X_FRAME_OPTIONS = 'DENY'
+# Content-Security-Policy: テンプレート内のインラインスクリプト・スタイルが存在するため
+# 完全な CSP 適用にはテンプレートへの nonce 導入が必要。
+# 現時点では上記3ヘッダで対応し、CSP は今後の課題とする。
+
+# --- 一覧取得の上限設定 ---
+FACILITY_SEARCH_LIMIT = 20
+ADJUSTMENT_LIST_LIMIT = 20
+AUDIT_LOG_LIST_LIMIT = 100
 
 # --- 安全装置: テストおよび開発環境の設定 ---
 if TESTING:

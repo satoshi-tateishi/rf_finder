@@ -407,3 +407,171 @@ class ConvertExcelToPdfTest(TestCase):
         with patch('builtins.open', unittest.mock.mock_open()):
             with self.assertRaises(FileNotFoundError):
                 convert_excel_to_pdf(self._make_excel_buffer())
+
+
+class EmailServiceEdgeCaseTest(TestCase):
+    """email_service のエッジケーステスト"""
+
+    BASE_DATA = {
+        'app_type': 'new',
+        'user': {'name': '太郎', 'email': 'taro@ex.com'},
+        'event': {'name': 'テスト催事'},
+        'facilities': [{'start_date': '2026-05-10'}],
+    }
+
+    def test_no_template_raises_runtime_error(self):
+        """EmailTemplate が1件も存在しない場合 RuntimeError が発生すること"""
+        member = Member.objects.create(name='会員')
+        pdf_buffer = io.BytesIO(b'dummy')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            send_adjustment_email(self.BASE_DATA, member, pdf_buffer)
+
+        self.assertIn('メールテンプレートが登録されていません', str(ctx.exception))
+
+    def test_empty_to_address_raises_runtime_error(self):
+        """to_address が空のテンプレートで RuntimeError が発生すること"""
+        member = Member.objects.create(name='会員')
+        EmailTemplate.objects.create(
+            subject='テスト',
+            body='本文',
+            to_address='',  # 空
+        )
+        pdf_buffer = io.BytesIO(b'dummy')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            send_adjustment_email(self.BASE_DATA, member, pdf_buffer)
+
+        self.assertIn('送信先メールアドレス', str(ctx.exception))
+
+    def test_invalid_to_address_raises_runtime_error(self):
+        """不正形式の to_address で RuntimeError が発生すること"""
+        member = Member.objects.create(name='会員')
+        EmailTemplate.objects.create(
+            subject='テスト',
+            body='本文',
+            to_address='not-an-email',  # 不正形式
+        )
+        pdf_buffer = io.BytesIO(b'dummy')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            send_adjustment_email(self.BASE_DATA, member, pdf_buffer)
+
+        self.assertIn('不正なメールアドレス形式', str(ctx.exception))
+
+    def test_member_name_placeholder_with_none_member(self):
+        """member=None のとき {会員名} と {運用担当者} が空文字に置換されること"""
+        EmailTemplate.objects.create(
+            subject='テスト',
+            body='会員名:{会員名} 担当者:{運用担当者}',
+            to_address='to@ex.com',
+        )
+        pdf_buffer = io.BytesIO(b'dummy')
+
+        send_adjustment_email(self.BASE_DATA, None, pdf_buffer)
+
+        sent = mail.outbox[0]
+        # プレースホルダーが空文字に置換されて残っていないこと
+        self.assertNotIn('{会員名}', sent.body)
+        self.assertNotIn('{運用担当者}', sent.body)
+        self.assertIn('会員名:', sent.body)
+        self.assertIn('担当者:', sent.body)
+
+
+class ExcelServiceCellTest(TestCase):
+    """generate_adjustment_excel のセル値書き込みテスト"""
+
+    def setUp(self):
+        self.member = Member.objects.create(
+            member_id_1='001',
+            member_id_2='0001',
+            name='テスト会員',
+            department='音響部',
+            manager_name='田中一郎',
+            phone='03-0000-0000',
+            email='member@ex.com',
+        )
+        self.data = {
+            'app_type': 'new',
+            'user': {'name': '現地使用者', 'kana': 'げんちしようしゃ', 'tel': '090-0000-0001', 'email': 'user@ex.com'},
+            'event': {'name': 'テスト催事', 'comment': 'テストコメント'},
+            'facilities': [
+                {
+                    'name': '施設A',
+                    'prefecture': '東京都',
+                    'address': '渋谷区1-1',
+                    'postal_code': '150-0001',
+                    'applied_area': 'A帯',
+                    'category': '屋内',
+                    'start_date': '2026-06-01',
+                    'end_date': '2026-06-02',
+                    'start_time': '10:00',
+                    'end_time': '21:00',
+                    'selectedChannels': [13, 14, 15],
+                }
+            ],
+            'mic_counts': {'analog_rm': {'10mw': 3}},
+        }
+
+    def _load_sheet(self, buffer):
+        import openpyxl
+        buffer.seek(0)
+        wb = openpyxl.load_workbook(buffer, data_only=True)
+        return wb['master_01']
+
+    def test_user_info_cells(self):
+        """現地使用者の名前・電話・メールが正しいセルに書き込まれること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        ws = self._load_sheet(buf)
+
+        self.assertIn('現地使用者', ws['O13'].value)
+        self.assertIn('090-0000-0001', ws['L15'].value)
+        self.assertIn('user@ex.com', ws['W15'].value)
+
+    def test_event_name_cell(self):
+        """催事名が正しいセルに書き込まれること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        ws = self._load_sheet(buf)
+
+        self.assertIn('テスト催事', ws['H18'].value)
+
+    def test_member_info_cells(self):
+        """会員情報（ID・名前・担当者）が正しいセルに書き込まれること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        ws = self._load_sheet(buf)
+
+        self.assertEqual(ws['M4'].value, '001')
+        self.assertEqual(ws['P4'].value, '0001')
+        self.assertIn('テスト会員', ws['W4'].value)
+        self.assertIn('田中一郎', ws['W6'].value)
+
+    def test_mic_count_cell(self):
+        """マイク数（analog_rm 10mw = 3）が正しいセルに書き込まれること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        ws = self._load_sheet(buf)
+
+        self.assertEqual(ws['K27'].value, 3)
+
+    def test_app_type_new(self):
+        """申請区分「新規」が APP_TYPE セルに書き込まれること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        ws = self._load_sheet(buf)
+
+        self.assertEqual(ws['D4'].value, '新規')
+
+    def test_template_not_found_raises_error(self):
+        """テンプレートファイルが存在しない場合 FileNotFoundError が発生すること"""
+        with patch('apps.adjustments.services.excel_service.os.path.exists', return_value=False):
+            with self.assertRaises(FileNotFoundError) as ctx:
+                generate_adjustment_excel(self.data, self.member)
+
+        self.assertIn('Template not found', str(ctx.exception))
+
+    def test_multi_facility_single_sheet(self):
+        """施設数 ≤ 4 のとき master_01 シートのみ出力されること"""
+        buf = generate_adjustment_excel(self.data, self.member)
+        buf.seek(0)
+        import openpyxl
+        wb = openpyxl.load_workbook(buf, data_only=True)
+        self.assertIn('master_01', wb.sheetnames)
+        self.assertNotIn('master_02', wb.sheetnames)

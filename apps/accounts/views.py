@@ -32,8 +32,9 @@ def list_audit_logs(request):
     if description:
         queryset = queryset.filter(description__icontains=description)
 
+    limit = getattr(settings, 'AUDIT_LOG_LIST_LIMIT', 100)
     results = []
-    for log in queryset[:100]:  # 直近100件
+    for log in queryset[:limit]:
         results.append(
             {
                 'id': log.id,

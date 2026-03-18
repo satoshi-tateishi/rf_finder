@@ -1,5 +1,5 @@
 import logging
-import os
+import sys
 import time
 import uuid
 from typing import Any, Dict, Optional, Tuple
@@ -64,7 +64,7 @@ class LineBotService:
         JWT を使用してアクセストークンを取得、またはキャッシュから取得する。
         """
         # 安全装置: テストモード時のモックトークン
-        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in sys.argv:
             return 'mock_access_token'
 
         token = cache.get(self.CACHE_KEY)
@@ -172,7 +172,7 @@ class LineBotService:
             return False
 
         # 安全装置: テストモードまたはデバッグモードでの誤送信防止
-        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in sys.argv:
             logger.info('[LineBotService][MOCK] Sending PDF to %s: %s (%s bytes)', channel_id, file_name, len(file_content))
             return True
 
@@ -212,7 +212,7 @@ class LineBotService:
         if not self.bot_id or not channel_id:
             return False
 
-        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in sys.argv:
             logger.info('[LineBotService][MOCK] Sending Flex Message to %s: %s', channel_id, alt_text)
             return True
 
@@ -241,7 +241,7 @@ class LineBotService:
         if not self.bot_id or not channel_id:
             return False
 
-        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in sys.argv:
             logger.info('[LineBotService][MOCK] Sending Text to %s: %s...', channel_id, text[:50])
             return True
 
@@ -270,7 +270,7 @@ class LineBotService:
         if not self.bot_id or not user_id:
             return False
 
-        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in os.sys.argv:
+        if getattr(settings, 'LINE_WORKS_MOCK_MODE', False) or 'test' in sys.argv:
             logger.info('[LineBotService][MOCK] Sending User Message to %s: %s...', user_id, text[:50])
             return True
 

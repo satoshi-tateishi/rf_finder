@@ -150,8 +150,12 @@ class PortalJWTMiddleware:
             logger.info('新規ユーザーを自動作成しました: %s (portal_uuid=%s)', email, portal_uuid)
             return user
         except User.MultipleObjectsReturned:
-            logger.warning('email=%s のユーザーが複数存在します。最初の1件を使用します。', email)
-            user = User.objects.filter(email=email).order_by('id').first()
+            logger.error(
+                'email=%s のユーザーが複数存在します。セキュリティのためログインを拒否しました。'
+                '管理者は重複ユーザーを解消してください。',
+                email,
+            )
+            return None
 
         # UserProfile に portal_uuid を保存（以降は portal_uuid で高速検索）
         profile, _ = UserProfile.objects.get_or_create(user=user)

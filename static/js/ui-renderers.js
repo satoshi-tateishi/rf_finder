@@ -4,7 +4,17 @@
  */
 
 const UIRenderer = (function() {
-    
+
+    /**
+     * HTML 特殊文字をエスケープする（XSS対策）
+     */
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text).replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[m]));
+    }
+
     /**
      * 履歴カードの DOM 要素を生成する
      */
@@ -73,15 +83,15 @@ const UIRenderer = (function() {
                     <span class="text-[10px] text-gray-400">${item.updated_at}</span>
                 </div>
                 <div class="flex items-center gap-2 mb-1">
-                    <div class="font-bold text-gray-800 flex-1">${item.event_name || '（催事名なし）'}</div>
+                    <div class="font-bold text-gray-800 flex-1">${escapeHtml(item.event_name) || '（催事名なし）'}</div>
                     <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColor} shrink-0">${item.app_type}</span>
                 </div>
-                <div class="text-xs text-gray-500 truncate mb-2">${item.facility_names.join(', ')}</div>
+                <div class="text-xs text-gray-500 truncate mb-2">${item.facility_names.map(escapeHtml).join(', ')}</div>
             </div>
             <div class="flex justify-between items-end">
                 <div class="text-[10px] text-gray-400 ${contentOpacity}">
-                    <div>現地使用者: ${item.user_name}</div>
-                    <div class="mt-0.5">申請者&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${item.sender_name}</div>
+                    <div>現地使用者: ${escapeHtml(item.user_name)}</div>
+                    <div class="mt-0.5">申請者&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${escapeHtml(item.sender_name)}</div>
                 </div>
                 <button class="preview-btn text-[10px] font-bold text-blue-600 border border-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors bg-white shrink-0">
                     <i class="fa-solid fa-eye"></i> プレビュー
@@ -140,10 +150,10 @@ const UIRenderer = (function() {
         div.innerHTML = `
             <div class="flex items-center gap-2 mb-1">
                 <span class="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">${index + 1}</span>
-                <span class="font-bold text-sm text-gray-800">${facility.name}</span>
+                <span class="font-bold text-sm text-gray-800">${escapeHtml(facility.name)}</span>
             </div>
             <div class="ml-7 mb-3 flex items-center gap-2">
-                <span class="channel-display text-[10px] text-blue-600 font-medium">使用チャンネル : ${formattedChannels}</span>
+                <span class="channel-display text-[10px] text-blue-600 font-medium">使用チャンネル : ${escapeHtml(formattedChannels)}</span>
                 <button class="change-channels-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-400 text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-center gap-1.5">
                     <i class="fa-solid fa-pen-to-square fa-xs"></i> 変更
                 </button>
@@ -190,19 +200,19 @@ const UIRenderer = (function() {
         const section = document.createElement('div');
         section.className = 'bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500';
         
-        const categoryBadge = facility.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${facility.category}</span>` : '';
-        const areaBadge = facility.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${facility.applied_area}</span>` : '';
-        const zipDisplay = facility.postal_code ? `<span class="mr-1">〒${facility.postal_code}</span>` : '';
+        const categoryBadge = facility.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${escapeHtml(facility.category)}</span>` : '';
+        const areaBadge = facility.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${escapeHtml(facility.applied_area)}</span>` : '';
+        const zipDisplay = facility.postal_code ? `<span class="mr-1">〒${escapeHtml(facility.postal_code)}</span>` : '';
 
         section.innerHTML = `
             <div class="mb-4 flex justify-between items-start">
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-1 flex-wrap">
-                        <span class="font-bold text-sm text-gray-800">${facility.name}</span>
+                        <span class="font-bold text-sm text-gray-800">${escapeHtml(facility.name)}</span>
                         ${categoryBadge}
                         ${areaBadge}
                     </div>
-                    <div class="text-[10px] text-gray-400">${zipDisplay}${facility.address}</div>
+                    <div class="text-[10px] text-gray-400">${zipDisplay}${escapeHtml(facility.address)}</div>
                 </div>
                 <button id="wsm-btn-${facility.id}" class="wsm-btn bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold py-1.5 px-3 rounded shadow-sm transition-colors flex items-center gap-1 shrink-0 opacity-50 cursor-not-allowed bg-gray-400" disabled>
                     <i class="fa-solid fa-file-csv"></i> WSM CSV
@@ -288,9 +298,9 @@ const UIRenderer = (function() {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100';
         
-        const categoryBadge = facility.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${facility.category}</span>` : '';
-        const areaBadge = facility.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${facility.applied_area}</span>` : '';
-        const zipDisplay = facility.postal_code ? `<span class="mr-1">〒${facility.postal_code}</span>` : '';
+        const categoryBadge = facility.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${escapeHtml(facility.category)}</span>` : '';
+        const areaBadge = facility.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${escapeHtml(facility.applied_area)}</span>` : '';
+        const zipDisplay = facility.postal_code ? `<span class="mr-1">〒${escapeHtml(facility.postal_code)}</span>` : '';
 
         div.innerHTML = `
             <div class="drag-handle text-gray-400 cursor-grab active:cursor-grabbing px-1 py-2">
@@ -302,11 +312,11 @@ const UIRenderer = (function() {
             <div class="flex-1 min-w-0">
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-1 flex-wrap">
-                        <span class="font-bold text-sm text-gray-800">${facility.name}</span>
+                        <span class="font-bold text-sm text-gray-800">${escapeHtml(facility.name)}</span>
                         ${categoryBadge}
                         ${areaBadge}
                     </div>
-                    <div class="text-[10px] text-gray-400">${zipDisplay}${facility.address}</div>
+                    <div class="text-[10px] text-gray-400">${zipDisplay}${escapeHtml(facility.address)}</div>
                 </div>
             </div>
             <button class="remove-btn text-gray-300 hover:text-red-500 shrink-0">
@@ -323,6 +333,7 @@ const UIRenderer = (function() {
     }
 
     return {
+        escapeHtml,
         createHistoryCard,
         createFacilityFormItem,
         createFacilitySection,

@@ -98,6 +98,20 @@ class ListAdjustmentsTest(TestCase):
         self.assertEqual(results[0]['parent_id'], self.adj1.id)
         child.delete()
 
+    def test_limit_respected_via_setting(self):
+        """ADJUSTMENT_LIST_LIMIT 設定が一覧件数の上限として機能すること"""
+        # 既存2件に加え3件追加して合計5件
+        for i in range(3):
+            OperationAdjustment.objects.create(
+                user=self.user, app_type='new', user_name=f'追加{i}', event_name=f'追加催事{i}', status='draft'
+            )
+
+        with self.settings(ADJUSTMENT_LIST_LIMIT=3):
+            response = self.client.get(reverse('adjustments:list_adjustments'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['data']), 3)
+
 
 class GetAdjustmentTest(TestCase):
     def setUp(self):

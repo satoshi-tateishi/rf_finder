@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpResponse
@@ -82,8 +83,9 @@ def list_adjustments(request):
     if status in (STATUS_DRAFT, STATUS_SUBMITTED):
         queryset = queryset.filter(status=status)
 
+    limit = getattr(settings, 'ADJUSTMENT_LIST_LIMIT', 20)
     results = []
-    for adj in queryset[:20]:
+    for adj in queryset[:limit]:
         results.append(
             {
                 'id': adj.id,

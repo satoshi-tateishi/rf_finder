@@ -69,19 +69,21 @@ function renderBackupList(backups) {
     backups.forEach(backup => {
         const div = document.createElement('div');
         div.className = 'flex items-center justify-between p-2 border-b border-gray-100 last:border-0 hover:bg-gray-50';
-        
+
         const sizeMb = (backup.size / (1024 * 1024)).toFixed(2);
         const dateDisplay = backup.server_modified;
+        const esc = UIRenderer.escapeHtml;
 
         div.innerHTML = `
             <div class="flex-1 min-w-0">
-                <div class="text-[11px] font-bold text-gray-700 truncate">${backup.name}</div>
-                <div class="text-[9px] text-gray-400">${dateDisplay} (${sizeMb} MB)</div>
+                <div class="text-[11px] font-bold text-gray-700 truncate">${esc(backup.name)}</div>
+                <div class="text-[9px] text-gray-400">${esc(dateDisplay)} (${sizeMb} MB)</div>
             </div>
-            <button onclick="confirmRestore('${backup.path}', '${backup.name}')" class="ml-2 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold transition-colors">
+            <button class="restore-btn ml-2 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold transition-colors">
                 復元
             </button>
         `;
+        div.querySelector('.restore-btn').addEventListener('click', () => confirmRestore(backup.path, backup.name));
         list.appendChild(div);
     });
 }
@@ -159,11 +161,12 @@ function renderAuditLogs(logs) {
         return;
     }
 
+    const esc = UIRenderer.escapeHtml;
     list.innerHTML = '';
     logs.forEach(log => {
         const div = document.createElement('div');
         div.className = 'p-3 rounded-lg border border-gray-100 shadow-sm bg-white hover:bg-gray-50 transition-all';
-        
+
         let actionColor = 'bg-gray-100 text-gray-600';
         if (log.action === 'LOGIN') actionColor = 'bg-green-100 text-green-700';
         if (log.action === 'LOGIN_FAILED') actionColor = 'bg-red-100 text-red-700';
@@ -172,13 +175,13 @@ function renderAuditLogs(logs) {
 
         div.innerHTML = `
             <div class="flex justify-between items-start mb-1">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${actionColor}">${log.action}</span>
-                <span class="text-[10px] text-gray-400">${log.timestamp}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${actionColor}">${esc(log.action)}</span>
+                <span class="text-[10px] text-gray-400">${esc(log.timestamp)}</span>
             </div>
-            <div class="text-sm font-medium text-gray-800 mb-1">${log.description}</div>
+            <div class="text-sm font-medium text-gray-800 mb-1">${esc(log.description)}</div>
             <div class="flex justify-between text-[10px] text-gray-500">
-                <span>ユーザー: ${log.user_display || log.user}</span>
-                <span>IP: ${log.ip_address || '---'}</span>
+                <span>ユーザー: ${esc(log.user_display || log.user)}</span>
+                <span>IP: ${esc(log.ip_address || '---')}</span>
             </div>
         `;
         list.appendChild(div);
@@ -354,21 +357,22 @@ window.addEventListener('DOMContentLoaded', () => {
                 const data = await Api.searchFacilities(q);
                 resultsDiv.innerHTML = '';
                 if (data.results && data.results.length > 0) {
+                    const esc = UIRenderer.escapeHtml;
                     data.results.forEach(f => {
                         const item = document.createElement('div');
                         item.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0';
-                        const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${f.category}</span>` : '';
-                        const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${f.applied_area}</span>` : '';
-                        const zipDisplay = f.postal_code ? `<span class="mr-1">〒${f.postal_code}</span>` : '';
-                        
+                        const categoryBadge = f.category ? `<span class="bg-gray-100 text-gray-600 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">${esc(f.category)}</span>` : '';
+                        const areaBadge = f.applied_area ? `<span class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap">${esc(f.applied_area)}</span>` : '';
+                        const zipDisplay = f.postal_code ? `<span class="mr-1">〒${esc(f.postal_code)}</span>` : '';
+
                         item.innerHTML = `
                             <div class="flex flex-col gap-1">
                                 <div class="flex items-center gap-1 flex-wrap">
-                                    <span class="font-bold text-sm text-gray-800">${f.name}</span>
+                                    <span class="font-bold text-sm text-gray-800">${esc(f.name)}</span>
                                     ${categoryBadge}
                                     ${areaBadge}
                                 </div>
-                                <div class="text-[10px] text-gray-400">${zipDisplay}${f.address}</div>
+                                <div class="text-[10px] text-gray-400">${zipDisplay}${esc(f.address)}</div>
                             </div>
                         `;
                         item.onclick = () => addToKeepList(f);

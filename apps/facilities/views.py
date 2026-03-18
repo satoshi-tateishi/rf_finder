@@ -40,7 +40,8 @@ def facility_search(request):
     if len(q) < 2:
         return api_success({'results': []})
 
-    facilities = Facility.objects.filter(name__icontains=q)[:20]
+    limit = getattr(settings, 'FACILITY_SEARCH_LIMIT', 20)
+    facilities = Facility.objects.filter(name__icontains=q)[:limit]
     results = [
         {
             'id': f.id,
