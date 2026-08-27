@@ -32,11 +32,11 @@
 #### デプロイ手順（サーバー側で自動実行）
 
 1. `git reset --hard origin/release` で最新コードを取得
-2. `docker compose -f docker-compose.prod.yml up -d --build` でコンテナ再構築
-3. `manage.py migrate` でDBマイグレーション
-4. `manage.py collectstatic` で静的ファイルを `static_root/` に集約
-5. `static_root/` の所有権を `www-data` に変更（Apache が読み取れるよう設定）
-6. 秘密鍵・`.env` のパーミッションをセキュアに設定 (`600`)
+2. 秘密鍵・`.env` のパーミッションをセキュアに設定 (`600`)
+3. `docker compose -f docker-compose.prod.yml up -d --build --wait` でコンテナを再構築し、healthcheck完了まで待機
+4. コンテナ起動時に `manage.py migrate` と `manage.py collectstatic` を各1回実行
+
+本番イメージはmulti-stage buildを使用し、テストツールとコンパイラを含めない。LINE WORKS秘密鍵はイメージへコピーせず、Compose secretとして `/run/secrets/line_works_private_key` にマウントする。
 
 #### 必要な GitHub Secrets
 

@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -40,7 +40,7 @@ jobs:
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
@@ -48,15 +48,18 @@ jobs:
           sudo apt-get install -y default-libmysqlclient-dev pkg-config
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run Tests
         env:
@@ -68,7 +71,7 @@ jobs:
           pytest --cov --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
@@ -84,7 +87,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.0
@@ -94,35 +97,20 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 56834
           script: |
+            # appleboy/ssh-actionの既定シェル（POSIX sh）で、途中エラーを即時検知する
+            set -eu
             cd ${{ secrets.DEPLOY_PATH }}
 
-            # 1. パーミッションの一時的な修正（git操作のため）
-            sudo chown -R $USER:$USER .
-
-            # 2. 最新コードの取得
-            GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git fetch origin
+            # 1. 最新コードの取得
+            GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git fetch --prune origin release
             git reset --hard origin/release
 
-            # 3. Dockerコンテナの起動・ビルド
-            docker compose -f docker-compose.prod.yml up -d --build
+            # 2. Compose secretと環境変数ファイルをデプロイユーザーだけが読めるようにする
+            test -f .env
+            test -f keys/line_works_private_key.key
+            chmod 600 .env keys/line_works_private_key.key
 
-            # 4. データベースマイグレーション
-            docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
-
-            # 5. 静的ファイルの集約（static_rootディレクトリへの集約）
-            # コンテナ内の /code/static_root がホストの static_root に同期されます
-            docker compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput --clear
-
-            # 6. Apache（www-data）がファイルを読み取れるように権限を設定
-            # static_root 全体の所有権を Apache ユーザーに変更し、適切なパーミッションを付与
-            sudo chown -R www-data:www-data static_root
-            sudo chmod -R 755 static_root
-
-            # 7. セキュリティ設定: 各種ファイルのパーミッション修正
-            if [ -f keys/line_works_private_key.key ]; then
-              sudo chmod 600 keys/line_works_private_key.key
-              sudo chown www-data:www-data keys/line_works_private_key.key
-            fi
-            sudo chmod 600 .env
+            # 3. migrate/collectstaticはコンテナ起動コマンド内で一度だけ実行する
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 180
 
             echo "Deployment completed successfully!"

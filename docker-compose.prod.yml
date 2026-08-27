@@ -32,13 +32,19 @@ services:
       start_period: 30s
 
   web:
-    build: .
+    build:
+      context: .
+      target: production
     container_name: rf_finder_web
     command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:80 --workers 3"
     ports:
       - '${APP_PORT:-8085}:80'
     env_file:
       - .env
+    environment:
+      LINE_WORKS_PRIVATE_KEY_PATH: /run/secrets/line_works_private_key
+    secrets:
+      - line_works_private_key
     depends_on:
       db:
         condition: service_healthy
@@ -51,6 +57,12 @@ services:
     networks:
       - rf_network
       - shin-on-internal   # apache-gateway からのリバースプロキシを受け付けるために追加
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 80), 5).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 networks:
   rf_network:
@@ -60,3 +72,7 @@ networks:
 
 volumes:
   mysql_data:
+
+secrets:
+  line_works_private_key:
+    file: ./keys/line_works_private_key.key

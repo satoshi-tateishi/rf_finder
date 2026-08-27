@@ -30,7 +30,9 @@ services:
       start_period: 30s
 
   web:
-    build: .
+    build:
+      context: .
+      target: development
     container_name: rf_finder_web_dev
     # 開発環境はボリュームマウント(.:/code)のため root で実行
     user: root
