@@ -111,6 +111,10 @@ jobs:
             chmod 600 .env
 
             # 3. migrate/collectstaticはコンテナ起動コマンド内で一度だけ実行する
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 180
+            if ! docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 180; then
+              docker compose -f docker-compose.prod.yml ps
+              docker compose -f docker-compose.prod.yml logs --no-color --tail=200 web
+              exit 1
+            fi
 
             echo "Deployment completed successfully!"

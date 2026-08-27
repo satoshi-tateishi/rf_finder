@@ -16,7 +16,8 @@ RUN pip install --no-cache-dir --prefix=/install -r /tmp/requirements.txt
 FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HOME=/home/appuser
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-mysql-client \
@@ -34,6 +35,7 @@ COPY --from=builder /install/ /usr/local/
 
 WORKDIR /code
 COPY --chown=appuser:appgroup . /code/
+RUN chown appuser:appgroup /code
 
 USER appuser
 
