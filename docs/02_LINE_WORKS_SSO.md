@@ -10,7 +10,7 @@
 ```
 ① ユーザーが http://localhost:8084/ にアクセス（未認証）
        ↓ login_required → login_view
-② http://localhost/login/?next=http://localhost:8084/
+② http://localhost:8000/login/?next=http://localhost:8084/
        ↓ Portal で LINE WORKS SSO + OTP 認証
 ③ http://localhost:8084/  ← 元の URL に戻る
        ↓ PortalJWTMiddleware が portal_jwt クッキーを検証

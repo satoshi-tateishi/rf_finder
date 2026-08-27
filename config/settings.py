@@ -193,10 +193,10 @@ DROPBOX_REDIRECT_URI = env('DROPBOX_REDIRECT_URI', default='http://localhost:808
 
 # shin•on Portal JWT 連携設定
 # PortalJWTMiddleware が portal_jwt クッキーを検証するために使用する
-PORTAL_JWKS_URL = env('PORTAL_JWKS_URL', default='http://localhost/api/jwks/')
+PORTAL_JWKS_URL = env('PORTAL_JWKS_URL', default='http://portal-app:8000/api/jwks/')
 PORTAL_JWT_ISSUER = env('PORTAL_JWT_ISSUER', default='https://portal.shin-on1981.com')
 PORTAL_JWT_AUDIENCE = env('PORTAL_JWT_AUDIENCE', default='shin-on-apps')
-# 未認証時のリダイレクト先（開発: http://localhost/login/ / 本番: https://portal.shin-on1981.com/login/）
+# 未認証時のリダイレクト先（開発: http://localhost:8000/login/ / 本番: https://portal.shin-on1981.com/login/）
 PORTAL_LOGIN_URL = env('PORTAL_LOGIN_URL', default='https://portal.shin-on1981.com/login/')
 # ポータルトップURL（PORTAL_LOGIN_URL からパスを除いたベースURL）
 PORTAL_URL = '/'.join(PORTAL_LOGIN_URL.split('/')[:3]) + '/'

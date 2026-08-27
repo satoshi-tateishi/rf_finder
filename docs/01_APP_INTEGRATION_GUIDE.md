@@ -18,7 +18,7 @@ RF Finder での実装・デバッグ経験を元に、**ハマりポイント�
   │  login_required → /auth/login/?next=/path/
   │
   ├─② ポータルログイン画面へリダイレクト
-  │   http://localhost/login/?next=http://localhost:8084/path/
+  │   http://localhost:8000/login/?next=http://localhost:8084/path/
   │
 [shin•on Portal]
   │  LINE WORKS SSO → OTP 検証
@@ -222,7 +222,7 @@ PORTAL_JWT_ISSUER=https://portal.shin-on1981.com
 PORTAL_JWT_AUDIENCE=shin-on-apps
 
 # ポータルのログインページ URL（連携アプリが未認証時にリダイレクトする先）
-PORTAL_LOGIN_URL=http://localhost/login/
+PORTAL_LOGIN_URL=http://localhost:8000/login/
 ```
 
 ### ポータル側（.env）
