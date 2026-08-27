@@ -36,7 +36,7 @@
 3. `docker compose -f docker-compose.prod.yml up -d --build --wait` でコンテナを再構築し、healthcheck完了まで待機
 4. コンテナ起動時に `manage.py migrate` と `manage.py collectstatic` を各1回実行
 
-本番イメージはmulti-stage buildを使用し、テストツールとコンパイラを含めない。LINE WORKS秘密鍵はイメージへコピーせず、Compose secretとして `/run/secrets/line_works_private_key` にマウントする。
+本番イメージはmulti-stage buildを使用し、テストツールとコンパイラを含めない。LINE WORKS秘密鍵はイメージへコピーせず、Compose secretから起動時に `/run/rf_finder/line_works_private_key` へコピーした後、非rootユーザーでアプリを実行する。
 
 #### 必要な GitHub Secrets
 

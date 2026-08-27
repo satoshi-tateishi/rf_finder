@@ -108,7 +108,7 @@ jobs:
             # 2. Compose secretと環境変数ファイルをデプロイユーザーだけが読めるようにする
             test -f .env
             test -f keys/line_works_private_key.key
-            chmod 600 .env keys/line_works_private_key.key
+            chmod 600 .env
 
             # 3. migrate/collectstaticはコンテナ起動コマンド内で一度だけ実行する
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 180

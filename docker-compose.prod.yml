@@ -42,7 +42,7 @@ services:
     env_file:
       - .env
     environment:
-      LINE_WORKS_PRIVATE_KEY_PATH: /run/secrets/line_works_private_key
+      LINE_WORKS_PRIVATE_KEY_PATH: /run/rf_finder/line_works_private_key
     secrets:
       - line_works_private_key
     depends_on:
