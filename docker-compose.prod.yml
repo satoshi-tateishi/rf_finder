@@ -55,8 +55,10 @@ services:
         reservations:
           memory: 128M
     networks:
-      - rf_network
-      - shin-on-internal   # apache-gateway からのリバースプロキシを受け付けるために追加
+      rf_network:
+      shin-on-internal:
+        aliases:
+          - rf-finder-app
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1/healthz/', timeout=5); assert response.status == 204"]
       interval: 10s
