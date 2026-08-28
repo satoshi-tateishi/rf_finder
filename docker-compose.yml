@@ -50,6 +50,12 @@ services:
     networks:
       - rf_network
       - shin-on-internal   # portal-app:8000 へ直接アクセスするために追加
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=5); assert response.status == 204"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 networks:
   rf_network:

@@ -15,6 +15,14 @@ from .models import AuditLog, DropboxToken, UserProfile
 from .utils import is_admin, katakana_to_hiragana, log_action, normalize_phonetic
 
 
+class HealthcheckTest(TestCase):
+    def test_healthcheckは認証なしで空の204を返す(self):
+        response = self.client.get(reverse('healthcheck'))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.content, b'')
+
+
 class AuditLogTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')

@@ -2,8 +2,10 @@ from django.contrib import admin
 from django.urls import include, path
 
 from apps.facilities import views as facility_views
+from config import views as config_views
 
 urlpatterns = [
+    path('healthz/', config_views.healthcheck, name='healthcheck'),
     path('admin/', admin.site.urls),
     path('', facility_views.index, name='index'),               # メイン画面（SPA）
     path('api/facilities/', include('apps.facilities.urls')),   # 施設検索・詳細 API

@@ -49,6 +49,9 @@
 
 ## Docker Compose ファイルの使い分け
 
+Webコンテナの軽量な応答確認には、認証不要で本文なしの204を返す `GET /healthz/` を使用する。
+Composeのhealthcheckも同URLを確認し、単なるTCP接続ではなくDjangoのHTTP応答を検証する。
+
 **`docker compose` コマンド実行時は必ずファイルを明示すること。** ファイルを省略すると dev 用（`docker-compose.yml`）が使われ、本番サイトが停止する。
 
 | ファイル | 用途 | 起動コマンド |
